@@ -3,6 +3,8 @@ from tkinter import filedialog, messagebox
 import json
 import os
 import time
+import shutil
+
 
 DATA_FILE = "Papyrusdata.json"
 
@@ -57,7 +59,7 @@ class PapyrusApp:
         scrollbar.pack(side="right", fill="y")
 
         self.content_text = tk.Text(self.card_frame, font=("微软雅黑", 13), wrap="word", 
-                                    bg="#f5f5f5", relief="flat", padx=15, pady=15,
+                                    bg="#fdf6e3",fg="#5d4037", relief="flat", padx=15, pady=15,
                                     state="disabled", yscrollcommand=scrollbar.set)
         self.content_text.bind("<Button-1>", lambda e: "break")   
         self.content_text.pack(side="left", fill="both", expand=True)
@@ -77,6 +79,8 @@ class PapyrusApp:
         data_menu.add_separator()
         data_menu.add_command(label="删除当前卡片", command=self.delete_current_card)
         data_menu.add_command(label="[危险] 重置所有进度", command=self.reset_data)
+        data_menu.add_command(label="创建备份", command=self.create_backup)
+        data_menu.add_command(label="从备份恢复", command=self.restore_backup)
         # 搜 重置所有进度，在它下面加
         data_menu.add_separator()
         data_menu.add_command(label="关于", command=self.show_about)
@@ -102,12 +106,20 @@ class PapyrusApp:
             self.cards = []
 
      if not self.cards: return
-
+    def create_backup(self):
+        if not os.path.exists(DATA_FILE):
+            messagebox.showinfo("", "没有数据文件可备份")
+            return
+        shutil.copy(DATA_FILE, DATA_FILE + ".bak")
+        messagebox.showinfo("", "备份成功")
 
 
     def save_data(self):
         with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(self.cards, f, ensure_ascii=False, indent=2)
+        if self.cards:
+            shutil.copy(DATA_FILE, DATA_FILE + ".bak")
+
 
     def get_due_cards(self):
         # 核心修复：只筛选时间到了的卡片
@@ -141,7 +153,7 @@ class PapyrusApp:
 
     def show_answer(self):
         if self.current_card_index == -1 or self.is_showing_answer: return
-        
+        self.answer_shown_time = time.time()  # 加这一行
         card = self.cards[self.current_card_index]
         full_text = f"\n\n【卷头】\n\n{card['q']}\n\n" + "-"*35 + f"\n\n【卷尾】\n\n{card['a']}\n\n"
         self.set_text(full_text)
@@ -153,7 +165,7 @@ class PapyrusApp:
 
     def rate_card(self, grade):
         if self.current_card_index == -1: return
-        
+        if time.time() - getattr(self, 'answer_shown_time', 0) < 0.5: return 
         card = self.cards[self.current_card_index]
         now = time.time()
         
@@ -195,7 +207,11 @@ class PapyrusApp:
                     p=b.split("===")
                     if len(p)>=2: self.cards.append({"q":p[0].strip(),"a":p[1].strip(),"next_review":0,"interval":0}); count+=1
             self.save_data(); self.next_card()
+            if count == 0:
+                messagebox.showwarning("", "未找到有效卡片，请确认格式为：\n题目===答案")
+                return
             top = tk.Toplevel(self.root)
+
             top.title(f"导入成功，共 {count} 张")
             top.geometry("400x400")
             scrollbar = tk.Scrollbar(top)
@@ -215,12 +231,27 @@ class PapyrusApp:
             del self.cards[self.current_card_index]; self.save_data(); self.current_card_index=-1; self.next_card()
 
     def reset_data(self):
-        if messagebox.askyesno("","清空所有数据？"): self.cards=[]; self.save_data(); self.next_card()
+        if messagebox.askyesno("","清空所有数据？"): 
+            self.cards=[]
+            self.save_data()  # 这里 save_data 会自动覆盖备份
+            self.next_card()
+
     def show_about(self):
         messagebox.showinfo("关于 Papyrus", "Papyrus v1.0.0\n一款极简的卷轴式学习工具\n\n开发者：[ALPACA LI]\n© 2026 Papyrus")
 
     def update_status(self, count):
         self.status_var.set(f"待复习: {count} | 总卡片: {len(self.cards)}")
+    def restore_backup(self):
+        bak_file = DATA_FILE + ".bak"
+        if not os.path.exists(bak_file):
+            messagebox.showinfo("", "没有找到备份文件")
+            return
+        if messagebox.askyesno("", "确认从备份恢复？当前数据将被覆盖。"):
+            shutil.copy(bak_file, DATA_FILE)
+            self.load_data()
+            self.next_card()
+            messagebox.showinfo("", "恢复成功")
+
 
 import traceback
 
