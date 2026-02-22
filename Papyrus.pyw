@@ -4,15 +4,20 @@ import json
 import os
 import time
 import shutil
-
+import sys
 
 DATA_FILE = "Papyrusdata.json"
+
+def resource_path(relative_path):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return relative_path
 
 class PapyrusApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Papyrus")
-        self.root.iconbitmap("icon.ico")
+        self.root.iconbitmap(resource_path("icon.ico"))
         self.root.geometry("600x600")
         
         self.cards = []
@@ -22,6 +27,13 @@ class PapyrusApp:
         self.load_data()
         self.setup_ui()
         self.next_card()
+        
+
+    def resource_path(relative_path):
+        if hasattr(sys, '_MEIPASS'):
+            return os.path.join(sys._MEIPASS, relative_path)
+        return relative_path
+
 
     def setup_ui(self):
         # 1. 顶部状态栏
@@ -98,14 +110,14 @@ class PapyrusApp:
         self.content_text.config(state="disabled") # 上锁
 
     def load_data(self):
-     if os.path.exists(DATA_FILE):
-        try:
-            with open(DATA_FILE, "r", encoding="utf-8") as f:
-                self.cards = json.load(f)
-        except (json.JSONDecodeError, ValueError):
-            self.cards = []
+        if os.path.exists(DATA_FILE):
+            try:
+                with open(DATA_FILE, "r", encoding="utf-8") as f:
+                    self.cards = json.load(f)
+            except (json.JSONDecodeError, ValueError):
+                self.cards = []
+        if not self.cards: return
 
-     if not self.cards: return
     def create_backup(self):
         if not os.path.exists(DATA_FILE):
             messagebox.showinfo("", "没有数据文件可备份")
