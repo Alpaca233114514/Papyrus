@@ -515,6 +515,7 @@ class SettingsWindow:
         self.update_model_list()
     
     def save_all(self):
+        # 保存API配置
         for provider in self.config.config["providers"].keys():
             if f"{provider}_api_key" in self.api_entries:
                 self.config.config["providers"][provider]["api_key"] = \
@@ -523,15 +524,37 @@ class SettingsWindow:
                 self.config.config["providers"][provider]["base_url"] = \
                     self.api_entries[f"{provider}_base_url"].get()
         
+        # 保存参数设置
         if hasattr(self, "temperature_var"):
             self.config.config["parameters"]["temperature"] = self.temperature_var.get()
         if hasattr(self, "max_tokens_var"):
             self.config.config["parameters"]["max_tokens"] = int(self.max_tokens_var.get())
         
-        self.config.save_config()
+        # 保存当前选择的提供商
+        new_provider = self.provider_var.get()
+        self.config.config["current_provider"] = new_provider
         
-        if self.callback:
-            self.callback()
+        # 验证并更新当前模型
+        current_model = self.config.config["current_model"]
+        available_models = self.config.config["providers"][new_provider]["models"]
         
-        messagebox.showinfo("成功", "设置已保存")
-        self.window.destroy()
+        # 如果当前模型不在新提供商的模型列表中，使用第一个可用模型
+        if not available_models:
+            messagebox.showwarning("警告", f"提供商 '{new_provider}' 没有可用模型，请先添加模型")
+            return
+        
+        if current_model not in available_models:
+            self.config.config["current_model"] = available_models[0]
+            messagebox.showinfo("提示", f"已自动切换到模型: {available_models[0]}")
+        
+        # 保存配置到文件
+        try:
+            self.config.save_config()
+            
+            if self.callback:
+                self.callback()
+            
+            messagebox.showinfo("成功", "设置已保存")
+            self.window.destroy()
+        except Exception as e:
+            messagebox.showerror("错误", f"保存设置失败: {str(e)}")
