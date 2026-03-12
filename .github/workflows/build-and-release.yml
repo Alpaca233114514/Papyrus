@@ -1,4 +1,5 @@
 name: Smart Build & Conditional Release
+
 on:
   push:
     branches:
@@ -20,12 +21,11 @@ jobs:
     strategy:
       matrix:
         include:
-          # 只保留两个平台
           - platform: "Windows x86_64"
             os: windows-latest
             artifact_name: "windows-x86_64"
           - platform: "macOS Apple Silicon"
-            os: macos-latest  # 默认是 ARM64 (M1/M2/M3)
+            os: macos-latest
             artifact_name: "macos-arm64"
           - platform: "Linux x86_64"
             os: ubuntu-latest
@@ -35,27 +35,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2  # 获取最近两次提交，用于检测文件变化
-
-      # 检测本次提交是否修改了 src/ 目录或构建配置
-      - name: Check if src/ or build config was modified
-        id: check_src
-        run: |
-          # 检查是否有前一次提交（避免第一次提交时出错）
-          if git rev-parse HEAD~1 >/dev/null 2>&1; then
-            if git diff --name-only HEAD~1 HEAD | grep -qE '^(src/|Papyrus\.spec)'; then
-              echo "src_changed=true" >> $GITHUB_OUTPUT
-              echo "✅ src/ or build config was modified"
-            else
-              echo "src_changed=false" >> $GITHUB_OUTPUT
-              echo "ℹ️ src/ and build config were NOT modified"
-            fi
-          else
-            # 第一次提交，默认认为有变化
-            echo "src_changed=true" >> $GITHUB_OUTPUT
-            echo "✅ First commit, treating as modified"
-          fi
-        shell: bash
+          fetch-depth: 2
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -64,35 +44,22 @@ jobs:
           cache: 'pip'
 
       - name: Install Dependencies
+        shell: bash
         run: |
           pip install pyinstaller
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        shell: bash
 
       - name: Build Application
+        shell: bash
         run: |
           pyinstaller Papyrus.spec
-        shell: bash
 
-      # 总是上传到 Artifacts（无论是否修改了 src/）
       - name: Upload to Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
           path: dist/*
 
-      # 将检测结果传递给下一个 job
-      - name: Save src change status
-        run: echo "${{ steps.check_src.outputs.src_changed }}" > src_status.txt
-        shell: bash
-
-      - name: Upload src status
-        uses: actions/upload-artifact@v4
-        with:
-          name: src-status-${{ matrix.artifact_name }}
-          path: src_status.txt
-
-    # 只有当 src/ 或构建配置被修改时，才执行这个 release 任务
   release:
     name: Publish to Release
     needs: build
@@ -101,60 +68,27 @@ jobs:
       contents: write
 
     steps:
-      # 下载所有构建产物
       - name: Download All Build Artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-            # 检查是否有任何一个平台检测到代码变化
-      - name: Check if should release
-        id: should_release
-        run: |
-          # 检查任意一个 src_status.txt 文件内容是否为 true
-          if grep -q "true" artifacts/src-status-*/src_status.txt 2>/dev/null; then
-            echo "release=true" >> $GITHUB_OUTPUT
-            echo "✅ Will create release (code was modified)"
-          else
-            echo "release=false" >> $GITHUB_OUTPUT
-            echo "⏭️ Skipping release (src/ was not modified)"
-          fi
-        shell: bash
-
       - name: Generate Version Tag
-        if: steps.should_release.outputs.release == 'true'
         id: version
+        shell: bash
         run: echo "tag=v$(date +'%Y.%m.%d-%H%M%S')" >> $GITHUB_OUTPUT
 
-            # 只有当代码被修改时才创建 Release
       - name: Create GitHub Release
-        if: steps.should_release.outputs.release == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: "Release ${{ steps.version.outputs.tag }}"
-          body: |
-            🚀 **自动发布** - src/ 目录有更新
-            
-            **支持平台：**
-            - ✅ Windows x86_64
-                        - ✅ macOS Apple Silicon (M1/M2/M3)
-            - ✅ Linux x86_64
-            
-            **下载说明：**
-            选择对应平台的文件下载即可直接运行
+          name: ${{ steps.version.outputs.tag }}
+          body: ""
           files: |
             artifacts/windows-x86_64/*
             artifacts/macos-arm64/*
             artifacts/linux-x86_64/*
           draft: false
-          prerelease: false  # 改为正式版本
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-            # 如果没有修改代码，输出提示信息
-      - name: Skip Release Notice
-        if: steps.should_release.outputs.release == 'false'
-        run: |
-          echo "ℹ️ Release skipped because code was not modified."
-          echo "📦 Build artifacts are available in the Actions tab."
