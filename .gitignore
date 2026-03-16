@@ -212,5 +212,46 @@ __marimo__/
 data/
 backup/
 
+# --- Node.js / Frontend ---
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+.eslintcache
+*.log
+
+# --- Python ---
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Environment ---
+.env
+.env.local
+
 # Build artifacts are already covered by dist/ and build/ above
 # Keep assets/ for icon and resources
