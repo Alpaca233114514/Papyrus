@@ -111,6 +111,10 @@ body[arco-theme='dark'] .chat-input-area {
   color: var(--color-text-1);
 }
 
+.chat-toolbar-btn-dark {
+  color: var(--color-text-1);
+}
+
 .chat-mode-btn {
   display: flex;
   align-items: center;
@@ -147,13 +151,25 @@ body[arco-theme='dark'] .chat-input-area {
   border: none;
   background: rgb(32, 108, 207);
   color: #fff;
-  border-radius: 8px;
+  border-radius: 50%;
   cursor: pointer;
   font-size: 16px;
 }
 
 .chat-send-btn:hover {
   background: rgb(25, 90, 180);
+}
+
+.chat-send-btn-disabled {
+  background: var(--color-fill-3) !important;
+  color: var(--color-text-3);
+  cursor: default;
+}
+
+.chat-send-btn-stop {
+  background: rgb(245, 63, 63) !important;
+  color: #fff;
+  cursor: pointer;
 }
 
 .chat-model-select {
@@ -169,15 +185,7 @@ body[arco-theme='dark'] .chat-input-area {
   gap: 8px;
 }
 
-.chat-reasoning-badge {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  color: var(--color-text-1);
-  padding: 0;
-  border-radius: 4px;
-}
+
 
 .chat-model-btn {
   display: flex;

@@ -53,6 +53,14 @@
   color: rgb(32, 108, 207);
 }
 
+.sidebar-toggle {
+  border: 1px solid var(--color-border-2);
+}
+
+.sidebar-toggle:hover {
+  border-color: rgb(32, 108, 207);
+}
+
 .sidebar-item-active::before {
   content: '';
   position: absolute;

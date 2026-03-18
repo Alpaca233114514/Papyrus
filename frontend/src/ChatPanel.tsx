@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { Dropdown, Menu } from '@arco-design/web-react';
-import { IconArrowUp, IconAt, IconImage, IconBranch, IconMessage, IconDown, IconBulb } from '@arco-design/web-react/icon';
+import { IconArrowUp, IconAt, IconImage, IconBranch, IconMessage, IconDown, IconBulb, IconRecordStop } from '@arco-design/web-react/icon';
 import './ChatPanel.css';
 
 const models = [
@@ -25,6 +25,7 @@ const ChatPanel = ({ open, width = 320 }: ChatPanelProps) => {
   const [mode, setMode] = useState('agent');
   const [model, setModel] = useState('claude-sonnet-4');
   const [reasoning, setReasoning] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [inputHeight, setInputHeight] = useState(160);
   const dragStartY = useRef<number>(0);
   const dragStartHeight = useRef<number>(0);
@@ -68,11 +69,7 @@ const ChatPanel = ({ open, width = 320 }: ChatPanelProps) => {
                 <IconDown style={{ fontSize: 12 }} />
               </button>
             </Dropdown>
-            {reasoning && (
-              <span className="chat-reasoning-badge">
-                <IconBulb />
-              </span>
-            )}
+
           </div>
         </div>
       </div>
@@ -106,8 +103,8 @@ const ChatPanel = ({ open, width = 320 }: ChatPanelProps) => {
                 <span>{currentMode.label}</span>
               </button>
             </Dropdown>
-            <button className="chat-toolbar-btn"><IconImage /></button>
-            <button className="chat-toolbar-btn"><IconAt /></button>
+            <button className="chat-toolbar-btn chat-toolbar-btn-dark"><IconImage /></button>
+            <button className="chat-toolbar-btn chat-toolbar-btn-dark"><IconAt /></button>
           </div>
           <div className="chat-toolbar-right">
             <button
@@ -117,8 +114,11 @@ const ChatPanel = ({ open, width = 320 }: ChatPanelProps) => {
             >
               <IconBulb />
             </button>
-            <button className="chat-send-btn">
-              <IconArrowUp />
+            <button
+              className={`chat-send-btn${isGenerating ? ' chat-send-btn-stop' : (!text.trim() ? ' chat-send-btn-disabled' : '')}`}
+              onClick={() => isGenerating && setIsGenerating(false)}
+            >
+              {isGenerating ? <IconRecordStop /> : <IconArrowUp />}
             </button>
           </div>
         </div>
