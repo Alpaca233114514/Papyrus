@@ -1,1 +1,1 @@
-"""UI modules for Papyrus (Tkinter)."""
+"""UI modules for Papyrus."""

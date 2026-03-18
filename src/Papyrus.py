@@ -1,9 +1,9 @@
-# SRC 
+# SRC
 """Backward-compatible entrypoint for Papyrus.
 
 The project is being modularized under `src/papyrus/`.
 This module keeps the old public import surface stable for:
-- tests (`from Papyrus import PapyrusApp, resource_path, ASSETS_DIR, ...`)
+- tests
 - `run.pyw`
 - PyInstaller build (`Papyrus.spec`)
 
@@ -13,7 +13,7 @@ Python runtime target: 3.14+
 from __future__ import annotations
 
 # Public re-exports (keep names stable)
-from papyrus.app import PapyrusApp, run_app  # noqa: F401
+from papyrus.app import run_app  # noqa: F401
 from papyrus.paths import (  # noqa: F401
     BASE_DIR,
     DATA_DIR,
