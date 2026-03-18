@@ -25,6 +25,10 @@
   height: 24px;
 }
 
+body[arco-theme="dark"] .titlebar-logo-icon {
+  filter: invert(1) brightness(1.2);
+}
+
 .titlebar-logo:hover,
 .titlebar-logo:active {
   background: var(--color-fill-2);
@@ -80,6 +84,14 @@
 .titlebar-search .arco-input-inner-wrapper:hover,
 .titlebar-search .arco-input-inner-wrapper:focus-within {
   border-color: rgb(32, 108, 207);
+}
+
+/* avatar */
+.titlebar-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
 }
 
 /* window controls */

@@ -1,4 +1,4 @@
-import { Input, Button, Space, Menu, Dropdown } from '@arco-design/web-react';
+import { Input, Button, Space, Menu, Dropdown, Avatar } from '@arco-design/web-react';
 import { IconMinus, IconExpand, IconClose, IconSearch } from '@arco-design/web-react/icon';
 import './TitleBar.css';
 
@@ -34,7 +34,10 @@ const TitleBar = () => {
         />
       </div>
 
-      {/* window controls */}
+      {/* avatar + window controls */}
+      <div className="titlebar-avatar">
+        <Avatar size={28} style={{ backgroundColor: 'rgb(32, 108, 207)', fontSize: 12, cursor: 'pointer' }}>P</Avatar>
+      </div>
       <div className="titlebar-controls">
         <button className="titlebar-btn" aria-label="最小化">
           <IconMinus />

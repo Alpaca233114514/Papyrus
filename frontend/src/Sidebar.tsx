@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Tooltip, Avatar } from '@arco-design/web-react';
-import { IconNav, IconPlayArrow, IconCommon, IconFolder, IconMindMapping, IconSettings, IconLock, IconUnlock, IconMoon, IconSun } from '@arco-design/web-react/icon';
+import { Tooltip } from '@arco-design/web-react';
+import { IconNav, IconPlayArrow, IconCommon, IconFolder, IconMindMapping, IconSettings, IconLock, IconUnlock, IconMoon, IconSun, IconRobot } from '@arco-design/web-react/icon';
 import './Sidebar.css';
 
 const items = [
@@ -14,9 +14,11 @@ const items = [
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
+  chatOpen: boolean;
+  onChatToggle: () => void;
 }
 
-const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
+const Sidebar = ({ collapsed, onToggle, chatOpen, onChatToggle }: SidebarProps) => {
   const [active, setActive] = useState('start');
   const [locked, setLocked] = useState(false);
   const [dark, setDark] = useState(() => {
@@ -51,7 +53,7 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
       {items.map((item) => (
         <Tooltip key={item.key} content={item.label} position="right" mini>
           <div
-            className={`sidebar-item${active === item.key ? ' sidebar-item-active' : ''}`}
+            className={`sidebar-item${item.key === 'sidebar' ? (!collapsed ? ' sidebar-item-active' : '') : (active === item.key ? ' sidebar-item-active' : '')}`}
             onClick={() => item.key === 'sidebar' ? onToggle() : setActive(item.key)}
           >
             {item.icon}
@@ -60,10 +62,10 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
         </Tooltip>
       ))}
       <div style={{ flex: 1 }} />
-      <Tooltip content="用户" position="right" mini>
-        <div className="sidebar-item">
-          <Avatar size={24} style={{ backgroundColor: 'rgb(32, 108, 207)', fontSize: 12 }}>P</Avatar>
-          {!collapsed && <span className="sidebar-label">用户</span>}
+      <Tooltip content="聊天" position="right" mini>
+        <div className={`sidebar-item${chatOpen ? ' sidebar-item-active' : ''}`} onClick={onChatToggle}>
+          <IconRobot />
+          {!collapsed && <span className="sidebar-label">聊天</span>}
         </div>
       </Tooltip>
       <Tooltip content={dark ? '夜间模式' : '日间模式'} position="right" mini>
