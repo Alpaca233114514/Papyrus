@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Dropdown, Menu } from '@arco-design/web-react';
 import { IconArrowUp, IconAt, IconImage, IconBranch, IconMessage, IconDown, IconBulb } from '@arco-design/web-react/icon';
 import './ChatPanel.css';
@@ -12,6 +12,7 @@ const models = [
 
 interface ChatPanelProps {
   open: boolean;
+  width?: number;
 }
 
 const modes = [
@@ -19,18 +20,36 @@ const modes = [
   { key: 'chat', icon: <IconMessage />, label: 'Chat 模式' },
 ];
 
-const ChatPanel = ({ open }: ChatPanelProps) => {
+const ChatPanel = ({ open, width = 320 }: ChatPanelProps) => {
   const [text, setText] = useState('');
   const [mode, setMode] = useState('agent');
   const [model, setModel] = useState('claude-sonnet-4');
   const [reasoning, setReasoning] = useState(false);
+  const [inputHeight, setInputHeight] = useState(160);
+  const dragStartY = useRef<number>(0);
+  const dragStartHeight = useRef<number>(0);
+
+  const onDragStart = useCallback((e: React.MouseEvent) => {
+    dragStartY.current = e.clientY;
+    dragStartHeight.current = inputHeight;
+    const onMove = (ev: MouseEvent) => {
+      const delta = dragStartY.current - ev.clientY;
+      setInputHeight(Math.min(400, Math.max(120, dragStartHeight.current + delta)));
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [inputHeight]);
 
   if (!open) return null;
 
   const currentMode = modes.find((m) => m.key === mode)!;
 
   return (
-    <div className="chat-panel">
+    <div className="chat-panel" style={{ width }}>
       <div className="chat-panel-body">
         <div className="chat-model-select">
           <div className="chat-model-row">
@@ -57,13 +76,13 @@ const ChatPanel = ({ open }: ChatPanelProps) => {
           </div>
         </div>
       </div>
-      <div className="chat-input-area">
+      <div className="chat-input-resize-handle" onMouseDown={onDragStart} />
+      <div className="chat-input-area" style={{ height: inputHeight }}>
         <textarea
           className="chat-textarea"
           placeholder="发送消息..."
           value={text}
           onChange={(e) => setText(e.target.value)}
-          rows={3}
         />
         <div className="chat-toolbar">
           <div className="chat-toolbar-left">
