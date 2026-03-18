@@ -102,6 +102,7 @@ const ChatPanel = ({ open, width = 320 }: ChatPanelProps) => {
               )}
               {msg.role === 'assistant' && (
                 <div className="chat-message-with-avatar" style={{ alignItems: 'flex-start' }}>
+                  <span className="chat-message-model-label">{models.find((m) => m.key === model)!.label}</span>
                   <div className="chat-message-bubble">{msg.content}</div>
                   <div className="chat-message-actions">
                     <Tooltip content="重新生成" mini><button className="chat-message-action-btn"><IconRefresh /></button></Tooltip>

@@ -41,6 +41,12 @@
   color: var(--color-text-1);
 }
 
+.chat-message-model-label {
+  font-size: 11px;
+  color: var(--color-text-1);
+  padding: 0 4px;
+}
+
 .chat-message-with-avatar {
   display: flex;
   flex-direction: column;
