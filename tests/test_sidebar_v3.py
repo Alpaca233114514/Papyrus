@@ -116,6 +116,23 @@ class TestModeSwitch(unittest.TestCase):
         sidebar.agent_btn.config.assert_called()
 
 
+class TestSessionActions(unittest.TestCase):
+    @patch("ai.sidebar_v3.simpledialog.askstring")
+    def test_rename_current_chat_calls_manager(self, mock_askstring):
+        sidebar = _make_sidebar()
+        sidebar.ai_manager.get_active_session_id = MagicMock(return_value="sid1")
+        sidebar.ai_manager.get_active_session_title = MagicMock(return_value="旧名称")
+        sidebar.ai_manager.rename_session = MagicMock()
+        sidebar.refresh_session_menu = MagicMock()
+        sidebar.add_message = MagicMock()
+        mock_askstring.return_value = "新名称"
+
+        sidebar.rename_current_chat()
+
+        sidebar.ai_manager.rename_session.assert_called_once_with("sid1", "新名称")
+        sidebar.refresh_session_menu.assert_called_once_with(select_active=True)
+
+
 class TestSendMessage(unittest.TestCase):
     def test_skip_when_placeholder_active(self):
         sidebar = _make_sidebar()

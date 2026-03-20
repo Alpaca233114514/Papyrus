@@ -7,6 +7,8 @@ except ImportError:
 from tkinter import messagebox, filedialog, simpledialog
 import threading
 import json
+import os
+import re
 
 class AISidebar:
     """AI侧边栏"""
@@ -18,6 +20,8 @@ class AISidebar:
         self.logger = logger
         self.is_processing = False
         self.agent_mode = tk.BooleanVar(value=True)  # Agent模式开关
+        self.pending_attachments = []
+        self.session_label_to_id = {}
         
         # 创建侧边栏容器
         self.sidebar = tk.Frame(parent, bg="#ffffff")
@@ -47,9 +51,13 @@ class AISidebar:
         btn_frame = tk.Frame(header, bg="#ffffff")
         btn_frame.pack(side="right")
         
-        tk.Button(btn_frame, text="🗑", command=self.clear_chat,
+        tk.Button(btn_frame, text="＋", command=self.new_chat,
                  bg="#f0f0f0", fg="#666666", font=("微软雅黑", 10),
                  relief="flat", width=3).pack(side="left", padx=2)
+
+        tk.Button(btn_frame, text="✎", command=self.rename_current_chat,
+             bg="#f0f0f0", fg="#666666", font=("微软雅黑", 10),
+             relief="flat", width=3).pack(side="left", padx=2)
         
         tk.Button(btn_frame, text="⚙", command=self.open_settings,
                  bg="#f0f0f0", fg="#666666", font=("微软雅黑", 10),
@@ -67,6 +75,13 @@ class AISidebar:
                                     font=("微软雅黑", 9),
                                     bg="#f8f8f8", fg="#888888")
         self.model_label.pack(side="left")
+
+        self.session_var = tk.StringVar(value="")
+        self.session_menu = tk.OptionMenu(status_bar, self.session_var, "")
+        self.session_menu.config(font=("微软雅黑", 8), bg="#ffffff", relief="flat", highlightthickness=0)
+        self.session_menu.pack(side="left", padx=(8, 0))
+
+        self.refresh_session_menu(select_active=True)
         
         self.status_label = tk.Label(status_bar, text="● 就绪",
                                      font=("微软雅黑", 9),
@@ -185,6 +200,21 @@ class AISidebar:
         input_border_container = tk.Frame(bottom_panel, bg="#f8f8f8")
         input_border_container.pack(side="top", fill="x", padx=15, pady=(0, 1))
 
+        attachment_row = tk.Frame(bottom_panel, bg="#f8f8f8")
+        attachment_row.pack(side="top", fill="x", padx=15, pady=(0, 2))
+
+        tk.Button(attachment_row,
+              text="📎 添加文件",
+              command=self.pick_attachments,
+              bg="#f0f0f0", fg="#666666", font=("微软雅黑", 9),
+              relief="flat").pack(side="left")
+
+        self.attachments_label = tk.Label(attachment_row,
+                          text="未添加附件",
+                          font=("微软雅黑", 8),
+                          bg="#f8f8f8", fg="#999999")
+        self.attachments_label.pack(side="left", padx=(8, 0))
+
         input_border = tk.Frame(input_border_container, bg="#d0d0d0", bd=1, relief="solid")
         input_border.pack(fill="x")
 
@@ -203,6 +233,137 @@ class AISidebar:
         self.chat_input.pack(fill="both", expand=True)
         self.chat_input.bind("<Return>", self.on_enter)
         self.chat_input.bind("<Shift-Return>", lambda e: None)
+        self._setup_drop_bindings()
+
+    def _setup_drop_bindings(self):
+        """绑定拖拽事件（支持 tkdnd 时可直接接收文件路径字符串）"""
+        if hasattr(self.chat_input, "drop_target_register") and hasattr(self.chat_input, "dnd_bind"):
+            try:
+                self.chat_input.drop_target_register("DND_Files")
+                self.chat_input.dnd_bind("<<Drop>>", self.on_file_drop)
+                return
+            except tk.TclError:
+                pass
+
+        for sequence in ("<<Drop>>", "<Drop>"):
+            try:
+                self.chat_input.bind(sequence, self.on_file_drop)
+            except tk.TclError:
+                continue
+
+    def refresh_session_menu(self, select_active=False):
+        """刷新会话下拉菜单"""
+        if not hasattr(self.ai_manager, "list_sessions") or not hasattr(self, "session_menu"):
+            return
+
+        sessions = self.ai_manager.list_sessions()
+        self.session_label_to_id = {}
+        menu = self.session_menu["menu"]
+        menu.delete(0, "end")
+
+        for item in sessions:
+            label = f"{item['title']} ({item['message_count']})"
+            self.session_label_to_id[label] = item["id"]
+            menu.add_command(label=label, command=tk._setit(self.session_var, label, self.on_session_change))
+
+        if not sessions:
+            self.session_var.set("")
+            return
+
+        if select_active:
+            active_id = self.ai_manager.get_active_session_id()
+            for label, sid in self.session_label_to_id.items():
+                if sid == active_id:
+                    self.session_var.set(label)
+                    break
+
+    def on_session_change(self, label):
+        """切换会话并重绘消息"""
+        session_id = self.session_label_to_id.get(label)
+        if not session_id:
+            return
+        try:
+            self.ai_manager.switch_session(session_id)
+            self.render_current_session()
+        except Exception as e:
+            self.add_message("system", f"切换会话失败: {e}")
+
+    def render_current_session(self):
+        """渲染当前会话历史"""
+        self.chat_display.config(state="normal")
+        self.chat_display.delete(1.0, "end")
+        self.chat_display.config(state="disabled")
+
+        for msg in self.ai_manager.conversation_history:
+            role = msg.get("role")
+            content = msg.get("content", "")
+            if role == "user":
+                attachments = msg.get("attachments") or []
+                if attachments:
+                    names = ", ".join([a.get("name", "") for a in attachments if a.get("name")])
+                    content = f"{content}\n[附件] {names}"
+                self.add_message("user", content)
+            elif role == "assistant":
+                self.add_message("assistant", content)
+
+    def _split_dropped_paths(self, raw):
+        """解析拖拽事件中的文件路径字符串"""
+        tokens = re.findall(r"\{[^}]+\}|\S+", (raw or "").strip())
+        paths = []
+        for token in tokens:
+            token = token.strip().strip("{}\"")
+            if token and os.path.exists(token):
+                paths.append(token)
+        return paths
+
+    def on_file_drop(self, event):
+        """处理拖拽上传"""
+        paths = self._split_dropped_paths(getattr(event, "data", ""))
+        if paths:
+            self.add_attachments(paths)
+            return "break"
+        return None
+
+    def pick_attachments(self):
+        """选择附件"""
+        paths = filedialog.askopenfilenames(
+            title="选择要发送的文件",
+            filetypes=[
+                ("支持的文件", "*.png *.jpg *.jpeg *.webp *.gif *.pdf *.txt *.md *.docx"),
+                ("图片", "*.png *.jpg *.jpeg *.webp *.gif"),
+                ("文档", "*.pdf *.txt *.md *.docx"),
+                ("所有文件", "*.*"),
+            ],
+        )
+        self.add_attachments(list(paths))
+
+    def add_attachments(self, paths):
+        """加入待发送附件队列"""
+        if not paths:
+            return
+
+        existing = {os.path.abspath(p) for p in self.pending_attachments}
+        for path in paths:
+            abs_path = os.path.abspath(path)
+            if os.path.isfile(abs_path) and abs_path not in existing:
+                self.pending_attachments.append(abs_path)
+                existing.add(abs_path)
+        self.update_attachments_label()
+
+    def clear_pending_attachments(self):
+        self.pending_attachments = []
+        self.update_attachments_label()
+
+    def update_attachments_label(self):
+        if not hasattr(self, "attachments_label"):
+            return
+        count = len(self.pending_attachments)
+        if count == 0:
+            self.attachments_label.config(text="未添加附件")
+            return
+        names = [os.path.basename(p) for p in self.pending_attachments[:2]]
+        suffix = "" if count <= 2 else f" 等{count}个"
+        self.attachments_label.config(text=f"{', '.join(names)}{suffix}")
     
     def set_mode(self, is_agent):
         """切换模式"""
@@ -274,11 +435,17 @@ class AISidebar:
             return
 
         message = self.chat_input.get("1.0", "end").strip()
-        if not message or self.is_processing:
+        if self.is_processing:
+            return
+        if not message and not self.pending_attachments:
             return
 
         self.chat_input.delete("1.0", "end")
-        self.add_message("user", message)
+        display_message = message or "[仅发送附件]"
+        if self.pending_attachments:
+            file_names = ", ".join([os.path.basename(p) for p in self.pending_attachments])
+            display_message = f"{display_message}\n[附件] {file_names}"
+        self.add_message("user", display_message)
 
         self.is_processing = True
         self.status_label.config(text="● 思考中...", fg="#ff9800")
@@ -301,9 +468,11 @@ class AISidebar:
                     "message_len": len(message),
                     "agent_mode": agent_mode,
                     "has_card": card is not None,
+                    "attachments": len(self.pending_attachments),
                 })
 
-                response = self.ai_manager.chat(message, system_prompt=system_prompt)
+                attachments = list(self.pending_attachments)
+                response = self.ai_manager.chat(message, system_prompt=system_prompt, attachments=attachments)
                 elapsed = round(time.time() - start, 4)
                 self._log_event("ai.chat_ok", {
                     "elapsed_s": elapsed,
@@ -312,6 +481,8 @@ class AISidebar:
 
                 self.parent.after(0, lambda: self.add_message("assistant", response))
                 self.parent.after(0, lambda: self.status_label.config(text="● 就绪", fg="#28a745"))
+                self.parent.after(0, self.clear_pending_attachments)
+                self.parent.after(0, lambda: self.refresh_session_menu(select_active=True))
 
                 if agent_mode and self.card_tools:
                     tool_call = self.card_tools.parse_tool_call(response)
@@ -332,13 +503,40 @@ class AISidebar:
 
         threading.Thread(target=process, daemon=True).start()
 
+    def new_chat(self):
+        """新建会话（替代清空对话）"""
+        self.ai_manager.create_session()
+        self.clear_pending_attachments()
+        self.render_current_session()
+        self.refresh_session_menu(select_active=True)
+
+    def rename_current_chat(self):
+        """重命名当前会话"""
+        if not hasattr(self.ai_manager, "rename_session"):
+            self.add_message("system", "当前版本不支持会话重命名")
+            return
+
+        session_id = self.ai_manager.get_active_session_id()
+        current_title = self.ai_manager.get_active_session_title()
+        new_title = simpledialog.askstring("重命名对话", "请输入新名称:", initialvalue=current_title)
+        if new_title is None:
+            return
+
+        new_title = new_title.strip()
+        if not new_title:
+            messagebox.showwarning("提示", "对话名称不能为空")
+            return
+
+        try:
+            self.ai_manager.rename_session(session_id, new_title)
+            self.refresh_session_menu(select_active=True)
+            self.add_message("system", f"已重命名为: {new_title}")
+        except Exception as e:
+            self.add_message("system", f"重命名失败: {e}")
+
     def clear_chat(self):
-        """清空对话"""
-        if messagebox.askyesno("确认", "清空对话历史?"):
-            self.ai_manager.clear_history()
-            self.chat_display.config(state="normal")
-            self.chat_display.delete(1.0, "end")
-            self.chat_display.config(state="disabled")
+        """兼容旧入口"""
+        self.new_chat()
 
     def open_settings(self):
         """打开设置"""
