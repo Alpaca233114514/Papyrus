@@ -1,70 +1,171 @@
-import { Typography, Button, BackTop } from '@arco-design/web-react';
-import { useState, useEffect, useRef } from 'react';
+import { Typography, Button } from '@arco-design/web-react';
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import RecentScrolls from './RecentScrolls';
 import RecentNotes from './RecentNotes';
 import ReviewQueue from './ReviewQueue';
 import { getSolarTerm, fetchSolarTerm } from './solarTerms';
 import { type SceneryContent, fetchSceneryContent } from './sceneryContent';
 
-/* ── 共享数据 ── */
-function useStartPageData() {
-  const today = new Date();
-  const hour = today.getHours();
-  const greeting = hour < 6 ? '夜深了' : hour < 12 ? '早安' : hour < 18 ? '下午好' : '晚上好';
-  const dateLabel = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
+type StartPageStats = {
+  cardsDue: number;
+  streakDays: number;
+  todayProgress: number;
+};
+
+type StartPageData = {
+  greeting: string;
+  dateLabel: string;
+  solarTerm: string | null;
+  scenery: SceneryContent | null;
+  stats: StartPageStats;
+};
+
+type StartPageProps = {
+  onDoneChange?: (done: boolean) => void;
+};
+
+type PendingCardProps = {
+  stats: StartPageStats;
+  greeting: string;
+  dateLabel: string;
+  solarTerm: string | null;
+};
+
+const PRIMARY_COLOR = '#206CCF';
+const CARD_HEIGHT_EXPR = 'calc(61.8vh - 128px)';
+
+const MOCK_STATS: StartPageStats = {
+  cardsDue: 1,
+  streakDays: 7,
+  todayProgress: 20,
+};
+
+const cardStyle: CSSProperties = {
+  position: 'absolute',
+  top: '152px',
+  left: '64px',
+  right: '64px',
+  height: CARD_HEIGHT_EXPR,
+  border: '1px solid var(--color-text-3)',
+  borderRadius: '16px',
+  overflow: 'hidden',
+};
+
+function getGreeting(hour: number): string {
+  if (hour < 6) return '夜深了';
+  if (hour < 12) return '早安';
+  if (hour < 18) return '下午好';
+  return '晚上好';
+}
+
+function formatDateLabel(date: Date): string {
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+}
+
+function useStartPageData(): StartPageData {
+  const [today] = useState(() => new Date());
   const [solarTerm, setSolarTerm] = useState<string | null>(() => getSolarTerm(today));
   const [scenery, setScenery] = useState<SceneryContent | null>(null);
 
   useEffect(() => {
-    fetchSolarTerm(today).then(t => { if (t) setSolarTerm(t); });
-    fetchSceneryContent().then(setScenery);
-  }, []);
+    let cancelled = false;
 
-  // TODO: 替换为真实数据接口
-  const stats = {
-    cardsDue: 1,
-    streakDays: 7,
-    todayProgress: 20, // TODO: 接入学习进度 API
+    void (async () => {
+      try {
+        const [remoteSolarTerm, nextScenery] = await Promise.all([
+          fetchSolarTerm(today),
+          fetchSceneryContent(),
+        ]);
+
+        if (cancelled) return;
+
+        if (remoteSolarTerm) {
+          setSolarTerm(remoteSolarTerm);
+        }
+
+        setScenery(nextScenery);
+      } catch {
+        if (!cancelled) {
+          setScenery(null);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [today]);
+
+  return {
+    greeting: getGreeting(today.getHours()),
+    dateLabel: formatDateLabel(today),
+    solarTerm,
+    scenery,
+    stats: MOCK_STATS,
   };
-
-  return { today, greeting, dateLabel, solarTerm, scenery, stats };
 }
 
-/* 窗景卡片高度常量，书架区复用 */
-const CARD_HEIGHT_EXPR = 'calc(61.8vh - 128px)';
-
-/* 动态测量窗景卡片高度，供书架区各列表复用 */
-const useCardHeight = () => {
+function useCardHeight() {
   const ref = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState(300);
 
   useEffect(() => {
-    const measure = () => { if (ref.current) setHeight(ref.current.offsetHeight); };
+    const element = ref.current;
+    if (!element) return;
+
+    const measure = () => {
+      setHeight(element.offsetHeight);
+    };
+
     measure();
+
+    const observer = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(measure)
+      : null;
+
+    observer?.observe(element);
     window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
   }, []);
 
   return { ref, height };
-};
+}
 
-const ShelfSection = ({ label, children }: { label: string; children: React.ReactNode }) => (
-  <div style={{ marginBottom: '48px' }}>
+const ShelfSection = ({ label, children }: { label: string; children: ReactNode }) => (
+  <section style={{ marginBottom: '48px' }}>
     <Typography.Text
-      style={{ display: 'block', marginBottom: '24px', fontSize: '24px', color: 'var(--color-text-3)' }}
+      style={{
+        display: 'block',
+        marginBottom: '24px',
+        fontSize: '24px',
+        color: 'var(--color-text-3)',
+      }}
     >
       {label}
     </Typography.Text>
     {children}
-  </div>
+  </section>
 );
 
-/* 书架区三个分区 */
 const ShelfSections = () => {
   const { ref, height } = useCardHeight();
+
   return (
     <>
-      <div ref={ref} style={{ height: CARD_HEIGHT_EXPR, visibility: 'hidden', position: 'absolute', pointerEvents: 'none' }} />
+      <div
+        ref={ref}
+        style={{
+          position: 'absolute',
+          height: CARD_HEIGHT_EXPR,
+          visibility: 'hidden',
+          pointerEvents: 'none',
+        }}
+      />
+
       <ShelfSection label='待复习'>
         <ReviewQueue height={height} />
       </ShelfSection>
@@ -78,62 +179,57 @@ const ShelfSections = () => {
   );
 };
 
-/* ── 共享卡片外壳 ── */
-const cardStyle: React.CSSProperties = {
-  position: 'absolute',
-  top: '152px',
-  left: '64px',
-  right: '64px',
-  height: CARD_HEIGHT_EXPR,
-  border: '1px solid var(--color-text-3)',
-  borderRadius: '16px',
-  overflow: 'hidden',
-};
-
-/* ── 窗棂 SVG 背景 ── */
-const LatticeBackground = () => (
-  <svg
-    xmlns='http://www.w3.org/2000/svg'
-    width='100%'
-    height='100%'
-    style={{ position: 'absolute', inset: 0 }}
-  >
-    <defs>
-      <pattern id='lattice' x='0' y='0' width='48' height='48' patternUnits='userSpaceOnUse'>
-        {/* 横线 */}
-        <line x1='0' y1='0' x2='64' y2='0' stroke='var(--color-text-3)' strokeWidth='0.5' strokeOpacity='0.25' />
-        <line x1='0' y1='32' x2='64' y2='32' stroke='var(--color-text-3)' strokeWidth='0.5' strokeOpacity='0.25' />
-        <line x1='0' y1='64' x2='64' y2='64' stroke='var(--color-text-3)' strokeWidth='0.5' strokeOpacity='0.25' />
-        {/* 竖线 */}
-        <line x1='0' y1='0' x2='0' y2='64' stroke='var(--color-text-3)' strokeWidth='0.5' strokeOpacity='0.25' />
-        <line x1='32' y1='0' x2='32' y2='64' stroke='var(--color-text-3)' strokeWidth='0.5' strokeOpacity='0.25' />
-        <line x1='64' y1='0' x2='64' y2='64' stroke='var(--color-text-3)' strokeWidth='0.5' strokeOpacity='0.25' />
-      </pattern>
-    </defs>
-    <rect width='100%' height='100%' fill='url(#lattice)' />
-  </svg>
-);
-
-/* ── 未完成状态 ── */
-const PendingCard = ({ stats, greeting, dateLabel, solarTerm, scenery }: {
-  stats: { cardsDue: number; streakDays: number; todayProgress: number };
-  greeting: string;
-  dateLabel: string;
-  solarTerm: string | null;
-  scenery: SceneryContent | null;
-}) => {
-  const [btnHovered, setBtnHovered] = useState(false);
-  const [btnActive, setBtnActive] = useState(false);
-  const [rippleKey, setRippleKey] = useState(0);
+const LatticeBackground = () => {
+  const patternId = useId();
 
   return (
-    <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-      {/* 窗棂背景（无画作时展示） */}
+    <svg
+      xmlns='http://www.w3.org/2000/svg'
+      width='100%'
+      height='100%'
+      style={{ position: 'absolute', inset: 0 }}
+      aria-hidden='true'
+    >
+      <defs>
+        <pattern id={patternId} x='0' y='0' width='48' height='48' patternUnits='userSpaceOnUse'>
+          <line x1='0' y1='0' x2='64' y2='0' stroke='var(--color-text-3)' strokeWidth='0.5' strokeOpacity='0.25' />
+          <line x1='0' y1='32' x2='64' y2='32' stroke='var(--color-text-3)' strokeWidth='0.5' strokeOpacity='0.25' />
+          <line x1='0' y1='64' x2='64' y2='64' stroke='var(--color-text-3)' strokeWidth='0.5' strokeOpacity='0.25' />
+          <line x1='0' y1='0' x2='0' y2='64' stroke='var(--color-text-3)' strokeWidth='0.5' strokeOpacity='0.25' />
+          <line x1='32' y1='0' x2='32' y2='64' stroke='var(--color-text-3)' strokeWidth='0.5' strokeOpacity='0.25' />
+          <line x1='64' y1='0' x2='64' y2='64' stroke='var(--color-text-3)' strokeWidth='0.5' strokeOpacity='0.25' />
+        </pattern>
+      </defs>
+      <rect width='100%' height='100%' fill={`url(#${patternId})`} />
+    </svg>
+  );
+};
+
+const PendingCard = ({ stats, greeting, dateLabel, solarTerm }: PendingCardProps) => {
+  const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  const [rippleKey, setRippleKey] = useState(0);
+
+  const highlighted = hovered || pressed;
+
+  return (
+    <div
+      style={{
+        ...cardStyle,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        background: 'var(--color-bg-2)',
+      }}
+    >
       <LatticeBackground />
 
-      {/* 左上：主文案 + 进度 */}
       <div style={{ position: 'relative', zIndex: 1, padding: '24px' }}>
-        <Typography.Paragraph type='secondary' spacing='close' style={{ margin: 0, fontSize: '48px', fontWeight: 600 }}>
+        <Typography.Paragraph
+          type='secondary'
+          spacing='close'
+          style={{ margin: 0, fontSize: '48px', fontWeight: 600 }}
+        >
           你有 <Typography.Text bold>{stats.cardsDue}</Typography.Text> 张卡片待复习
         </Typography.Paragraph>
         <Typography.Text className='scenery-sub-text' style={{ fontSize: '24px' }}>
@@ -141,43 +237,64 @@ const PendingCard = ({ stats, greeting, dateLabel, solarTerm, scenery }: {
         </Typography.Text>
       </div>
 
-      {/* 底部：日期左下，按钮右下 */}
-      <div style={{ position: 'relative', zIndex: 1, padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          padding: '24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-end',
+          gap: '24px',
+        }}
+      >
         <Typography.Text className='scenery-sub-text' style={{ fontSize: '24px', fontWeight: 600 }}>
           {greeting}，学习者。今天是 {dateLabel}{solarTerm ? `，${solarTerm}` : ''}。
         </Typography.Text>
+
         <Button
           shape='round'
           size='large'
-          type={btnHovered || btnActive ? 'primary' : 'secondary'}
+          type={highlighted ? 'primary' : 'secondary'}
           style={{
-            backgroundColor: btnHovered || btnActive ? '#206CCF' : undefined,
-            borderColor: btnHovered || btnActive ? '#206CCF' : undefined,
-            overflow: 'hidden',
             position: 'relative',
-            padding: '0 32px',
+            overflow: 'hidden',
+            minWidth: '120px',
             height: '48px',
+            padding: '0 32px',
             fontSize: '16px',
+            flexShrink: 0,
+            backgroundColor: highlighted ? PRIMARY_COLOR : undefined,
+            borderColor: highlighted ? PRIMARY_COLOR : undefined,
           }}
-          onMouseEnter={() => { setBtnHovered(true); setRippleKey(k => k + 1); }}
-          onMouseLeave={() => setBtnHovered(false)}
-          onClick={() => setBtnActive(v => !v)}
+          onMouseEnter={() => {
+            setHovered(true);
+            setRippleKey((value) => value + 1);
+          }}
+          onMouseLeave={() => {
+            setHovered(false);
+            setPressed(false);
+          }}
+          onMouseDown={() => setPressed(true)}
+          onMouseUp={() => setPressed(false)}
         >
-          {btnHovered && (
+          {hovered ? (
             <span
               key={rippleKey}
               className='start-btn-ripple'
               style={{
                 position: 'absolute',
-                top: '50%', left: '50%',
-                width: '100%', aspectRatio: '1',
+                top: '50%',
+                left: '50%',
+                width: '100%',
+                aspectRatio: '1',
                 borderRadius: '50%',
-                background: '#206CCF',
+                background: PRIMARY_COLOR,
                 pointerEvents: 'none',
                 zIndex: 0,
               }}
             />
-          )}
+          ) : null}
           <span style={{ position: 'relative', zIndex: 1 }}>开始</span>
         </Button>
       </div>
@@ -185,99 +302,148 @@ const PendingCard = ({ stats, greeting, dateLabel, solarTerm, scenery }: {
   );
 };
 
-/* ── 已完成状态 ── */
 const DoneCard = ({ scenery }: { scenery: SceneryContent | null }) => {
   const [hovered, setHovered] = useState(false);
+
+  const image = scenery?.image ?? '/scenery/image.png';
+  const poem = scenery?.poem ?? '且将新火试新茶，诗酒趁年华。';
+  const source = scenery?.source ?? '[宋] 苏轼《望江南·超然台作》';
 
   return (
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={{ ...cardStyle, position: 'absolute' }}
+      style={cardStyle}
     >
-      {/* 窗景图片 */}
       <img
-        src={scenery?.image ?? '/scenery/image.png'}
+        src={image}
         alt=''
         className={`scenery-img${hovered ? ' expanded' : ''}`}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+        }}
       />
 
-      {/* 主文案：淡出 */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1, padding: '24px',
-        opacity: hovered ? 0 : 1,
-        transition: 'opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-        pointerEvents: hovered ? 'none' : 'auto',
-      }}>
-        <Typography.Paragraph type='secondary' spacing='close' style={{ margin: 0, fontSize: '48px', fontWeight: 600 }}>
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 1,
+          padding: '24px',
+          opacity: hovered ? 0 : 1,
+          transition: 'opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+          pointerEvents: hovered ? 'none' : 'auto',
+        }}
+      >
+        <Typography.Paragraph
+          type='secondary'
+          spacing='close'
+          style={{ margin: 0, fontSize: '48px', fontWeight: 600 }}
+        >
           恭喜你，今日任务已完成！
         </Typography.Paragraph>
       </div>
 
-      {/* 诗句：悬停淡入，竖排，定位在左侧 38.2% */}
-      <div style={{
-        position: 'absolute', top: 0, bottom: 0, left: 0, width: '38.2%',
-        zIndex: 1,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        overflow: 'hidden',
-        opacity: (hovered && !!scenery) ? 1 : 0,
-        transition: 'opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-        pointerEvents: 'none',
-      }}>
-        <div style={{
-          display: 'flex', flexDirection: 'row-reverse', alignItems: 'flex-start',
-          gap: '12px', height: '90%', maxHeight: '90%', overflow: 'hidden',
-        }}>
-          <div style={{
-            writingMode: 'vertical-rl',
-            fontFamily: '"Noto Serif SC", "Source Han Serif SC", "STSong", serif',
-            fontSize: '18px', fontWeight: 400, letterSpacing: '0.3em',
-            color: '#2C2C2C', lineHeight: 1.6,
-            height: '100%', overflow: 'hidden',
-          }}>
-            {scenery?.poem ?? ''}
-          </div>
-          {scenery?.source && (
-            <div style={{
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          left: 0,
+          width: '38.2%',
+          zIndex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          opacity: hovered ? 1 : 0,
+          transition: 'opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+          pointerEvents: 'none',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'row-reverse',
+            alignItems: 'flex-start',
+            gap: '12px',
+            height: '90%',
+            maxHeight: '90%',
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            style={{
               writingMode: 'vertical-rl',
               fontFamily: '"Noto Serif SC", "Source Han Serif SC", "STSong", serif',
-              fontSize: '14px', fontWeight: 400, letterSpacing: '0.15em',
-              color: 'var(--color-text-3)', lineHeight: 1.6, overflow: 'hidden',
-            }}>
-              {'——'}{scenery.source}
-            </div>
-          )}
+              fontSize: '18px',
+              fontWeight: 400,
+              letterSpacing: '0.3em',
+              color: '#2C2C2C',
+              lineHeight: 1.6,
+              height: '100%',
+              overflow: 'hidden',
+            }}
+          >
+            {poem}
+          </div>
+          <div
+            style={{
+              writingMode: 'vertical-rl',
+              fontFamily: '"Noto Serif SC", "Source Han Serif SC", "STSong", serif',
+              fontSize: '14px',
+              fontWeight: 400,
+              letterSpacing: '0.15em',
+              color: 'var(--color-text-3)',
+              lineHeight: 1.6,
+              overflow: 'hidden',
+            }}
+          >
+            {'——'}{source}
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-/* ── 页面入口 ── */
-const StartPage = ({ onDoneChange }: { onDoneChange?: (done: boolean) => void }) => {
+const StartPage = ({ onDoneChange }: StartPageProps) => {
   const data = useStartPageData();
-  const done = false; // TODO: 接入真实完成状态
+  const done = data.stats.cardsDue === 0;
 
-  useEffect(() => { onDoneChange?.(done); }, [done]);
+  useEffect(() => {
+    onDoneChange?.(done);
+  }, [done, onDoneChange]);
 
   return (
     <div id='start-page-scroll' style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
-
-            
-
-      {/* ── 第一屏：开始区 ── */}
       <div style={{ position: 'relative', height: '61.8vh', padding: '64px 0 0 64px' }}>
-        <Typography.Title heading={1} style={{ fontWeight: 400, lineHeight: 1, margin: 0, fontSize: '56px' }}>开始</Typography.Title>
+        <Typography.Title
+          heading={1}
+          style={{ fontWeight: 400, lineHeight: 1, margin: 0, fontSize: '56px' }}
+        >
+          开始
+        </Typography.Title>
 
-        {done
-          ? <DoneCard scenery={data.scenery} />
-          : <PendingCard {...data} />
-        }
+        {done ? (
+          <DoneCard scenery={data.scenery} />
+        ) : (
+          <PendingCard
+            stats={data.stats}
+            greeting={data.greeting}
+            dateLabel={data.dateLabel}
+            solarTerm={data.solarTerm}
+          />
+        )}
       </div>
 
-      {/* ── 第二屏：书架区 ── */}
-      <div style={{ padding: '64px 64px 0 64px' }}>
+      <div style={{ padding: '64px 64px 0' }}>
         <Typography.Title
           heading={2}
           style={{ fontWeight: 400, lineHeight: 1, margin: 0, marginBottom: '48px', fontSize: '32px' }}
@@ -296,31 +462,45 @@ const StartPage = ({ onDoneChange }: { onDoneChange?: (done: boolean) => void })
           inherits: false;
           initial-value: 61.8%;
         }
+
         .scenery-img {
           --mask-start: 61.8%;
           mask-image: linear-gradient(to right, transparent var(--mask-start), black 100%);
           -webkit-mask-image: linear-gradient(to right, transparent var(--mask-start), black 100%);
           transition: --mask-start 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
+
         .scenery-img.expanded {
           --mask-start: 38.2%;
         }
+
         .scenery-sub-text {
           color: #888;
         }
+
         body[arco-theme='dark'] .scenery-sub-text {
           color: #666;
         }
+
         @keyframes spread {
-          0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
-          100% { transform: translate(-50%, -50%) scale(8); opacity: 1; }
+          0% {
+            transform: translate(-50%, -50%) scale(0);
+            opacity: 1;
+          }
+
+          100% {
+            transform: translate(-50%, -50%) scale(8);
+            opacity: 1;
+          }
         }
+
         .start-btn-ripple {
           animation: spread 1s ease-out forwards;
         }
-        /* 隐藏横向滚动条但保留滚动功能 */
+
         #start-page-scroll ::-webkit-scrollbar {
           height: 0;
+          width: 0;
         }
       `}</style>
     </div>

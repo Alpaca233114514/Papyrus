@@ -16,5 +16,5 @@ createRoot(el).render(
     <ConfigProvider locale={zhCN}>
       <App />
     </ConfigProvider>
-  </React.StrictMode>
+    </React.StrictMode>
 );
