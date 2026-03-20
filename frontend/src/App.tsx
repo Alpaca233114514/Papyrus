@@ -1,6 +1,5 @@
 
 import { useState, useRef, useCallback } from 'react';
-import { BackTop } from '@arco-design/web-react';
 import TitleBar from './TitleBar';
 import Sidebar from './Sidebar';
 import ChatPanel from './ChatPanel';
@@ -14,11 +13,9 @@ import FilesPage from './FilesPage/FilesPage';
 
 const App = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
-  const [todayDone, setTodayDone] = useState(false); // TODO: 接入真实完成状态
   const [activePage, setActivePage] = useState('start');
   const [chatOpen, setChatOpen] = useState(false);
-  const CHAT_DEFAULT_WIDTH = 320;
-  const [chatWidth, setChatWidth] = useState(CHAT_DEFAULT_WIDTH);
+  const [chatWidth, setChatWidth] = useState(320);
   const dragStartX = useRef<number>(0);
   const dragStartWidth = useRef<number>(0);
 
@@ -38,33 +35,13 @@ const App = () => {
   }, [chatWidth]);
 
   return (
-    <div style={{ width: '1440px', height: '900px', margin: '0 auto', background: 'var(--color-bg-1)', border: '1px solid var(--color-border-3)', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-      {activePage === 'start' && (
-        <BackTop
-          visibleHeight={200}
-          style={{ position: 'absolute', right: '64px', bottom: '64px' }}
-          target={() => document.getElementById('start-page-scroll')!}
-        />
-      )}
+    <div style={{ width: '1440px', height: '900px', margin: '0 auto', background: 'var(--color-bg-1)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       <TitleBar />
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
         <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} chatOpen={chatOpen} onChatToggle={() => setChatOpen(!chatOpen)} activePage={activePage} onPageChange={setActivePage} />
-        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', position: 'relative' }}>
-          {/* 完成状态：顶部绿色光晕，仅今日完成时显示 */}
-          {activePage === 'start' && todayDone && (
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              height: '160px',
-              background: 'linear-gradient(to bottom, rgba(232, 255, 234, 0.45) 0%, transparent 100%)',
-              pointerEvents: 'none',
-              zIndex: 0,
-            }} />
-          )}
-          {activePage === 'start' && <StartPage onDoneChange={setTodayDone} />}
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
+          {activePage === 'start' && <StartPage />}
           {activePage === 'scroll' && <ScrollPage />}
           {activePage === 'notes' && <NotesPage />}
           {activePage === 'charts' && <ChartsPage />}
@@ -74,12 +51,12 @@ const App = () => {
         {chatOpen && (
           <div style={{ display: 'flex', flexShrink: 0 }}>
             <div
-              style={{ width: 4, cursor: activePage === 'start' ? 'default' : 'ew-resize', background: 'transparent', flexShrink: 0 }}
-              onMouseDown={activePage !== 'start' ? onChatDragStart : undefined}
-              onMouseEnter={e => { if (activePage !== 'start') e.currentTarget.style.background = 'var(--color-border-2)'; }}
+              style={{ width: 4, cursor: 'ew-resize', background: 'transparent', flexShrink: 0 }}
+              onMouseDown={onChatDragStart}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-border-2)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             />
-            <ChatPanel open={chatOpen} width={activePage === 'start' ? CHAT_DEFAULT_WIDTH : chatWidth} onClose={() => setChatOpen(false)} />
+            <ChatPanel open={chatOpen} width={chatWidth} onClose={() => setChatOpen(false)} />
           </div>
         )}
       </div>

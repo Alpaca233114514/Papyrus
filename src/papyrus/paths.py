@@ -20,4 +20,3 @@ for directory in [DATA_DIR, BACKUP_DIR, ASSETS_DIR, LOG_DIR]:
 
 DATA_FILE = str(Path(DATA_DIR) / "Papyrusdata.json")
 BACKUP_FILE = str(Path(BACKUP_DIR) / "Papyrusdata.json.bak")
-SCROLLS_FILE = str(Path(DATA_DIR) / "scrolls.json")

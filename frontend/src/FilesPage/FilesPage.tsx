@@ -1,8 +1,6 @@
-import { Typography } from '@arco-design/web-react';
-
 const FilesPage = () => (
-  <div style={{ flex: 1, overflowY: 'auto', padding: '64px 0 0 64px' }}>
-    <Typography.Title heading={1} style={{ fontWeight: 400, lineHeight: 1, margin: 0, fontSize: '56px' }}>文件库</Typography.Title>
+  <div style={{ flex: 1, overflow: 'hidden', position: 'relative', padding: '64px 0 0 64px' }}>
+    <span style={{ fontSize: '56px', fontWeight: 400, lineHeight: 1, color: 'var(--color-text-1)' }}>文件库</span>
   </div>
 );
 
