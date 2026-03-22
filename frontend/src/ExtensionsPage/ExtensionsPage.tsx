@@ -165,7 +165,7 @@ const ExtensionsPage = () => {
             <Typography.Text type='secondary' style={{ fontSize: '12px', display: 'block', marginTop: '2px' }}>总下载</Typography.Text>
           </div>
         </div>
-        <Button type='primary' size='large' style={{ backgroundColor: PRIMARY_COLOR }}>检查更新</Button>
+        <Button shape='round' type='primary' size='large' style={{ height: '40px', padding: '0 20px', fontSize: '14px', backgroundColor: PRIMARY_COLOR }}>检查更新</Button>
       </div>
 
       {/* 内容 */}

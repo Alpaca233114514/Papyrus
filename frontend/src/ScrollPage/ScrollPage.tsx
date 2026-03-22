@@ -352,30 +352,30 @@ const ScrollPage = () => {
         <div style={{ display: 'flex', gap: '12px' }}>
           {/* 演示按钮 */}
           <Button
+            shape='round'
             size='large'
             icon={<IconEye />}
             onClick={startDemo}
             style={{
-              height: '48px',
-              borderRadius: '24px',
-              padding: '0 24px',
-              fontSize: '15px',
+              height: '40px',
+              padding: '0 20px',
+              fontSize: '14px',
             }}
           >
             预览学习界面
           </Button>
           {/* 开始学习按钮 */}
           <Button
+            shape='round'
             type='primary'
             size='large'
             icon={<IconPlayCircle />}
             onClick={startStudy}
             disabled={dueCount === 0}
             style={{
-              height: '48px',
-              borderRadius: '24px',
-              padding: '0 28px',
-              fontSize: '15px',
+              height: '40px',
+              padding: '0 20px',
+              fontSize: '14px',
               backgroundColor: dueCount > 0 ? PRIMARY_COLOR : 'var(--color-text-3)',
             }}
           >

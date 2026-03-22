@@ -152,16 +152,20 @@ const FilesPage = () => {
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           <Button 
+            shape='round'
+            size='large'
             type='secondary' 
             icon={<IconFolderAdd />}
-            style={{ height: '40px', borderRadius: '20px', padding: '0 20px', fontSize: '14px' }}
+            style={{ height: '40px', padding: '0 20px', fontSize: '14px' }}
           >
             新建文件夹
           </Button>
           <Button 
+            shape='round'
+            size='large'
             type='primary' 
             icon={<IconUpload />} 
-            style={{ height: '40px', borderRadius: '20px', padding: '0 20px', fontSize: '14px', backgroundColor: PRIMARY_COLOR }}
+            style={{ height: '40px', padding: '0 20px', fontSize: '14px', backgroundColor: PRIMARY_COLOR }}
           >
             上传文件
           </Button>

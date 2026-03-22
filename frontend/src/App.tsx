@@ -46,7 +46,7 @@ const App = () => {
           target={() => document.getElementById('start-page-scroll')!}
         />
       )}
-      <TitleBar />
+      <TitleBar onPageChange={setActivePage} />
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
         <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} chatOpen={chatOpen} onChatToggle={() => setChatOpen(!chatOpen)} activePage={activePage} onPageChange={setActivePage} />
