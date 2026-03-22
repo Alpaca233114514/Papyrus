@@ -1,6 +1,6 @@
 
 import { useState, useRef, useCallback } from 'react';
-import { BackTop } from '@arco-design/web-react';
+import { BackTop, Message } from '@arco-design/web-react';
 import TitleBar from './TitleBar';
 import Sidebar from './Sidebar';
 import ChatPanel from './ChatPanel';
@@ -11,6 +11,8 @@ import NotesPage from './NotesPage/NotesPage';
 import ChartsPage from './ChartsPage/ChartsPage';
 import ExtensionsPage from './ExtensionsPage/ExtensionsPage';
 import FilesPage from './FilesPage/FilesPage';
+import SettingsPage from './SettingsPage/SettingsPage';
+import type { SearchResult } from './api';
 
 const App = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
@@ -21,6 +23,19 @@ const App = () => {
   const [chatWidth, setChatWidth] = useState(CHAT_DEFAULT_WIDTH);
   const dragStartX = useRef<number>(0);
   const dragStartWidth = useRef<number>(0);
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+
+  // 处理搜索结果点击
+  const handleSearchResult = useCallback((result: SearchResult) => {
+    if (result.type === 'note') {
+      setActivePage('notes');
+      setSelectedNoteId(result.id);
+      Message.success(`打开笔记: ${result.title}`);
+    } else if (result.type === 'card') {
+      setActivePage('scroll');
+      Message.success('跳转到复习页面');
+    }
+  }, []);
 
   const onChatDragStart = useCallback((e: React.MouseEvent) => {
     dragStartX.current = e.clientX;
@@ -46,7 +61,7 @@ const App = () => {
           target={() => document.getElementById('start-page-scroll')!}
         />
       )}
-      <TitleBar onPageChange={setActivePage} />
+      <TitleBar onPageChange={setActivePage} onSearchResult={handleSearchResult} />
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
         <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} chatOpen={chatOpen} onChatToggle={() => setChatOpen(!chatOpen)} activePage={activePage} onPageChange={setActivePage} />
@@ -70,6 +85,7 @@ const App = () => {
           {activePage === 'charts' && <ChartsPage />}
           {activePage === 'files' && <FilesPage />}
           {activePage === 'extensions' && <ExtensionsPage />}
+          {activePage === 'settings' && <SettingsPage />}
         </div>
         {chatOpen && (
           <div style={{ display: 'flex', flexShrink: 0 }}>

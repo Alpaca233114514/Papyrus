@@ -20,6 +20,7 @@ python -m uvicorn src.papyrus_api.main:app --reload
 from __future__ import annotations
 
 import os
+import re
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException
@@ -38,6 +39,8 @@ from papyrus.data.notes_storage import (
     delete_note as delete_note_storage,
 )
 from papyrus.integrations.obsidian import import_obsidian_vault, sync_obsidian_vault
+from ai.config import AIConfig
+from papyrus.paths import DATA_DIR
 
 
 def _get_data_file() -> str:
@@ -55,6 +58,16 @@ def _pick_card_text(*values: str | None) -> str:
 
 
 app = FastAPI(title="Papyrus API", version="0.2.0")
+
+# AI Config 实例
+_ai_config: AIConfig | None = None
+
+
+def get_ai_config() -> AIConfig:
+    global _ai_config
+    if _ai_config is None:
+        _ai_config = AIConfig(DATA_DIR)
+    return _ai_config
 
 
 # Frontend dev server (vite) defaults to 5173
@@ -362,3 +375,384 @@ def import_obsidian_endpoint(payload: ObsidianImportIn) -> ObsidianImportRespons
         errors=result.errors,
     )
 
+
+# ========== Search API ==========
+
+class SearchResultItem(BaseModel):
+    id: str
+    type: Literal["note", "card"]
+    title: str
+    preview: str
+    folder: str = ""
+    tags: list[str] = []
+    matched_field: str
+    updated_at: float = 0
+
+
+class SearchResponse(BaseModel):
+    success: bool
+    query: str
+    results: list[SearchResultItem]
+    total: int
+    notes_count: int
+    cards_count: int
+
+
+# ========== AI Config Types ==========
+
+class ProviderConfigModel(BaseModel):
+    api_key: str = ""
+    base_url: str = ""
+    models: list[str] = []
+
+
+class ParametersConfigModel(BaseModel):
+    temperature: float = 0.7
+    top_p: float = 0.9
+    max_tokens: int = 2000
+    presence_penalty: float = 0.0
+    frequency_penalty: float = 0.0
+
+
+class FeaturesConfigModel(BaseModel):
+    auto_hint: bool = False
+    auto_explain: bool = False
+    context_length: int = 10
+
+
+class AIConfigModel(BaseModel):
+    current_provider: str = "openai"
+    current_model: str = "gpt-3.5-turbo"
+    providers: dict[str, ProviderConfigModel] = {}
+    parameters: ParametersConfigModel
+    features: FeaturesConfigModel
+
+
+class AIConfigResponse(BaseModel):
+    success: bool
+    config: AIConfigModel
+
+
+class TestConnectionResponse(BaseModel):
+    success: bool
+    message: str
+
+
+# ========== Data Management Types ==========
+
+class BackupResponse(BaseModel):
+    success: bool
+    path: str
+
+
+class ExportDataResponse(BaseModel):
+    cards: list
+    notes: list
+    config: dict
+
+
+class ImportDataResponse(BaseModel):
+    success: bool
+    imported: int
+
+
+def _search_notes(notes: list[Note], query: str) -> list[SearchResultItem]:
+    """Search notes by title, content, or tags."""
+    results: list[SearchResultItem] = []
+    query_lower = query.lower()
+    
+    for note in notes:
+        matched_field = ""
+        
+        # Check title
+        if query_lower in note.title.lower():
+            matched_field = "title"
+        # Check content
+        elif query_lower in note.content.lower():
+            matched_field = "content"
+        # Check tags
+        elif any(query_lower in tag.lower() for tag in note.tags):
+            matched_field = "tags"
+        
+        if matched_field:
+            results.append(SearchResultItem(
+                id=note.id,
+                type="note",
+                title=note.title,
+                preview=note.preview,
+                folder=note.folder,
+                tags=note.tags,
+                matched_field=matched_field,
+                updated_at=note.updated_at,
+            ))
+    
+    return results
+
+
+def _search_cards(cards: list[CardDict], query: str) -> list[SearchResultItem]:
+    """Search cards by question or answer."""
+    results: list[SearchResultItem] = []
+    query_lower = query.lower()
+    
+    for card in cards:
+        matched_field = ""
+        
+        # Check question
+        if query_lower in card.get("q", "").lower():
+            matched_field = "question"
+        # Check answer
+        elif query_lower in card.get("a", "").lower():
+            matched_field = "answer"
+        
+        if matched_field:
+            title = card.get("q", "")[:50]
+            if len(card.get("q", "")) > 50:
+                title += "..."
+            
+            results.append(SearchResultItem(
+                id=card.get("id", ""),
+                type="card",
+                title=title,
+                preview=card.get("a", "")[:100],
+                folder="复习卡片",
+                tags=[],
+                matched_field=matched_field,
+            ))
+    
+    return results
+
+
+@app.get("/api/search", response_model=SearchResponse)
+def search_all(query: str = "") -> SearchResponse:
+    """Search across notes and cards.
+    
+    Query parameters:
+        query: Search keyword (required)
+    """
+    if not query or not query.strip():
+        return SearchResponse(
+            success=True,
+            query="",
+            results=[],
+            total=0,
+            notes_count=0,
+            cards_count=0,
+        )
+    
+    data_file = _get_data_file()
+    
+    # Search notes
+    notes = load_notes(NOTES_FILE)
+    note_results = _search_notes(notes, query.strip())
+    
+    # Search cards
+    cards = card_core.list_cards(data_file)
+    card_results = _search_cards(cards, query.strip())
+    
+    # Combine results, notes first
+    all_results = note_results + card_results
+    
+    return SearchResponse(
+        success=True,
+        query=query.strip(),
+        results=all_results,
+        total=len(all_results),
+        notes_count=len(note_results),
+        cards_count=len(card_results),
+    )
+
+
+
+# ========== AI Config Endpoints ==========
+
+@app.get("/api/config/ai", response_model=AIConfigResponse)
+def get_ai_config_endpoint() -> AIConfigResponse:
+    """Get AI configuration."""
+    config = get_ai_config()
+    return AIConfigResponse(
+        success=True,
+        config=AIConfigModel(
+            current_provider=config.config["current_provider"],
+            current_model=config.config["current_model"],
+            providers={
+                k: ProviderConfigModel(
+                    api_key=v.get("api_key", ""),
+                    base_url=v.get("base_url", ""),
+                    models=v.get("models", []),
+                )
+                for k, v in config.config["providers"].items()
+            },
+            parameters=ParametersConfigModel(
+                temperature=config.config["parameters"]["temperature"],
+                top_p=config.config["parameters"]["top_p"],
+                max_tokens=config.config["parameters"]["max_tokens"],
+                presence_penalty=config.config["parameters"]["presence_penalty"],
+                frequency_penalty=config.config["parameters"]["frequency_penalty"],
+            ),
+            features=FeaturesConfigModel(
+                auto_hint=config.config["features"]["auto_hint"],
+                auto_explain=config.config["features"]["auto_explain"],
+                context_length=config.config["features"]["context_length"],
+            ),
+        ),
+    )
+
+
+@app.post("/api/config/ai", response_model=dict)
+def save_ai_config_endpoint(payload: AIConfigModel) -> dict:
+    """Save AI configuration."""
+    try:
+        config = get_ai_config()
+        config.config["current_provider"] = payload.current_provider
+        config.config["current_model"] = payload.current_model
+        
+        # Update providers
+        for provider_name, provider_data in payload.providers.items():
+            config.config["providers"][provider_name] = {
+                "api_key": provider_data.api_key,
+                "base_url": provider_data.base_url,
+                "models": provider_data.models,
+            }
+        
+        # Update parameters
+        config.config["parameters"] = {
+            "temperature": payload.parameters.temperature,
+            "top_p": payload.parameters.top_p,
+            "max_tokens": payload.parameters.max_tokens,
+            "presence_penalty": payload.parameters.presence_penalty,
+            "frequency_penalty": payload.parameters.frequency_penalty,
+        }
+        
+        # Update features
+        config.config["features"] = {
+            "auto_hint": payload.features.auto_hint,
+            "auto_explain": payload.features.auto_explain,
+            "context_length": payload.features.context_length,
+        }
+        
+        config.save_config()
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"保存配置失败: {e}")
+
+
+@app.post("/api/config/ai/test", response_model=TestConnectionResponse)
+def test_ai_connection_endpoint() -> TestConnectionResponse:
+    """Test AI connection."""
+    try:
+        config = get_ai_config()
+        provider_config = config.get_provider_config()
+        
+        # Simple validation
+        if config.config["current_provider"] != "ollama":
+            api_key = provider_config.get("api_key", "")
+            if not api_key:
+                return TestConnectionResponse(
+                    success=False,
+                    message="API Key 未设置",
+                )
+        
+        # TODO: 实际测试连接
+        # 这里可以添加实际的 API 调用测试
+        
+        return TestConnectionResponse(
+            success=True,
+            message="配置验证通过",
+        )
+    except Exception as e:
+        return TestConnectionResponse(
+            success=False,
+            message=f"连接测试失败: {e}",
+        )
+
+
+# ========== Data Management Endpoints ==========
+
+@app.post("/api/backup", response_model=BackupResponse)
+def create_backup_endpoint() -> BackupResponse:
+    """Create a backup of all data."""
+    import shutil
+    from papyrus.paths import BACKUP_FILE
+    
+    try:
+        data_file = _get_data_file()
+        
+        # Ensure backup directory exists
+        backup_dir = os.path.dirname(BACKUP_FILE)
+        if backup_dir:
+            os.makedirs(backup_dir, exist_ok=True)
+        
+        # Copy data file to backup
+        if os.path.exists(data_file):
+            shutil.copy(data_file, BACKUP_FILE)
+        
+        return BackupResponse(
+            success=True,
+            path=BACKUP_FILE,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"备份失败: {e}")
+
+
+@app.get("/api/export", response_model=ExportDataResponse)
+def export_data_endpoint() -> ExportDataResponse:
+    """Export all data."""
+    data_file = _get_data_file()
+    
+    cards = card_core.list_cards(data_file)
+    notes = load_notes(NOTES_FILE)
+    config = get_ai_config()
+    
+    return ExportDataResponse(
+        cards=cards,
+        notes=[
+            {
+                "id": n.id,
+                "title": n.title,
+                "folder": n.folder,
+                "content": n.content,
+                "tags": n.tags,
+                "created_at": n.created_at,
+                "updated_at": n.updated_at,
+            }
+            for n in notes
+        ],
+        config=config.config,
+    )
+
+
+@app.post("/api/import", response_model=ImportDataResponse)
+def import_data_endpoint(payload: dict) -> ImportDataResponse:
+    """Import data from JSON."""
+    try:
+        data_file = _get_data_file()
+        
+        # Import cards
+        cards_data = payload.get("cards", [])
+        if cards_data:
+            # TODO: 实现卡片导入逻辑
+            pass
+        
+        # Import notes
+        notes_data = payload.get("notes", [])
+        imported_count = 0
+        if notes_data:
+            existing_notes = load_notes(NOTES_FILE)
+            for note_data in notes_data:
+                create_note(
+                    NOTES_FILE,
+                    title=note_data.get("title", "Untitled"),
+                    folder=note_data.get("folder", "默认"),
+                    content=note_data.get("content", ""),
+                    tags=note_data.get("tags", []),
+                )
+                imported_count += 1
+        
+        return ImportDataResponse(
+            success=True,
+            imported=imported_count,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"导入失败: {e}")

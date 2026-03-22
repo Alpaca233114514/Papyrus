@@ -12,25 +12,106 @@
 
 ## 字体
 
-使用 Arco Design `Typography` 组件渲染文字，自动应用字节跳动设计规范字体（ByteDance Sans / PingFang SC 等）。
+### 字体栈
+
+```css
+/* 字节跳动设计规范字体栈 */
+font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", 
+  "WenQuanYi Micro Hei", -apple-system, BlinkMacSystemFont, 
+  "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+```
+
+- **中文**：PingFang SC (苹方)、Hiragino Sans GB、Microsoft YaHei
+- **英文/系统**：-apple-system、BlinkMacSystemFont、Segoe UI、Roboto
+
+### Typography 组件规范
+
+使用 Arco Design `Typography` 组件渲染文字，符合字节跳动设计规范。
 
 ```tsx
 import { Typography } from '@arco-design/web-react';
-
-<Typography.Text>正文</Typography.Text>
-<Typography.Text type='secondary'>次级文字</Typography.Text>
-<Typography.Text type='primary'>主色文字</Typography.Text>
-<Typography.Text bold>加粗</Typography.Text>
+const { Title, Text, Paragraph } = Typography;
 ```
 
-| type 值 | 用途 |
-|---------|------|
-| 默认 | 主要正文 |
-| secondary | 次级/辅助文字 |
-| primary | 强调/主色 |
-| success | 成功状态 |
-| warning | 警告状态 |
-| error | 错误状态 |
+#### 标题 (Title)
+
+用于页面标题、表单标签：
+
+```tsx
+// 页面主标题
+<Title heading={3}>页面标题</Title>
+
+// 表单标签
+<Title heading={6}>API 密钥</Title>
+```
+
+| heading | 字号 | 字重 | 用途 |
+|---------|------|------|------|
+| heading={3} | 24px | 600 | 页面主标题 |
+| heading={4} | 20px | 600 | 页面副标题 |
+| heading={6} | 16px | 600 | 表单标签、小标题 |
+
+#### 正文 (Text)
+
+用于简短的文本标签：
+
+```tsx
+// 主要文字
+<Text>Provider 名称</Text>
+
+// 加粗文字
+<Text bold>模型名称</Text>
+```
+
+| 属性 | 值 | 用途 |
+|------|-----|------|
+| 默认 | 400 | 主要正文 |
+| bold | 600 | 强调文字 |
+| type='secondary' | 400 | 次级/辅助文字 |
+| type='primary' | 400 | 强调/主色 |
+
+#### 段落 (Paragraph)
+
+用于描述文字、多行文本：
+
+```tsx
+// 描述文字
+<Paragraph type='secondary' style={{ fontSize: 12 }}>
+  API Key 仅存储在本地
+</Paragraph>
+
+// 警告文字
+<Paragraph type='warning'>
+  当前模型不支持工具调用
+</Paragraph>
+```
+
+### 字重规范
+
+| 值 | 名称 | 用途 |
+|----|------|------|
+| 400 | Regular | 正文、辅助文字 |
+| 500 | Medium | 按钮文字 |
+| 600 | Semibold | 标题、加粗文字 |
+
+### 使用示例
+
+```tsx
+// 设置页面规范用法
+<Title heading={3}>OpenAI</Title>
+
+<Title heading={6}>API 密钥</Title>
+<Input placeholder="输入 API Key" />
+<Paragraph type='secondary' style={{ fontSize: 12, marginTop: 4 }}>
+  API Key 仅存储在本地，不会上传到服务器
+</Paragraph>
+
+// 模型卡片
+<Text bold style={{ fontSize: 15 }}>GPT-4o</Text>
+<Paragraph type='secondary' style={{ fontSize: 12 }}>
+  gpt-4o
+</Paragraph>
+```
 
 ### 标题与段落
 
@@ -117,6 +198,29 @@ import { BackTop, Typography } from '@arco-design/web-react';
 
 ## 字重
 
-| 变量 | 值 | 用途 |
-|------|-----|------|
-| font-weight-400 | 400 | 标题文字，如开始页面标题 |
+| 变量 | 值 | 名称 | 用途 |
+|------|-----|------|------|
+| font-weight-400 | 400 | Regular | 正文、辅助文字 |
+| font-weight-500 | 500 | Medium | 按钮文字 |
+| font-weight-600 | 600 | Semibold | 标题、加粗文字 |
+
+## 字号
+
+| 元素 | 字号 | 行高 |
+|------|------|------|
+| 页面主标题 (h3) | 24px | 1.3 |
+| 页面副标题 (h4) | 20px | 1.3 |
+| 表单标签 (h6) | 16px | 1.5 |
+| 正文/标签 | 14-15px | 1.5 |
+| 辅助文字 | 12-13px | 1.5 |
+
+## 胶囊按钮
+
+设置页面中所有可点击按钮使用 `shape="round"` 胶囊样式：
+
+```tsx
+<Button type="primary" shape="round">保存</Button>
+<Button shape="round">取消</Button>
+<Button status="danger" shape="round">删除</Button>
+<Button type="outline" shape="round">添加</Button>
+```

@@ -49,6 +49,61 @@ export type ImportObsidianRes = {
   errors: string[];
 };
 
+// ========== Search Types ==========
+export type SearchResult = {
+  id: string;
+  type: 'note' | 'card';
+  title: string;
+  preview: string;
+  folder: string;
+  tags: string[];
+  matched_field: string;
+  updated_at: number;
+};
+
+export type SearchRes = {
+  success: boolean;
+  query: string;
+  results: SearchResult[];
+  total: number;
+  notes_count: number;
+  cards_count: number;
+};
+
+// ========== AI Config Types ==========
+export type ProviderConfig = {
+  api_key?: string;
+  base_url?: string;
+  models: string[];
+};
+
+export type ParametersConfig = {
+  temperature: number;
+  top_p: number;
+  max_tokens: number;
+  presence_penalty: number;
+  frequency_penalty: number;
+};
+
+export type FeaturesConfig = {
+  auto_hint: boolean;
+  auto_explain: boolean;
+  context_length: number;
+};
+
+export type AIConfig = {
+  current_provider: string;
+  current_model: string;
+  providers: Record<string, ProviderConfig>;
+  parameters: ParametersConfig;
+  features: FeaturesConfig;
+};
+
+export type AIConfigRes = {
+  success: boolean;
+  config: AIConfig;
+};
+
 // ========== Card API ==========
 export const api = {
   health: () => request<{ status: string }>('/health'),
@@ -90,5 +145,31 @@ export const api = {
     request<ImportObsidianRes>('/notes/import/obsidian', { 
       method: 'POST', 
       body: JSON.stringify({ vault_path: vaultPath, exclude_folders: excludeFolders || ['.obsidian', '.git'] }) 
+    }),
+
+  // Search
+  search: (query: string) => 
+    request<SearchRes>(`/search?query=${encodeURIComponent(query)}`),
+
+  // AI Config
+  getAIConfig: () => 
+    request<AIConfig>('/config/ai'),
+  saveAIConfig: (config: AIConfig) => 
+    request<{ success: boolean }>('/config/ai', { 
+      method: 'POST', 
+      body: JSON.stringify(config) 
+    }),
+  testAIConnection: () => 
+    request<{ success: boolean; message: string }>('/config/ai/test', { method: 'POST' }),
+
+  // Data Management
+  createBackup: () => 
+    request<{ success: boolean; path: string }>('/backup', { method: 'POST' }),
+  exportData: () => 
+    request<{ cards: any[]; notes: any[]; config: any }>('/export'),
+  importData: (data: any) => 
+    request<{ success: boolean; imported: number }>('/import', { 
+      method: 'POST', 
+      body: JSON.stringify(data) 
     }),
 };

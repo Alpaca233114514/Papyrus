@@ -1,8 +1,9 @@
-import { Input, Button, Space, Menu, Dropdown, Avatar, Modal, Message, Divider } from '@arco-design/web-react';
-import { IconMinus, IconExpand, IconClose, IconSearch } from '@arco-design/web-react/icon';
+import { Button, Space, Menu, Dropdown, Avatar, Modal, Message, Divider, Input } from '@arco-design/web-react';
+import { IconMinus, IconExpand, IconClose } from '@arco-design/web-react/icon';
 import './TitleBar.css';
-import { api } from './api';
+import { api, type SearchResult } from './api';
 import { useState } from 'react';
+import SearchBox from './SearchBox';
 
 // 快捷键提示组件
 const Shortcut = ({ keys }: { keys: string }) => (
@@ -20,11 +21,26 @@ const Shortcut = ({ keys }: { keys: string }) => (
 interface TitleBarProps {
   onPageChange?: (page: string) => void;
   onNewNote?: () => void;
+  onSearchResult?: (result: SearchResult) => void;
 }
 
-const TitleBar = ({ onPageChange, onNewNote }: TitleBarProps) => {
+const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) => {
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [importContent, setImportContent] = useState('');
+
+  // 处理搜索结果点击
+  const handleSearchResult = (result: SearchResult) => {
+    if (onSearchResult) {
+      onSearchResult(result);
+    } else {
+      // 默认行为：跳转到对应页面
+      if (result.type === 'note') {
+        onPageChange?.('notes');
+      } else if (result.type === 'card') {
+        onPageChange?.('scroll');
+      }
+    }
+  };
 
   // 新建菜单项
   const handleNewNote = () => {
@@ -307,20 +323,21 @@ const TitleBar = ({ onPageChange, onNewNote }: TitleBarProps) => {
 
         {/* center search */}
         <div className="titlebar-center">
-          <Input
-            className="titlebar-search"
-            placeholder="搜索"
-            prefix={<IconSearch />}
-            size="small"
-            readOnly
+          <SearchBox 
+            onResultClick={handleSearchResult}
+            onNavigateToNote={(noteId) => {
+              onPageChange?.('notes');
+              // 可以扩展为直接导航到特定笔记
+            }}
+            onNavigateToCard={() => onPageChange?.('scroll')}
           />
         </div>
 
-        {/* avatar + window controls */}
-        <div className="titlebar-avatar">
-          <Avatar size={28} style={{ backgroundColor: 'rgb(32, 108, 207)', fontSize: 12, cursor: 'pointer' }}>P</Avatar>
-        </div>
+        {/* window controls */}
         <div className="titlebar-controls">
+          <div className="titlebar-avatar">
+            <Avatar size={28} style={{ backgroundColor: 'rgb(32, 108, 207)', fontSize: 12, cursor: 'pointer' }}>P</Avatar>
+          </div>
           <button className="titlebar-btn" aria-label="最小化">
             <IconMinus />
           </button>
@@ -349,7 +366,7 @@ const TitleBar = ({ onPageChange, onNewNote }: TitleBarProps) => {
           <Input.TextArea
             placeholder="例如：\n环境问题 A === 答案 A\n环境问题 B === 答案 B"
             value={importContent}
-            onChange={setImportContent}
+            onChange={(value: string) => setImportContent(value)}
             rows={8}
           />
         </div>

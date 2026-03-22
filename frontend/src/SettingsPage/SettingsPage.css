@@ -1,0 +1,519 @@
+.settings-page {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  background: var(--color-bg-1);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+/* 字节字体规范 */
+.settings-page,
+.settings-page * {
+  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* 标题字体 - 苹方/Medium */
+.settings-page h4,
+.settings-page h5,
+.settings-page h6,
+.settings-page .arco-typography-title {
+  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-weight: 600;
+}
+
+/* 正文字体 - 苹方/Regular */
+.settings-page .arco-typography,
+.settings-page .arco-typography-text,
+.settings-page .settings-menu-item,
+.settings-page .arco-input-wrapper input {
+  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-weight: 400;
+}
+
+/* 辅助文字 - 苹方/Regular */
+.settings-page .arco-typography-secondary {
+  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-weight: 400;
+}
+
+/* 左侧菜单 */
+.settings-left-menu {
+  width: 200px;
+  height: 100%;
+  border-right: 1px solid var(--color-border-2);
+  background: var(--color-bg-2);
+  flex-shrink: 0;
+}
+
+.settings-menu-header {
+  padding: 20px 16px 16px;
+  border-bottom: 1px solid var(--color-border-2);
+}
+
+.settings-menu-header h6 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-1);
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+}
+
+.settings-menu-list {
+  padding: 8px;
+}
+
+.settings-menu-item {
+  padding: 12px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--color-text-2);
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 4px;
+  transition: all 0.2s ease;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.settings-menu-item:hover {
+  background: var(--color-fill-2);
+  color: #206CCF;
+}
+
+.settings-menu-item.active {
+  background: rgba(32, 108, 207, 0.1);
+  color: #206CCF;
+  font-weight: 600;
+}
+
+/* 中间 Provider 列表 */
+.settings-provider-list {
+  width: 280px;
+  height: 100%;
+  border-right: 1px solid var(--color-border-2);
+  background: var(--color-bg-1);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.settings-provider-search {
+  padding: 16px;
+  border-bottom: 1px solid var(--color-border-2);
+}
+
+.settings-provider-items {
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+}
+
+.settings-provider-item {
+  padding: 14px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  background: var(--color-bg-1);
+}
+
+.settings-provider-item:hover {
+  background: var(--color-fill-2);
+  border-color: var(--color-border-2);
+}
+
+.settings-provider-item.selected {
+  background: #fff;
+  border-color: #206CCF;
+  box-shadow: 0 2px 8px rgba(32, 108, 207, 0.15);
+}
+
+.settings-provider-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-provider-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-provider-name .arco-typography {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+}
+
+.settings-provider-footer {
+  padding: 16px;
+  border-top: 1px solid var(--color-border-2);
+}
+
+/* 右侧详情 */
+.settings-provider-detail {
+  flex: 1;
+  height: 100%;
+  overflow: auto;
+  padding: 24px 32px;
+  min-width: 0;
+  background: var(--color-bg-1);
+}
+
+/* 头部 - 去掉分隔线 */
+.settings-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.settings-detail-title {
+  flex: 1;
+}
+
+.settings-detail-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 0;
+}
+
+.settings-detail-name h4 {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--color-text-1);
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+
+.settings-detail-title .arco-typography-secondary {
+  font-size: 14px;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+
+/* 紧凑的表单项 - 减少间距 */
+.settings-form-item-compact {
+  margin-bottom: 16px;
+}
+
+.settings-form-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-1);
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+}
+
+/* 输入框样式 - 纯白背景 + 蓝色边框 */
+.settings-page .arco-input-wrapper,
+.settings-page .arco-input-password {
+  background-color: #fff !important;
+  border: 1px solid #206CCF !important;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.settings-page .arco-input-wrapper:hover,
+.settings-page .arco-input-password:hover {
+  border-color: #1654a8 !important;
+  box-shadow: 0 2px 4px rgba(32, 108, 207, 0.1);
+}
+
+.settings-page .arco-input-wrapper.arco-input-focus,
+.settings-page .arco-input-password.arco-input-focus {
+  border-color: #206CCF !important;
+  box-shadow: 0 0 0 3px rgba(32, 108, 207, 0.15);
+}
+
+/* 输入框内部元素 */
+.settings-page .arco-input-wrapper .arco-input,
+.settings-page .arco-input-password .arco-input {
+  background-color: #fff !important;
+  color: var(--color-text-1);
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+/* 输入框前后缀 */
+.settings-page .arco-input-wrapper .arco-input-addafter,
+.settings-page .arco-input-wrapper .arco-input-addbefore {
+  background-color: #fff !important;
+  border-left: 1px solid #206CCF;
+}
+
+/* 输入框占位符 */
+.settings-page .arco-input-wrapper .arco-input::placeholder {
+  color: var(--color-text-3);
+}
+
+/* 选择器样式 */
+.settings-provider-detail .arco-select-view,
+.settings-content-page .arco-select-view {
+  background: #fff !important;
+  border: 1px solid #206CCF !important;
+  border-radius: 6px;
+}
+
+/* 模型列表 */
+.settings-models-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.settings-models-header .arco-typography-bold {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+}
+
+.settings-models-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 模型卡片 - 纯白背景 + 蓝色描边 */
+.settings-model-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #206CCF;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.settings-model-card:hover {
+  border-color: rgb(24, 90, 175);
+  box-shadow: 0 2px 8px rgba(32, 108, 207, 0.15);
+}
+
+.settings-model-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-model-icon {
+  font-size: 20px;
+}
+
+.settings-model-info .arco-typography-bold {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-1);
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+.settings-model-info .arco-typography-secondary {
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 2px;
+}
+
+.settings-model-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-detail-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 32px;
+  padding-top: 0;
+  border-top: none;
+}
+
+/* 内容页面通用 */
+.settings-content-page {
+  flex: 1;
+  height: 100%;
+  overflow: auto;
+  padding: 32px 40px;
+  background: var(--color-bg-1);
+}
+
+.settings-content-page h5 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-text-1);
+  margin-bottom: 24px;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+
+.settings-content-page h6 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-1);
+  margin-bottom: 16px;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+.settings-param-item {
+  margin-bottom: 28px;
+}
+
+.settings-param-control {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 10px;
+}
+
+.settings-general-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--color-border-2);
+}
+
+.settings-general-item .arco-typography-bold {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-1);
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+.settings-general-item .arco-typography-secondary {
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 4px;
+  letter-spacing: 0;
+}
+
+/* 数据卡片 - 纯白背景 + 蓝色描边 */
+.settings-data-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #206CCF;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.settings-data-card .arco-typography-bold {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-1);
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+.settings-data-card .arco-typography-secondary {
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 4px;
+  letter-spacing: 0;
+}
+
+/* 危险操作卡片 - 纯白背景 + 红色描边 */
+.settings-data-danger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid var(--color-danger);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.settings-data-danger .arco-typography-bold {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+.settings-data-danger .arco-typography-secondary {
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 4px;
+  letter-spacing: 0;
+}
+
+/* 按钮样式 */
+.settings-detail-actions .arco-btn-primary {
+  font-weight: 500;
+}
+
+/* 标签 */
+.settings-page .arco-tag {
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+/* 默认标签 - 蓝底白字 */
+.settings-page .arco-tag-color-arcoblue {
+  background-color: #206CCF !important;
+  color: #fff !important;
+  border-color: #206CCF !important;
+  font-size: 13px;
+  padding: 4px 10px;
+  height: auto;
+  line-height: 1.4;
+}
+
+/* 复选框样式调整 - 勾选框在右边 */
+.settings-page .arco-checkbox {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.settings-page .arco-checkbox > .arco-checkbox-text {
+  flex: 1;
+  margin-right: auto;
+  margin-left: 0;
+}
+
+.settings-page .arco-checkbox > .arco-checkbox-mask-wrapper {
+  margin-left: 8px;
+  margin-right: 0;
+}
+
+/* 通用卡片样式 - 纯白背景 + 蓝色描边 */
+.settings-card-blue {
+  background: #fff;
+  border: 1px solid #206CCF;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+/* 警告卡片样式 - 纯白背景 + 红色/橙色描边 */
+.settings-card-warning {
+  background: #fff;
+  border: 1px solid var(--color-warning);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}

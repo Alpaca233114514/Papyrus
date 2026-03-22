@@ -92,7 +92,10 @@ const Sidebar = ({ collapsed, onToggle, chatOpen, onChatToggle, activePage, onPa
         </div>
       </Tooltip>
       <Tooltip content="设置" position="right" mini disabled={!collapsed}>
-        <div className="sidebar-item">
+        <div 
+          className={`sidebar-item${activePage === 'settings' ? ' sidebar-item-active' : ''}`}
+          onClick={() => onPageChange('settings')}
+        >
           <IconSettings />
           <span className="sidebar-label">设置</span>
         </div>
