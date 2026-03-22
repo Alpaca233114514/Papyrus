@@ -107,12 +107,21 @@ class PapyrusApp:
         self.mcp_server = None
         self.setup_logger()
 
+        # macOS 窗口激活修复
+        if sys.platform == 'darwin':
+            # 绑定窗口显示事件
+            self.root.bind('<Map>', self.on_window_map)
 
         self.load_data()
         self.setup_ui()  # 先初始化主界面容器
         self.setup_ai()  # 再初始化AI侧边栏
         self.setup_mcp()  # 启动MCP本地服务器
         self.next_card()
+
+    def on_window_map(self, event):
+        """窗口显示时的处理，用于 macOS 窗口激活修复"""
+        # 延迟激活窗口，确保窗口完全显示
+        self.root.after(50, self.activate_window)
 
     # -------------------------
     # 日志
@@ -727,6 +736,14 @@ class PapyrusApp:
 
     def update_status(self, count: int):
         self.status_var.set(f"待复习: {count} | 总卡片: {len(self.cards)}")
+
+    def activate_window(self):
+        """激活窗口，确保窗口在前台显示"""
+        try:
+            self.root.lift()  # 提升窗口到顶层
+            self.root.focus_force()  # 强制获取焦点
+        except Exception:
+            pass  # 忽略可能的错误
 
     def restore_backup(self):
         if not os.path.exists(BACKUP_FILE):
