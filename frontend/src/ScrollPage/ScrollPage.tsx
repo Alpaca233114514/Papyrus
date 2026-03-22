@@ -1,6 +1,8 @@
 import { Typography, Button } from '@arco-design/web-react';
-import { IconPlus, IconClockCircle, IconBook } from '@arco-design/web-react/icon';
-import { useState } from 'react';
+import { IconPlus, IconClockCircle, IconBook, IconPlayCircle, IconEye } from '@arco-design/web-react/icon';
+import { useState, useEffect } from 'react';
+import FlashcardStudy from './FlashcardStudy';
+import { api } from '../api';
 
 // 类型定义
 interface Collection {
@@ -121,7 +123,7 @@ const CollectionCard = ({ collection }: { collection: Collection }) => {
 };
 
 // 卷轴卡片
-const ScrollCard = ({ scroll }: { scroll: Scroll }) => {
+const ScrollCard = ({ scroll, onStudy }: { scroll: Scroll; onStudy?: () => void }) => {
   const [hovered, setHovered] = useState(false);
   const cardStyle = useCardStyle(hovered);
 
@@ -129,6 +131,7 @@ const ScrollCard = ({ scroll }: { scroll: Scroll }) => {
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onClick={onStudy}
       style={{
         ...cardStyle,
         flex: '0 0 auto',
@@ -139,8 +142,36 @@ const ScrollCard = ({ scroll }: { scroll: Scroll }) => {
         flexDirection: 'column',
         justifyContent: 'space-between',
         boxSizing: 'border-box',
+        position: 'relative',
       }}
     >
+      {/* 快速学习按钮 */}
+      {scroll.dueCount > 0 && hovered && (
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            onStudy?.();
+          }}
+          style={{
+            position: 'absolute',
+            top: '12px',
+            right: '12px',
+            width: '32px',
+            height: '32px',
+            borderRadius: '50%',
+            background: PRIMARY_COLOR,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(32, 108, 207, 0.3)',
+            transition: 'transform 0.2s',
+          }}
+        >
+          <IconPlayCircle style={{ fontSize: '18px', color: '#fff' }} />
+        </div>
+      )}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {scroll.dueCount > 0 ? (
@@ -249,7 +280,40 @@ const ShelfTitle = ({ children }: { children: React.ReactNode }) => (
 );
 
 const ScrollPage = () => {
+  const [isStudying, setIsStudying] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
+  const [dueCount, setDueCount] = useState(MOCK_STATS.totalDue);
+  const [totalCount, setTotalCount] = useState(MOCK_STATS.totalCards);
   const overallProgress = Math.round((MOCK_STATS.masteredCards / MOCK_STATS.totalCards) * 100);
+
+  // 获取真实的待复习数量
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await api.nextDue();
+        setDueCount(res.due_count);
+        setTotalCount(res.total_count);
+      } catch (err) {
+        console.error('获取统计失败:', err);
+      }
+    };
+    
+    if (!isStudying) {
+      fetchStats();
+    }
+  }, [isStudying]);
+
+  // 开始学习（真实模式）
+  const startStudy = () => {
+    setIsDemo(false);
+    setIsStudying(true);
+  };
+
+  // 开始演示
+  const startDemo = () => {
+    setIsDemo(true);
+    setIsStudying(true);
+  };
 
   const shelfContainerStyle = {
     display: 'flex',
@@ -260,6 +324,21 @@ const ScrollPage = () => {
     paddingBottom: '8px',
   };
 
+  // 学习模式
+  if (isStudying) {
+    return (
+      <div style={{ 
+        flex: 1, 
+        display: 'flex', 
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}>
+        <FlashcardStudy onExit={() => setIsStudying(false)} demo={isDemo} />
+      </div>
+    );
+  }
+
+  // 列表模式
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '48px 64px 64px' }}>
       {/* 标题行 */}
@@ -270,18 +349,39 @@ const ScrollPage = () => {
         >
           卷轴
         </Typography.Title>
-        <Button
-          type='primary'
-          style={{
-            height: '40px',
-            borderRadius: '20px',
-            padding: '0 20px',
-            fontSize: '14px',
-            backgroundColor: PRIMARY_COLOR,
-          }}
-        >
-          开始复习
-        </Button>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          {/* 演示按钮 */}
+          <Button
+            size='large'
+            icon={<IconEye />}
+            onClick={startDemo}
+            style={{
+              height: '48px',
+              borderRadius: '24px',
+              padding: '0 24px',
+              fontSize: '15px',
+            }}
+          >
+            预览学习界面
+          </Button>
+          {/* 开始学习按钮 */}
+          <Button
+            type='primary'
+            size='large'
+            icon={<IconPlayCircle />}
+            onClick={startStudy}
+            disabled={dueCount === 0}
+            style={{
+              height: '48px',
+              borderRadius: '24px',
+              padding: '0 28px',
+              fontSize: '15px',
+              backgroundColor: dueCount > 0 ? PRIMARY_COLOR : 'var(--color-text-3)',
+            }}
+          >
+            {dueCount > 0 ? `开始复习 (${dueCount})` : '暂无待复习'}
+          </Button>
+        </div>
       </div>
 
       {/* 数据小栏 */}
@@ -296,8 +396,8 @@ const ScrollPage = () => {
         background: 'var(--color-bg-1)',
       }}>
         <div style={{ display: 'flex', gap: '48px' }}>
-          <StatItem label='待复习' value={MOCK_STATS.totalDue} color={PRIMARY_COLOR} />
-          <StatItem label='已掌握' value={`${MOCK_STATS.masteredCards}/${MOCK_STATS.totalCards}`} color={SUCCESS_COLOR} />
+          <StatItem label='待复习' value={dueCount} color={dueCount > 0 ? PRIMARY_COLOR : undefined} />
+          <StatItem label='已掌握' value={`${MOCK_STATS.masteredCards}/${totalCount || MOCK_STATS.totalCards}`} color={SUCCESS_COLOR} />
           <StatItem label='总进度' value={`${overallProgress}%`} />
           <StatItem label='今日已学' value={MOCK_STATS.todayLearned} />
           <StatItem label='连续学习' value={`${MOCK_STATS.streakDays}天`} />
@@ -317,7 +417,13 @@ const ScrollPage = () => {
       <section>
         <ShelfTitle>最近使用</ShelfTitle>
         <div style={shelfContainerStyle}>
-          {MOCK_SCROLLS.map(s => <ScrollCard key={s.id} scroll={s} />)}
+          {MOCK_SCROLLS.map(s => (
+            <ScrollCard 
+              key={s.id} 
+              scroll={s} 
+              onStudy={s.dueCount > 0 ? startStudy : undefined}
+            />
+          ))}
           <AddCard label='新建卷轴' />
         </div>
       </section>

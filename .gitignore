@@ -21,6 +21,7 @@ htmlcov/
 .cache
 .pytest_cache/
 coverage.xml
+.mypy_cache/
 
 # Environments
 .env

@@ -5,6 +5,7 @@ import RecentNotes from './RecentNotes';
 import ReviewQueue from './ReviewQueue';
 import { getSolarTerm, fetchSolarTerm } from './solarTerms';
 import { type SceneryContent, fetchSceneryContent } from './sceneryContent';
+import FlashcardStudy from '../ScrollPage/FlashcardStudy';
 
 type StartPageStats = {
   cardsDue: number;
@@ -29,6 +30,7 @@ type PendingCardProps = {
   greeting: string;
   dateLabel: string;
   solarTerm: string | null;
+  onStartStudy?: () => void;
 };
 
 const PRIMARY_COLOR = '#206CCF';
@@ -205,12 +207,16 @@ const LatticeBackground = () => {
   );
 };
 
-const PendingCard = ({ stats, greeting, dateLabel, solarTerm }: PendingCardProps) => {
+const PendingCard = ({ stats, greeting, dateLabel, solarTerm, onStartStudy }: PendingCardProps) => {
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
   const [rippleKey, setRippleKey] = useState(0);
 
   const highlighted = hovered || pressed;
+  
+  const handleClick = () => {
+    onStartStudy?.();
+  };
 
   return (
     <div
@@ -277,6 +283,7 @@ const PendingCard = ({ stats, greeting, dateLabel, solarTerm }: PendingCardProps
           }}
           onMouseDown={() => setPressed(true)}
           onMouseUp={() => setPressed(false)}
+          onClick={handleClick}
         >
           {hovered ? (
             <span
@@ -399,13 +406,15 @@ const DoneCard = ({ scenery }: { scenery: SceneryContent | null }) => {
               fontFamily: '"Noto Serif SC", "Source Han Serif SC", "STSong", serif',
               fontSize: '14px',
               fontWeight: 400,
-              letterSpacing: '0.15em',
-              color: 'var(--color-text-3)',
+              letterSpacing: '0.2em',
+              color: '#5C5C5C',
               lineHeight: 1.6,
+              marginTop: '6px',
+              height: '100%',
               overflow: 'hidden',
             }}
           >
-            {'——'}{source}
+            {source}
           </div>
         </div>
       </div>
@@ -416,10 +425,20 @@ const DoneCard = ({ scenery }: { scenery: SceneryContent | null }) => {
 const StartPage = ({ onDoneChange }: StartPageProps) => {
   const data = useStartPageData();
   const done = data.stats.cardsDue === 0;
+  const [isStudying, setIsStudying] = useState(false);
 
   useEffect(() => {
     onDoneChange?.(done);
   }, [done, onDoneChange]);
+
+  // 学习模式
+  if (isStudying) {
+    return (
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <FlashcardStudy onExit={() => setIsStudying(false)} demo={false} />
+      </div>
+    );
+  }
 
   return (
     <div id='start-page-scroll' style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
@@ -439,6 +458,7 @@ const StartPage = ({ onDoneChange }: StartPageProps) => {
             greeting={data.greeting}
             dateLabel={data.dateLabel}
             solarTerm={data.solarTerm}
+            onStartStudy={() => setIsStudying(true)}
           />
         )}
       </div>
@@ -460,47 +480,39 @@ const StartPage = ({ onDoneChange }: StartPageProps) => {
         @property --mask-start {
           syntax: '<percentage>';
           inherits: false;
-          initial-value: 61.8%;
+          initial-value: 20%;
+        }
+        @property --mask-end {
+          syntax: '<percentage>';
+          inherits: false;
+          initial-value: 80%;
         }
 
         .scenery-img {
-          --mask-start: 61.8%;
-          mask-image: linear-gradient(to right, transparent var(--mask-start), black 100%);
-          -webkit-mask-image: linear-gradient(to right, transparent var(--mask-start), black 100%);
-          transition: --mask-start 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+          transition: transform 6s cubic-bezier(0.4, 0, 0.2, 1);
+          transform: scale(1);
         }
-
         .scenery-img.expanded {
-          --mask-start: 38.2%;
+          transform: scale(1.05);
         }
 
         .scenery-sub-text {
-          color: #888;
+          color: var(--color-text-3);
         }
 
-        body[arco-theme='dark'] .scenery-sub-text {
-          color: #666;
-        }
-
-        @keyframes spread {
+        @keyframes ripple-effect {
           0% {
             transform: translate(-50%, -50%) scale(0);
-            opacity: 1;
+            opacity: 0.6;
           }
-
           100% {
-            transform: translate(-50%, -50%) scale(8);
-            opacity: 1;
+            transform: translate(-50%, -50%) scale(2.5);
+            opacity: 0;
           }
         }
 
         .start-btn-ripple {
-          animation: spread 1s ease-out forwards;
-        }
-
-        #start-page-scroll ::-webkit-scrollbar {
-          height: 0;
-          width: 0;
+          animation: ripple-effect 0.6s ease-out forwards;
         }
       `}</style>
     </div>
