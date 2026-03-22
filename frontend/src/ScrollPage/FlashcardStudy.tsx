@@ -132,7 +132,14 @@ const ResultToast = ({ grade, onUndo, canUndo }: ResultToastProps) => {
             fontSize: '13px',
           }}
         >
-          撤销
+          撤销 <kbd style={{ 
+            padding: '2px 6px', 
+            background: 'var(--color-bg-1)', 
+            borderRadius: '4px',
+            fontFamily: 'monospace',
+            fontSize: '11px',
+            marginLeft: '4px',
+          }}>U</kbd>
         </Button>
       )}
     </div>
@@ -198,6 +205,22 @@ export default function FlashcardStudy({ onExit, demo = false }: FlashcardStudyP
       loadRealCard();
     }
   }, [isDemo, loadDemoCard, loadRealCard]);
+
+  // 防止刷新丢失进度（真实学习模式）
+  useEffect(() => {
+    if (isDemo || studyState === 'empty' || studyState === 'loading') return;
+    
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (stats.studied > 0) {
+        e.preventDefault();
+        e.returnValue = '正在复习中，确定要离开吗？';
+        return e.returnValue;
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDemo, stats.studied, studyState]);
 
   // 揭晓答案
   const revealAnswer = useCallback(() => {
@@ -320,6 +343,7 @@ export default function FlashcardStudy({ onExit, demo = false }: FlashcardStudyP
 
       switch (e.code) {
         case 'Space':
+        case 'Enter':
           e.preventDefault();
           revealAnswer();
           break;
@@ -337,6 +361,12 @@ export default function FlashcardStudy({ onExit, demo = false }: FlashcardStudyP
         case 'Numpad3':
           e.preventDefault();
           submitRating(3);
+          break;
+        case 'KeyU':
+          e.preventDefault();
+          if (lastResult && studyState === 'question') {
+            undoRating();
+          }
           break;
         case 'Escape':
           e.preventDefault();
@@ -518,7 +548,31 @@ export default function FlashcardStudy({ onExit, demo = false }: FlashcardStudyP
             />
           </div>
           
-          {/* 进度显示 */}
+          {/* 当前进度 */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px',
+            padding: '6px 16px',
+            background: 'var(--color-fill-2)',
+            borderRadius: '20px',
+          }}>
+            <Typography.Text type="secondary" style={{ fontSize: '13px' }}>
+              第
+            </Typography.Text>
+            <Typography.Text style={{ 
+              fontSize: '16px', 
+              fontWeight: 600, 
+              color: PRIMARY_COLOR,
+            }}>
+              {isDemo ? demoIndex + 1 : stats.studied + 1}
+            </Typography.Text>
+            <Typography.Text type="secondary" style={{ fontSize: '13px' }}>
+              / {isDemo ? DEMO_CARDS.length : totalCount} 张
+            </Typography.Text>
+          </div>
+          
+          {/* 待复习数量 */}
           <div style={{ 
             display: 'flex', 
             alignItems: 'center', 
@@ -536,9 +590,6 @@ export default function FlashcardStudy({ onExit, demo = false }: FlashcardStudyP
               color: dueCount > 0 ? PRIMARY_COLOR : 'inherit' 
             }}>
               {dueCount}
-            </Typography.Text>
-            <Typography.Text type="secondary" style={{ fontSize: '13px' }}>
-              / {totalCount}
             </Typography.Text>
           </div>
           
@@ -681,7 +732,7 @@ export default function FlashcardStudy({ onExit, demo = false }: FlashcardStudyP
             }}>
               <Typography.Text style={{ fontSize: '16px' }}>␣</Typography.Text>
               <Typography.Text type="secondary" style={{ fontSize: '14px' }}>
-                按空格揭晓答案
+                按空格或回车揭晓答案
               </Typography.Text>
             </div>
           )}
@@ -759,6 +810,17 @@ export default function FlashcardStudy({ onExit, demo = false }: FlashcardStudyP
               fontSize: '14px',
             }}>Space</kbd>
             <Typography.Text type="secondary" style={{ fontSize: '14px' }}>
+              或
+            </Typography.Text>
+            <kbd style={{
+              padding: '4px 12px',
+              background: 'var(--color-bg-1)',
+              border: '1px solid var(--color-border-2)',
+              borderRadius: '6px',
+              fontFamily: 'monospace',
+              fontSize: '14px',
+            }}>Enter</kbd>
+            <Typography.Text type="secondary" style={{ fontSize: '14px' }}>
               揭晓答案
             </Typography.Text>
           </div>
@@ -769,11 +831,12 @@ export default function FlashcardStudy({ onExit, demo = false }: FlashcardStudyP
       <div style={{
         display: 'flex',
         justifyContent: 'center',
-        gap: '24px',
+        gap: '20px',
         padding: '16px',
+        flexWrap: 'wrap',
       }}>
         <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
-          <kbd style={kbdStyle}>Space</kbd> 揭晓
+          <kbd style={kbdStyle}>Space/Enter</kbd> 揭晓
         </Typography.Text>
         <Typography.Text style={{ fontSize: '12px', color: DANGER_COLOR }}>
           <kbd style={kbdStyle}>1</kbd> 忘记
@@ -784,6 +847,11 @@ export default function FlashcardStudy({ onExit, demo = false }: FlashcardStudyP
         <Typography.Text style={{ fontSize: '12px', color: SUCCESS_COLOR }}>
           <kbd style={kbdStyle}>3</kbd> 掌握
         </Typography.Text>
+        {lastResult && (
+          <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
+            <kbd style={kbdStyle}>U</kbd> 撤销
+          </Typography.Text>
+        )}
         <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
           <kbd style={kbdStyle}>Esc</kbd> 退出
         </Typography.Text>
