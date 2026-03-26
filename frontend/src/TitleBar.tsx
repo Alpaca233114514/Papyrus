@@ -291,26 +291,12 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
     </Menu>
   );
 
-  // 关于菜单
-  const aboutMenu = (
-    <Menu>
-      <Menu.Item key="about" onClick={() => Message.info('Papyrus v1.0.0 - SRS复习引擎')}>
-        关于 Papyrus
-      </Menu.Item>
-      <Menu.Item key="check-update" onClick={() => Message.info('已是最新版本')}>
-        检查更新
-      </Menu.Item>
-    </Menu>
-  );
-
   return (
     <>
       <div className="titlebar">
-        <Dropdown trigger="click" droplist={aboutMenu}>
-          <div className="titlebar-logo">
-            <img src="/icon.ico" alt="Papyrus" className="titlebar-logo-icon" />
-          </div>
-        </Dropdown>
+        <div className="titlebar-logo">
+          <img src="/icon.ico" alt="Papyrus" className="titlebar-logo-icon" />
+        </div>
 
         <Space className="titlebar-menus" size={0}>
           <Dropdown trigger="click" droplist={fileMenu}>
