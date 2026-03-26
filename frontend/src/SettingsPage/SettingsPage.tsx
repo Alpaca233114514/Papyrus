@@ -645,12 +645,12 @@ const SettingsPage = () => {
                   min={25}
                   max={75}
                   step={5}
-                  value={Math.round((config.opacity ?? 0.15) * 100)}
+                  value={Math.round((config.opacity ?? 0.35) * 100)}
                   onChange={(val) => updateConfig({ opacity: (val as number) / 100 })}
                   style={{ flex: 1, maxWidth: 150 }}
                 />
                 <Text style={{ fontSize: 13, minWidth: 40 }}>
-                  {Math.round((config.opacity ?? 0.15) * 100)}%
+                  {Math.round((config.opacity ?? 0.35) * 100)}%
                 </Text>
               </div>
             </div>
