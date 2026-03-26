@@ -111,8 +111,8 @@ const StatsCard = ({
   const poem = scenery.poem ?? '且将新火试新茶，诗酒趁年华。';
   const source = scenery.source ?? '[宋] 苏轼《望江南·超然台作》';
 
-  // 计算遮罩透明度 (0.05 ~ 0.5)
-  const overlayOpacity = Math.max(0.05, Math.min(0.5, opacity));
+  // 计算遮罩透明度 (0.25 ~ 0.75)
+  const overlayOpacity = Math.max(0.25, Math.min(0.75, opacity));
 
   return (
     <div

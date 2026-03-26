@@ -39,7 +39,7 @@ export const StatsBar = ({ noteCount, totalWords, todayNotes, tagCount }: StatsB
   const image = sceneryConfig.image;
   const poem = '且将新火试新茶，诗酒趁年华。';
   const source = '[宋] 苏轼《望江南·超然台作》';
-  const overlayOpacity = Math.max(0.25, Math.min(0.5, sceneryConfig.opacity));
+  const overlayOpacity = Math.max(0.25, Math.min(0.75, sceneryConfig.opacity));
 
   return (
     <div style={{

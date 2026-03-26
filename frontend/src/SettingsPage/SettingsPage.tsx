@@ -642,8 +642,8 @@ const SettingsPage = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <Text style={{ fontSize: 13, minWidth: 60 }}>透明度</Text>
                 <Slider
-                  min={5}
-                  max={50}
+                  min={25}
+                  max={75}
                   step={5}
                   value={Math.round((config.opacity ?? 0.15) * 100)}
                   onChange={(val) => updateConfig({ opacity: (val as number) / 100 })}
