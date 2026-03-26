@@ -142,16 +142,18 @@ function useCardHeight() {
 
 const ShelfSection = ({ label, children }: { label: string; children: ReactNode }) => (
   <section style={{ marginBottom: '48px' }}>
-    <Typography.Text
+    <Typography.Title
+      heading={3}
       style={{
-        display: 'block',
-        marginBottom: '24px',
-        fontSize: '24px',
+        fontWeight: 200,
+        lineHeight: 1,
+        margin: '0 0 24px',
+        fontSize: '16px',
         color: 'var(--color-text-3)',
       }}
     >
       {label}
-    </Typography.Text>
+    </Typography.Title>
     {children}
   </section>
 );
@@ -487,10 +489,10 @@ const StartPage = ({ onDoneChange }: StartPageProps) => {
 
   return (
     <StartPageSceneryBackground id="start-page-scroll" style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
-      <div style={{ position: 'relative', height: '61.8vh', padding: '64px 0 0 64px' }}>
+      <div style={{ position: 'relative', height: '61.8vh', padding: '48px 0 0 64px' }}>
         <Typography.Title
           heading={1}
-          style={{ fontWeight: 400, lineHeight: 1, margin: 0, fontSize: '40px' }}
+          style={{ fontWeight: 600, lineHeight: 1, margin: 0, fontSize: '40px' }}
         >
           开始
         </Typography.Title>
@@ -508,10 +510,10 @@ const StartPage = ({ onDoneChange }: StartPageProps) => {
         )}
       </div>
 
-      <div style={{ padding: '64px 64px 0' }}>
+      <div style={{ padding: '48px 64px 64px' }}>
         <Typography.Title
           heading={2}
-          style={{ fontWeight: 400, lineHeight: 1, margin: 0, marginBottom: '48px', fontSize: '24px' }}
+          style={{ fontWeight: 400, lineHeight: 1, margin: 0, marginBottom: '16px', fontSize: '28px' }}
         >
           书架
         </Typography.Title>

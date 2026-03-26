@@ -4,7 +4,7 @@
  * 接入设置中的窗景选择。
  */
 
-import { loadStartPageScenery } from '../hooks/useScenery';
+import { loadStartPageScenery, getSceneryOpacity } from '../hooks/useScenery';
 
 export type SceneryContent = {
   id: string;
@@ -42,3 +42,6 @@ export async function fetchSceneryContent(): Promise<SceneryContent | null> {
   // 窗景未启用，返回 null
   return null;
 }
+
+// 导出获取透明度的函数
+export { getSceneryOpacity };

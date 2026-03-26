@@ -1,7 +1,7 @@
 import { Typography, Card, Progress, Tooltip } from '@arco-design/web-react';
 import { useState, useMemo } from 'react';
 import { IconFire, IconClockCircle, IconCheckCircle, IconCalendar } from '@arco-design/web-react/icon';
-import { SceneryBackground } from '../components/SceneryBackground';
+
 
 const PRIMARY_COLOR = '#206CCF';
 const SUCCESS_COLOR = '#00B42A';
@@ -268,11 +268,11 @@ const ChartsPage = () => {
   const overallProgress = Math.round((MOCK_STATS.totalLearned / MOCK_STATS.totalCards) * 100);
 
   return (
-    <SceneryBackground page="charts" style={{ flex: 1, overflowY: 'auto', padding: '48px 64px 64px' }}>
+    <div style={{ flex: 1, overflowY: 'auto', padding: '48px 64px 64px', background: 'var(--color-bg-1)' }}>
       {/* 标题 */}
       <Typography.Title
         heading={1}
-        style={{ fontWeight: 400, lineHeight: 1, margin: 0, marginBottom: '32px', fontSize: '40px' }}
+        style={{ fontWeight: 600, lineHeight: 1, margin: 0, marginBottom: '32px', fontSize: '40px' }}
       >
         数据
       </Typography.Title>
@@ -361,7 +361,7 @@ const ChartsPage = () => {
       </div>
 
       <div style={{ height: '32px' }} />
-    </SceneryBackground>
+    </div>
   );
 };
 

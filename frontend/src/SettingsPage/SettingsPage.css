@@ -396,35 +396,6 @@
   background: var(--color-border-2);
 }
 
-/* 窗景设置卡片 */
-.settings-scenery-card {
-  border-radius: 16px;
-  border: 1px solid var(--color-text-3);
-  background: transparent;
-}
-
-/* 窗景缩略图 */
-.settings-scenery-thumb {
-  transition: all 0.2s ease;
-}
-
-.settings-scenery-thumb:hover {
-  transform: scale(1.02);
-}
-
-.settings-scenery-thumb.active {
-  border-color: #206CCF !important;
-  box-shadow: 0 0 0 2px rgba(32, 108, 207, 0.2) !important;
-}
-
-.settings-scenery-thumb img {
-  transition: transform 0.3s ease;
-}
-
-.settings-scenery-thumb:hover img {
-  transform: scale(1.05);
-}
-
 /* 响应式适配 */
 @media (max-width: 768px) {
   .settings-main,

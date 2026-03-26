@@ -1,7 +1,7 @@
 import { Typography, Button, Tag, Radio, Empty, Tooltip } from '@arco-design/web-react';
 import { useState } from 'react';
 import { IconFolderAdd, IconUpload, IconFolder, IconImage, IconFileVideo, IconMusic, IconFile, IconDownload, IconDelete } from '@arco-design/web-react/icon';
-import { SceneryBackground } from '../components/SceneryBackground';
+
 import ZipIcon from './ZipIcon';
 
 const PRIMARY_COLOR = '#206CCF';
@@ -142,11 +142,11 @@ const FilesPage = () => {
   };
 
   return (
-    <SceneryBackground page="files" style={{ flex: 1, overflowY: 'auto', padding: '48px 64px 64px' }}>
+    <div style={{ flex: 1, overflowY: 'auto', padding: '48px 64px 64px', background: 'var(--color-bg-1)' }}>
       {/* 标题 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <div>
-          <Typography.Title heading={1} style={{ fontWeight: 400, lineHeight: 1, margin: 0, fontSize: '40px' }}>
+          <Typography.Title heading={1} style={{ fontWeight: 600, lineHeight: 1, margin: 0, fontSize: '40px' }}>
             文件库
           </Typography.Title>
           <Typography.Text type='secondary' style={{ fontSize: '14px', marginTop: '8px', display: 'block' }}>
@@ -231,7 +231,7 @@ const FilesPage = () => {
       )}
 
       <div style={{ height: '32px' }} />
-    </SceneryBackground>
+    </div>
   );
 };
 

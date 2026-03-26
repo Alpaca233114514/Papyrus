@@ -3,7 +3,7 @@ import { NoteListView } from './views/NoteListView';
 import { NoteDetailView } from './views/NoteDetailView';
 import { FileTree } from './components/FileTree';
 import { useNotes } from './useNotes';
-import { SceneryBackground } from '../components/SceneryBackground';
+
 import type { Note } from './types';
 
 // 视图模式
@@ -107,11 +107,12 @@ const NotesPage = () => {
   }, [sidebarWidth]);
 
   return (
-    <SceneryBackground page="notes" style={{ 
+    <div style={{ 
       flex: 1, 
       display: 'flex', 
       overflow: 'hidden',
       position: 'relative',
+      background: 'var(--color-bg-1)',
     }}>
       {/* 文件树侧边栏 - 只在详情模式显示 */}
       {viewMode === 'detail' && (
@@ -167,7 +168,7 @@ const NotesPage = () => {
           />
         )}
       </div>
-    </SceneryBackground>
+    </div>
   );
 };
 

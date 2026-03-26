@@ -110,7 +110,7 @@ const FolderNode = ({
         <Typography.Text 
           style={{ 
             fontSize: '13px', 
-            fontWeight: 500,
+            fontWeight: 400,
             flex: 1,
           }}
         >
@@ -228,7 +228,7 @@ export const FileTree = ({
         <Typography.Text
           style={{
             fontSize: '14px',
-            fontWeight: 600,
+            fontWeight: 500,
             display: 'block',
             marginBottom: '16px',
           }}

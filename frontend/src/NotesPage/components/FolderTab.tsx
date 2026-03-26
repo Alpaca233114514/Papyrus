@@ -34,7 +34,7 @@ export const FolderTab = ({ folder, count, isActive, onClick }: FolderTabProps) 
     <div style={{ textAlign: 'center' }}>
       <div style={{ 
         fontSize: '14px', 
-        fontWeight: isActive ? 600 : 500,
+        fontWeight: isActive ? 500 : 400,
         color: isActive ? PRIMARY_COLOR : 'var(--color-text-1)',
       }}>
         {folder}

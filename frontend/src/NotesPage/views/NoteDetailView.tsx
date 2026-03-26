@@ -175,7 +175,7 @@ export const NoteDetailView = ({
           <Typography.Text
             style={{
               fontSize: '12px',
-              fontWeight: 600,
+              fontWeight: 500,
               color: 'var(--color-text-2)',
               display: 'block',
               marginBottom: '16px',
@@ -298,7 +298,7 @@ export const NoteDetailView = ({
               placeholder='输入标题...'
               style={{
                 fontSize: '32px',
-                fontWeight: 700,
+                fontWeight: 500,
                 border: 'none',
                 background: 'transparent',
                 padding: 0,

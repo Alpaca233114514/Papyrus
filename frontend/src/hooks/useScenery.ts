@@ -10,6 +10,7 @@ export interface PageSceneryConfig {
   enabled: boolean;
   image: string;
   name: string;
+  opacity: number; // 遮罩透明度 (0.05 ~ 0.5)
 }
 
 export interface SceneryItem {
@@ -29,13 +30,13 @@ const STORAGE_KEY = 'papyrus_scenery_settings';
 const CUSTOM_SCENERIES_KEY = 'papyrus_custom_sceneries';
 const START_PAGE_SCENERY_KEY = 'papyrus_start_page_scenery';
 
-// 默认设置（开始页面已移除，窗景由 DoneCard 独立管理）
+// 默认设置（各页面独立窗景配置）
 const defaultPageSceneries: Record<PageType, PageSceneryConfig> = {
-  notes: { enabled: false, image: '/scenery/image.png', name: '默认窗景' },
-  scroll: { enabled: false, image: '/scenery/image.png', name: '默认窗景' },
-  files: { enabled: false, image: '/scenery/image.png', name: '默认窗景' },
-  extensions: { enabled: false, image: '/scenery/image.png', name: '默认窗景' },
-  charts: { enabled: false, image: '/scenery/image.png', name: '默认窗景' },
+  notes: { enabled: false, image: '/scenery/image.png', name: '默认窗景', opacity: 0.15 },
+  scroll: { enabled: false, image: '/scenery/image.png', name: '默认窗景', opacity: 0.15 },
+  files: { enabled: false, image: '/scenery/image.png', name: '默认窗景', opacity: 0.15 },
+  extensions: { enabled: false, image: '/scenery/image.png', name: '默认窗景', opacity: 0.15 },
+  charts: { enabled: false, image: '/scenery/image.png', name: '默认窗景', opacity: 0.15 },
 };
 
 // 开始页面窗景设置（用于 DoneCard）
@@ -43,12 +44,14 @@ export interface StartPageSceneryConfig {
   enabled: boolean;
   image: string;
   name: string;
+  opacity: number; // 遮罩透明度 (0.05 ~ 0.5)
 }
 
 const defaultStartPageScenery: StartPageSceneryConfig = {
   enabled: true,
   image: '/scenery/image.png',
   name: '默认窗景',
+  opacity: 0.15,
 };
 
 // 加载页面设置
@@ -98,6 +101,12 @@ export const saveStartPageScenery = (config: StartPageSceneryConfig) => {
   } catch {
     // ignore
   }
+};
+
+// 获取窗景透明度（供其他界面使用）
+export const getSceneryOpacity = (): number => {
+  const config = loadStartPageScenery();
+  return config.opacity ?? defaultStartPageScenery.opacity;
 };
 
 // 加载自定义窗景库

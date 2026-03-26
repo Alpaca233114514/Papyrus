@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import FlashcardStudy from './FlashcardStudy';
 import { SceneryBackground } from '../components/SceneryBackground';
 import { api } from '../api';
+import { type SceneryContent } from '../StartPage/sceneryContent';
+import { usePageScenery } from '../hooks/useScenery';
 
 // 类型定义
 interface Collection {
@@ -65,6 +67,105 @@ const StatItem = ({ label, value, color }: { label: string; value: string | numb
     </Typography.Text>
   </div>
 );
+
+// 统计数据栏 - 支持窗景背景（简洁版 - 无悬停效果）
+const StatsCard = ({ 
+  dueCount, 
+  totalCount, 
+  overallProgress, 
+  scenery,
+  opacity = 0.15,
+}: { 
+  dueCount: number; 
+  totalCount: number; 
+  overallProgress: number; 
+  scenery: SceneryContent | null;
+  opacity?: number;
+}) => {
+  // 窗景关闭时（scenery 为 null），显示纯背景样式
+  if (!scenery) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '24px',
+        marginBottom: '40px',
+        borderRadius: '12px',
+        border: '1px solid var(--color-text-3)',
+        background: 'var(--color-bg-1)',
+      }}>
+        <div style={{ display: 'flex', gap: '48px' }}>
+          <StatItem label='待复习' value={dueCount} color={dueCount > 0 ? PRIMARY_COLOR : undefined} />
+          <StatItem label='已掌握' value={`${MOCK_STATS.masteredCards}/${totalCount || MOCK_STATS.totalCards}`} color={SUCCESS_COLOR} />
+          <StatItem label='总进度' value={`${overallProgress}%`} />
+          <StatItem label='今日已学' value={MOCK_STATS.todayLearned} />
+          <StatItem label='连续学习' value={`${MOCK_STATS.streakDays}天`} />
+        </div>
+      </div>
+    );
+  }
+
+  // 窗景开启时，显示图片 + 固定透明度遮罩
+  const image = scenery.image;
+  const poem = scenery.poem ?? '且将新火试新茶，诗酒趁年华。';
+  const source = scenery.source ?? '[宋] 苏轼《望江南·超然台作》';
+
+  // 计算遮罩透明度 (0.05 ~ 0.5)
+  const overlayOpacity = Math.max(0.05, Math.min(0.5, opacity));
+
+  return (
+    <div
+      style={{
+        position: 'relative',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '24px',
+        marginBottom: '40px',
+        borderRadius: '12px',
+        border: '1px solid var(--color-text-3)',
+        overflow: 'hidden',
+      }}
+    >
+      {/* 窗景背景图 */}
+      <img
+        src={image}
+        alt={`窗景图片：${poem} —— ${source}`}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+        }}
+      />
+
+      {/* 固定透明度遮罩层 */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: `rgba(255, 255, 255, ${overlayOpacity})`,
+        }}
+      />
+
+      {/* 统计内容 */}
+      <div style={{ 
+        position: 'relative', 
+        zIndex: 1, 
+        display: 'flex', 
+        gap: '48px',
+      }}>
+        <StatItem label='待复习' value={dueCount} color={dueCount > 0 ? PRIMARY_COLOR : undefined} />
+        <StatItem label='已掌握' value={`${MOCK_STATS.masteredCards}/${totalCount || MOCK_STATS.totalCards}`} color={SUCCESS_COLOR} />
+        <StatItem label='总进度' value={`${overallProgress}%`} />
+        <StatItem label='今日已学' value={MOCK_STATS.todayLearned} />
+        <StatItem label='连续学习' value={`${MOCK_STATS.streakDays}天`} />
+      </div>
+    </div>
+  );
+};
 
 // 通用卡片样式 - 与开始界面统一
 const useCardStyle = (hovered: boolean) => ({
@@ -313,6 +414,9 @@ const ScrollPage = () => {
   const [dueCount, setDueCount] = useState(MOCK_STATS.totalDue);
   const [totalCount, setTotalCount] = useState(MOCK_STATS.totalCards);
   const overallProgress = Math.round((MOCK_STATS.masteredCards / MOCK_STATS.totalCards) * 100);
+  
+  // 窗景配置（使用卷轴页面独立配置）
+  const { config: sceneryConfig } = usePageScenery('scroll');
 
   // 获取真实的待复习数量
   useEffect(() => {
@@ -373,7 +477,7 @@ const ScrollPage = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <Typography.Title
           heading={1}
-          style={{ fontWeight: 400, lineHeight: 1, margin: 0, fontSize: '40px' }}
+          style={{ fontWeight: 600, lineHeight: 1, margin: 0, fontSize: '40px' }}
         >
           卷轴
         </Typography.Title>
@@ -412,25 +516,19 @@ const ScrollPage = () => {
         </div>
       </div>
 
-      {/* 数据小栏 */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '24px',
-        marginBottom: '40px',
-        borderRadius: '12px',
-        border: '1px solid var(--color-text-3)',
-        background: 'var(--color-bg-1)',
-      }}>
-        <div style={{ display: 'flex', gap: '48px' }}>
-          <StatItem label='待复习' value={dueCount} color={dueCount > 0 ? PRIMARY_COLOR : undefined} />
-          <StatItem label='已掌握' value={`${MOCK_STATS.masteredCards}/${totalCount || MOCK_STATS.totalCards}`} color={SUCCESS_COLOR} />
-          <StatItem label='总进度' value={`${overallProgress}%`} />
-          <StatItem label='今日已学' value={MOCK_STATS.todayLearned} />
-          <StatItem label='连续学习' value={`${MOCK_STATS.streakDays}天`} />
-        </div>
-      </div>
+      {/* 数据小栏 - 带窗景背景 */}
+      <StatsCard 
+        dueCount={dueCount} 
+        totalCount={totalCount} 
+        overallProgress={overallProgress} 
+        scenery={sceneryConfig.enabled ? { 
+          id: 'scroll-scenery', 
+          image: sceneryConfig.image, 
+          poem: '且将新火试新茶，诗酒趁年华。',
+          source: '[宋] 苏轼《望江南·超然台作》'
+        } : null}
+        opacity={sceneryConfig.opacity}
+      />
 
       {/* 卷帙分类 */}
       <section style={{ marginBottom: '40px' }}>

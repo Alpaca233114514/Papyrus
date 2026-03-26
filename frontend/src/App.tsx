@@ -53,7 +53,7 @@ const App = () => {
   }, [chatWidth]);
 
   return (
-    <div style={{ width: '1440px', height: '900px', margin: '0 auto', background: '#FFFFFF', border: '1px solid var(--color-border-3)', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+    <div style={{ width: '1440px', height: '900px', margin: '0 auto', background: '#FFFFFF', border: '1px solid rgba(0, 0, 0, 0.35)', display: 'flex', flexDirection: 'column', position: 'relative' }}>
       {/* Skip Link - 无障碍导航 */}
       <a href="#main-content" className="skip-link">
         跳转到主内容

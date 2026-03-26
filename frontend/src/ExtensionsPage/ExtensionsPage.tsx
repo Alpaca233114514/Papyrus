@@ -1,7 +1,7 @@
 import { Typography, Button, Tabs, Tag, Switch, Card } from '@arco-design/web-react';
 import { useState } from 'react';
 import { IconPlus, IconSettings, IconDelete, IconCheckCircleFill, IconDownload, IconStarFill } from '@arco-design/web-react/icon';
-import { SceneryBackground } from '../components/SceneryBackground';
+
 
 const PRIMARY_COLOR = '#206CCF';
 const SUCCESS_COLOR = '#00B42A';
@@ -131,9 +131,9 @@ const ExtensionsPage = () => {
   const updateCount = extensions.filter(e => e.updateAvailable).length;
 
   return (
-    <SceneryBackground page="extensions" style={{ flex: 1, overflowY: 'auto', padding: '48px 64px 64px' }}>
+    <div style={{ flex: 1, overflowY: 'auto', padding: '48px 64px 64px', background: 'var(--color-bg-1)' }}>
       {/* 标题 */}
-      <Typography.Title heading={1} style={{ fontWeight: 400, lineHeight: 1, margin: 0, marginBottom: '32px', fontSize: '40px' }}>
+      <Typography.Title heading={1} style={{ fontWeight: 600, lineHeight: 1, margin: 0, marginBottom: '32px', fontSize: '40px' }}>
         扩展管理
       </Typography.Title>
 
@@ -201,7 +201,7 @@ const ExtensionsPage = () => {
       )}
 
       <div style={{ height: '32px' }} />
-    </SceneryBackground>
+    </div>
   );
 };
 
