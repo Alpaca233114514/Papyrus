@@ -40,10 +40,10 @@
   color: var(--color-text-1);
 }
 
-/* 分类网格 */
+/* 分类网格 - 固定三列布局 */
 .settings-categories-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
 
