@@ -1,6 +1,7 @@
 import { Typography, Card, Progress, Tooltip } from '@arco-design/web-react';
 import { useState, useMemo } from 'react';
 import { IconFire, IconClockCircle, IconCheckCircle, IconCalendar } from '@arco-design/web-react/icon';
+import { usePageScenery } from '../hooks/useScenery';
 
 
 const PRIMARY_COLOR = '#206CCF';
@@ -264,20 +265,14 @@ const Heatmap = () => {
   );
 };
 
-const ChartsPage = () => {
+// 顶部统计栏组件 - 支持窗景背景
+const StatsBar = () => {
+  const { config: sceneryConfig, loaded } = usePageScenery('charts');
   const overallProgress = Math.round((MOCK_STATS.totalLearned / MOCK_STATS.totalCards) * 100);
 
-  return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '48px 64px 64px', background: 'var(--color-bg-1)' }}>
-      {/* 标题 */}
-      <Typography.Title
-        heading={1}
-        style={{ fontWeight: 600, lineHeight: 1, margin: 0, marginBottom: '32px', fontSize: '40px' }}
-      >
-        数据
-      </Typography.Title>
-
-      {/* 顶部统计栏 */}
+  // 等待设置加载完成
+  if (!loaded) {
+    return (
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -296,6 +291,77 @@ const ChartsPage = () => {
           <StatItem label='平均正确率' value={`${MOCK_STATS.avgAccuracy}%`} />
         </div>
       </div>
+    );
+  }
+
+  // 窗景配置
+  const image = sceneryConfig.image;
+  const poem = '且将新火试新茶，诗酒趁年华。';
+  const source = '[宋] 苏轼《望江南·超然台作》';
+  const overlayOpacity = Math.max(0.25, Math.min(0.5, sceneryConfig.opacity));
+
+  return (
+    <div style={{
+      position: 'relative',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: '24px',
+      marginBottom: '32px',
+      borderRadius: '12px',
+      border: '1px solid var(--color-text-3)',
+      overflow: 'hidden',
+    }}>
+      {/* 窗景背景图 */}
+      {sceneryConfig.enabled && (
+        <>
+          <img
+            src={image}
+            alt={`窗景图片：${poem} —— ${source}`}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+            }}
+          />
+          {/* 固定透明度遮罩层 */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: `rgba(255, 255, 255, ${overlayOpacity})`,
+            }}
+          />
+        </>
+      )}
+
+      {/* 统计内容 */}
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', gap: '48px' }}>
+        <StatItem label='连续学习' value={MOCK_STATS.streakDays} suffix='天' />
+        <StatItem label='已掌握' value={`${MOCK_STATS.totalLearned}/${MOCK_STATS.totalCards}`} />
+        <StatItem label='总进度' value={`${overallProgress}%`} />
+        <StatItem label='今日待复习' value={MOCK_STATS.totalDue} />
+        <StatItem label='平均正确率' value={`${MOCK_STATS.avgAccuracy}%`} />
+      </div>
+    </div>
+  );
+};
+
+const ChartsPage = () => {
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', padding: '48px 64px 64px', background: 'var(--color-bg-1)' }}>
+      {/* 标题 */}
+      <Typography.Title
+        heading={1}
+        style={{ fontWeight: 600, lineHeight: 1, margin: 0, marginBottom: '32px', fontSize: '40px' }}
+      >
+        数据
+      </Typography.Title>
+
+      {/* 顶部统计栏 */}
+      <StatsBar />
 
       {/* 统计卡片网格 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
