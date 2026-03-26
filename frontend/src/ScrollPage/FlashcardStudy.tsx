@@ -753,6 +753,7 @@ export default function FlashcardStudy({ onExit, demo = false }: FlashcardStudyP
                   key={grade}
                   size="large"
                   onClick={() => submitRating(Number(grade) as RatingGrade)}
+                  aria-label={`${config.label}，${config.desc}，快捷键 ${grade}`}
                   style={{
                     height: '72px',
                     minWidth: '140px',

@@ -126,6 +126,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
         <textarea
           className="chat-textarea"
           placeholder="发送消息..."
+          aria-label="消息输入框，按 Enter 发送"
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
@@ -151,19 +152,21 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
                 <span>{currentMode.label}</span>
               </button>
             </Dropdown>
-            <button className="chat-toolbar-btn chat-toolbar-btn-dark"><IconImage /></button>
-            <button className="chat-toolbar-btn chat-toolbar-btn-dark"><IconAt /></button>
+            <button className="chat-toolbar-btn chat-toolbar-btn-dark" aria-label="发送图片"><IconImage aria-hidden="true" /></button>
+            <button className="chat-toolbar-btn chat-toolbar-btn-dark" aria-label="@提及"><IconAt aria-hidden="true" /></button>
           </div>
           <div className="chat-toolbar-right">
             <button
               className={`chat-toolbar-btn${reasoning ? ' chat-toolbar-btn-active' : ''}`}
               onClick={() => setReasoning(!reasoning)}
               title="推理模式"
+              aria-label={reasoning ? '关闭推理模式' : '开启推理模式'}
+              aria-pressed={reasoning}
             >
-              <IconBulb />
+              <IconBulb aria-hidden="true" />
             </button>
-            <button className="chat-toolbar-btn" title="工具">
-              <IconTool />
+            <button className="chat-toolbar-btn" title="工具" aria-label="工具">
+              <IconTool aria-hidden="true" />
             </button>
             <button
               className={`chat-send-btn${isGenerating ? ' chat-send-btn-stop' : (!text.trim() ? ' chat-send-btn-disabled' : '')}`}

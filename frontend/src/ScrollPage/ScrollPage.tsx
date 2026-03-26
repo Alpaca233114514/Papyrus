@@ -82,8 +82,16 @@ const CollectionCard = ({ collection }: { collection: Collection }) => {
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`${collection.title}，包含 ${collection.scrollCount} 个卷轴，共 ${collection.totalCards} 张卡片`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+        }
+      }}
       style={{
         ...cardStyle,
         flex: '0 0 auto',
@@ -131,9 +139,19 @@ const ScrollCard = ({ scroll, onStudy }: { scroll: Scroll; onStudy?: () => void 
 
   return (
     <div
+      role="button"
+      tabIndex={onStudy ? 0 : -1}
+      aria-label={`${scroll.title}，${scroll.collection}，${scroll.dueCount > 0 ? `${scroll.dueCount} 张待复习` : '已完成'}，共 ${scroll.cardCount} 张卡片`}
+      aria-disabled={!onStudy}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={onStudy}
+      onKeyDown={(e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && onStudy) {
+          e.preventDefault();
+          onStudy();
+        }
+      }}
       style={{
         ...cardStyle,
         flex: '0 0 auto',
@@ -233,8 +251,16 @@ const AddCard = ({ label }: { label: string }) => {
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`${label}，点击创建新项`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+        }
+      }}
       style={{
         flex: '0 0 auto',
         width: '220px',

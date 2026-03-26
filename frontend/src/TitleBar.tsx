@@ -336,7 +336,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
         {/* window controls */}
         <div className="titlebar-controls">
           <div className="titlebar-avatar">
-            <Avatar size={28} style={{ backgroundColor: 'rgb(32, 108, 207)', fontSize: 12, cursor: 'pointer' }}>P</Avatar>
+            <Avatar size={28} style={{ backgroundColor: 'rgb(32, 108, 207)', fontSize: 12, cursor: 'pointer' }} aria-label="用户头像">P</Avatar>
           </div>
           <button className="titlebar-btn" aria-label="最小化">
             <IconMinus />
@@ -365,6 +365,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
           </p>
           <Input.TextArea
             placeholder="例如：\n环境问题 A === 答案 A\n环境问题 B === 答案 B"
+            aria-label="导入内容，格式：问题 === 答案"
             value={importContent}
             onChange={(value: string) => setImportContent(value)}
             rows={8}

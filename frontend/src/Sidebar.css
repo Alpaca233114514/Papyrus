@@ -37,6 +37,17 @@ body[arco-theme="dark"] .sidebar {
   overflow: hidden;
   transition: width 0.15s ease, padding 0.15s ease;
   box-sizing: border-box;
+  /* Reset button styles */
+  background: none;
+  border: none;
+  font-family: inherit;
+  text-align: left;
+}
+
+/* Focus visible for keyboard navigation */
+.sidebar-item:focus-visible {
+  outline: 2px solid #206CCF;
+  outline-offset: 2px;
 }
 
 .sidebar-item > svg {
@@ -66,6 +77,10 @@ body[arco-theme="dark"] .sidebar {
   background: transparent;
   border: 2px solid #9FD4FD;
   color: #000000;
+}
+
+.sidebar-item:focus {
+  outline: none;
 }
 
 .sidebar-item-active {

@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback } from 'react';
 import { BackTop, Message } from '@arco-design/web-react';
 import TitleBar from './TitleBar';
@@ -24,6 +23,7 @@ const App = () => {
   const dragStartX = useRef<number>(0);
   const dragStartWidth = useRef<number>(0);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const mainContentRef = useRef<HTMLDivElement>(null);
 
   // 处理搜索结果点击
   const handleSearchResult = useCallback((result: SearchResult) => {
@@ -54,6 +54,11 @@ const App = () => {
 
   return (
     <div style={{ width: '1440px', height: '900px', margin: '0 auto', background: '#FFFFFF', border: '1px solid var(--color-border-3)', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      {/* Skip Link - 无障碍导航 */}
+      <a href="#main-content" className="skip-link">
+        跳转到主内容
+      </a>
+      
       {activePage === 'start' && (
         <BackTop
           visibleHeight={200}
@@ -65,7 +70,14 @@ const App = () => {
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
         <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} chatOpen={chatOpen} onChatToggle={() => setChatOpen(!chatOpen)} activePage={activePage} onPageChange={setActivePage} />
-        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', position: 'relative' }}>
+        
+        {/* 主内容区域 - 无障碍标记 */}
+        <main 
+          id="main-content" 
+          ref={mainContentRef}
+          tabIndex={-1}
+          style={{ flex: 1, overflow: 'hidden', display: 'flex', position: 'relative', outline: 'none' }}
+        >
           {/* 完成状态：顶部绿色光晕，仅今日完成时显示 */}
           {activePage === 'start' && todayDone && (
             <div style={{
@@ -86,7 +98,8 @@ const App = () => {
           {activePage === 'files' && <FilesPage />}
           {activePage === 'extensions' && <ExtensionsPage />}
           {activePage === 'settings' && <SettingsPage />}
-        </div>
+        </main>
+        
         {chatOpen && (
           <div style={{ display: 'flex', flexShrink: 0 }}>
             <div

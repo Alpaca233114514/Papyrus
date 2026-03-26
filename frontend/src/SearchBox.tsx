@@ -196,7 +196,7 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
       <Input
         ref={inputRef}
         placeholder="搜索 (Ctrl+K)"
-        prefix={<IconSearch />}
+        prefix={<IconSearch aria-hidden="true" />}
         size="small"
         value={query}
         onChange={handleInputChange}
@@ -209,11 +209,19 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
         style={{ width: '480px' }}
         className="titlebar-search-input"
         allowClear
+        aria-label="搜索笔记和卡片，按 Ctrl+K 快速聚焦"
+        aria-autocomplete="list"
+        aria-controls={isOpen ? 'search-results-listbox' : undefined}
+        aria-expanded={isOpen}
+        aria-activedescendant={selectedIndex >= 0 ? `search-result-${selectedIndex}` : undefined}
       />
 
       {/* 搜索结果下拉菜单 */}
       {isOpen && (
         <div
+          id="search-results-listbox"
+          role="listbox"
+          aria-label="搜索结果"
           style={{
             position: 'absolute',
             top: 'calc(100% + 8px)',
@@ -291,6 +299,9 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
               {results.map((result, index) => (
                 <div
                   key={`${result.type}-${result.id}`}
+                  id={`search-result-${index}`}
+                  role="option"
+                  aria-selected={selectedIndex === index}
                   onClick={() => handleResultClick(result)}
                   onMouseEnter={() => setSelectedIndex(index)}
                   style={{

@@ -53,54 +53,81 @@ const Sidebar = ({ collapsed, onToggle, chatOpen, onChatToggle, activePage, onPa
   const toggleDark = () => setDark(!dark);
 
   return (
-    <div className={`sidebar${collapsed ? '' : ' sidebar-expanded'}`}>
-      <div
+    <nav className={`sidebar${collapsed ? '' : ' sidebar-expanded'}`} aria-label="主导航">
+      <button
         className={`sidebar-item sidebar-toggle${!collapsed ? ' sidebar-item-active' : ''}`}
         onClick={onToggle}
+        aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'}
+        aria-expanded={!collapsed}
+        type="button"
       >
-        <IconNav />
+        <IconNav aria-hidden="true" />
         <span className="sidebar-label">侧边栏</span>
-      </div>
+      </button>
       {items.map((item) => (
         <Tooltip key={item.key} content={item.label} position="right" mini disabled={!collapsed}>
-          <div
+          <button
             className={`sidebar-item${activePage === item.key ? ' sidebar-item-active' : ''}`}
             onClick={() => onPageChange(item.key)}
+            aria-current={activePage === item.key ? 'page' : undefined}
+            aria-label={item.label}
+            type="button"
           >
-            {item.icon}
+            <span aria-hidden="true">{item.icon}</span>
             <span className="sidebar-label">{item.label}</span>
-          </div>
+          </button>
         </Tooltip>
       ))}
       <div style={{ flex: 1 }} />
       <Tooltip content="聊天" position="right" mini disabled={!collapsed}>
-        <div className={`sidebar-item${chatOpen ? ' sidebar-item-active' : ''}`} onClick={onChatToggle}>
-          <IconRobot />
+        <button 
+          className={`sidebar-item${chatOpen ? ' sidebar-item-active' : ''}`} 
+          onClick={onChatToggle}
+          aria-label={chatOpen ? '关闭聊天' : '打开聊天'}
+          aria-pressed={chatOpen}
+          type="button"
+        >
+          <IconRobot aria-hidden="true" />
           <span className="sidebar-label">聊天</span>
-        </div>
+        </button>
       </Tooltip>
-      <Tooltip content={dark ? '夜间模式' : '日间模式'} position="right" mini disabled={!collapsed}>
-        <div className="sidebar-item" onClick={toggleDark}>
-          {dark ? <IconMoon /> : <IconSun />}
+      <Tooltip content={dark ? '切换到日间模式' : '切换到夜间模式'} position="right" mini disabled={!collapsed}>
+        <button 
+          className="sidebar-item" 
+          onClick={toggleDark}
+          aria-label={dark ? '切换到日间模式' : '切换到夜间模式'}
+          aria-pressed={dark}
+          type="button"
+        >
+          {dark ? <IconMoon aria-hidden="true" /> : <IconSun aria-hidden="true" />}
           <span className="sidebar-label">{dark ? '夜间模式' : '日间模式'}</span>
-        </div>
+        </button>
       </Tooltip>
-      <Tooltip content={locked ? '锁定文本编辑' : '解锁文本编辑'} position="right" mini disabled={!collapsed}>
-        <div className="sidebar-item" onClick={() => setLocked(!locked)}>
-          {locked ? <IconLock /> : <IconUnlock />}
+      <Tooltip content={locked ? '解锁文本编辑' : '锁定文本编辑'} position="right" mini disabled={!collapsed}>
+        <button 
+          className="sidebar-item" 
+          onClick={() => setLocked(!locked)}
+          aria-label={locked ? '解锁文本编辑' : '锁定文本编辑'}
+          aria-pressed={locked}
+          type="button"
+        >
+          {locked ? <IconLock aria-hidden="true" /> : <IconUnlock aria-hidden="true" />}
           <span className="sidebar-label">{locked ? '锁定编辑' : '解锁编辑'}</span>
-        </div>
+        </button>
       </Tooltip>
       <Tooltip content="设置" position="right" mini disabled={!collapsed}>
-        <div 
+        <button 
           className={`sidebar-item${activePage === 'settings' ? ' sidebar-item-active' : ''}`}
           onClick={() => onPageChange('settings')}
+          aria-current={activePage === 'settings' ? 'page' : undefined}
+          aria-label="设置"
+          type="button"
         >
-          <IconSettings />
+          <IconSettings aria-hidden="true" />
           <span className="sidebar-label">设置</span>
-        </div>
+        </button>
       </Tooltip>
-    </div>
+    </nav>
   );
 };
 

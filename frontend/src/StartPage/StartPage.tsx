@@ -369,7 +369,7 @@ const DoneCard = ({ scenery }: { scenery: SceneryContent | null }) => {
     >
       <img
         src={image}
-        alt=''
+        alt={`窗景图片：${poem} —— ${source}`}
         className={`scenery-img${hovered ? ' expanded' : ''}`}
         style={{
           position: 'absolute',

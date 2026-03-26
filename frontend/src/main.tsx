@@ -5,6 +5,7 @@ import zhCN from '@arco-design/web-react/es/locale/zh-CN';
 
 import '@arco-design/web-react/es/_util/react-19-adapter';
 import '@arco-design/web-react/dist/css/arco.css';
+import './a11y.css';  // 无障碍样式
 
 import App from './App';
 
