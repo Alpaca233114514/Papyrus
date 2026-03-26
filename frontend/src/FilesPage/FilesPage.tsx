@@ -1,6 +1,7 @@
 import { Typography, Button, Tag, Radio, Empty, Tooltip } from '@arco-design/web-react';
 import { useState } from 'react';
 import { IconFolderAdd, IconUpload, IconFolder, IconImage, IconFileVideo, IconMusic, IconFile, IconDownload, IconDelete } from '@arco-design/web-react/icon';
+import { usePageScenery } from '../hooks/useScenery';
 
 import ZipIcon from './ZipIcon';
 
@@ -132,6 +133,115 @@ const ListFileRow = ({ file }: { file: FileItem }) => {
   );
 };
 
+// 统计栏组件 - 支持窗景背景
+interface StatsBarProps {
+  stats: { totalFiles: number; totalFolders: number; totalSize: string };
+  viewMode: 'grid' | 'list';
+  setViewMode: (mode: 'grid' | 'list') => void;
+}
+
+const StatsBar = ({ stats, viewMode, setViewMode }: StatsBarProps) => {
+  const { config: sceneryConfig, loaded } = usePageScenery('files');
+
+  // 等待设置加载完成
+  if (!loaded) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '24px',
+        marginBottom: '24px',
+        borderRadius: '16px',
+        border: '1px solid var(--color-text-3)',
+        background: 'var(--color-fill-2)',
+      }}>
+        <div style={{ display: 'flex', gap: '64px' }}>
+          <div>
+            <Typography.Text style={{ fontSize: '28px', fontWeight: 600 }}>{stats.totalFiles}</Typography.Text>
+            <Typography.Text type='secondary' style={{ fontSize: '13px', display: 'block', marginTop: '4px' }}>文件</Typography.Text>
+          </div>
+          <div>
+            <Typography.Text style={{ fontSize: '28px', fontWeight: 600 }}>{stats.totalFolders}</Typography.Text>
+            <Typography.Text type='secondary' style={{ fontSize: '13px', display: 'block', marginTop: '4px' }}>文件夹</Typography.Text>
+          </div>
+          <div>
+            <Typography.Text style={{ fontSize: '28px', fontWeight: 600 }}>{stats.totalSize}</Typography.Text>
+            <Typography.Text type='secondary' style={{ fontSize: '13px', display: 'block', marginTop: '4px' }}>占用空间</Typography.Text>
+          </div>
+        </div>
+        <Radio.Group type='button' value={viewMode} onChange={setViewMode} options={[{ label: '网格', value: 'grid' }, { label: '列表', value: 'list' }]} />
+      </div>
+    );
+  }
+
+  // 窗景配置
+  const image = sceneryConfig.image;
+  const poem = '且将新火试新茶，诗酒趁年华。';
+  const source = '[宋] 苏轼《望江南·超然台作》';
+  const overlayOpacity = Math.max(0.25, Math.min(0.75, sceneryConfig.opacity));
+
+  return (
+    <div style={{
+      position: 'relative',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: '24px',
+      marginBottom: '24px',
+      borderRadius: '16px',
+      border: '1px solid var(--color-text-3)',
+      overflow: 'hidden',
+    }}>
+      {/* 窗景背景图 */}
+      {sceneryConfig.enabled && (
+        <>
+          <img
+            src={image}
+            alt={`窗景图片：${poem} —— ${source}`}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+            }}
+          />
+          {/* 固定透明度遮罩层 */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: `rgba(255, 255, 255, ${overlayOpacity})`,
+            }}
+          />
+        </>
+      )}
+
+      {/* 统计内容 */}
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', gap: '64px' }}>
+        <div>
+          <Typography.Text style={{ fontSize: '28px', fontWeight: 600 }}>{stats.totalFiles}</Typography.Text>
+          <Typography.Text type='secondary' style={{ fontSize: '13px', display: 'block', marginTop: '4px' }}>文件</Typography.Text>
+        </div>
+        <div>
+          <Typography.Text style={{ fontSize: '28px', fontWeight: 600 }}>{stats.totalFolders}</Typography.Text>
+          <Typography.Text type='secondary' style={{ fontSize: '13px', display: 'block', marginTop: '4px' }}>文件夹</Typography.Text>
+        </div>
+        <div>
+          <Typography.Text style={{ fontSize: '28px', fontWeight: 600 }}>{stats.totalSize}</Typography.Text>
+          <Typography.Text type='secondary' style={{ fontSize: '13px', display: 'block', marginTop: '4px' }}>占用空间</Typography.Text>
+        </div>
+      </div>
+
+      {/* 视图切换 */}
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <Radio.Group type='button' value={viewMode} onChange={setViewMode} options={[{ label: '网格', value: 'grid' }, { label: '列表', value: 'list' }]} />
+      </div>
+    </div>
+  );
+};
+
 const FilesPage = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
@@ -175,33 +285,8 @@ const FilesPage = () => {
         </div>
       </div>
 
-      {/* 数据栏 - 深色风格 */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '24px',
-        marginBottom: '24px',
-        borderRadius: '16px',
-        border: '1px solid var(--color-text-3)',
-        background: 'var(--color-fill-2)',
-      }}>
-        <div style={{ display: 'flex', gap: '64px' }}>
-          <div>
-            <Typography.Text style={{ fontSize: '28px', fontWeight: 600 }}>{stats.totalFiles}</Typography.Text>
-            <Typography.Text type='secondary' style={{ fontSize: '13px', display: 'block', marginTop: '4px' }}>文件</Typography.Text>
-          </div>
-          <div>
-            <Typography.Text style={{ fontSize: '28px', fontWeight: 600 }}>{stats.totalFolders}</Typography.Text>
-            <Typography.Text type='secondary' style={{ fontSize: '13px', display: 'block', marginTop: '4px' }}>文件夹</Typography.Text>
-          </div>
-          <div>
-            <Typography.Text style={{ fontSize: '28px', fontWeight: 600 }}>{stats.totalSize}</Typography.Text>
-            <Typography.Text type='secondary' style={{ fontSize: '13px', display: 'block', marginTop: '4px' }}>占用空间</Typography.Text>
-          </div>
-        </div>
-        <Radio.Group type='button' value={viewMode} onChange={setViewMode} options={[{ label: '网格', value: 'grid' }, { label: '列表', value: 'list' }]} />
-      </div>
+      {/* 数据栏 - 支持窗景背景 */}
+      <StatsBar stats={stats} viewMode={viewMode} setViewMode={setViewMode} />
 
       {/* 快速筛选 */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
