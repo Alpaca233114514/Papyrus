@@ -139,20 +139,20 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
   const fileMenu = (
     <Menu style={{ width: 280, maxHeight: 'none', overflow: 'visible' }}>
       {/* 新建组 */}
-      <Menu.SubMenu key="new" title="新建">
-        <Menu.Item key="new-note" onClick={handleNewNote}>
+      <Menu.SubMenu key="new" title="新建" style={{ width: 260 }}>
+        <Menu.Item key="new-note" onClick={handleNewNote} style={{ width: 260 }}>
           <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
             新建笔记
             <Shortcut keys="Ctrl+N" />
           </span>
         </Menu.Item>
-        <Menu.Item key="new-card" onClick={handleNewCard}>
+        <Menu.Item key="new-card" onClick={handleNewCard} style={{ width: 260 }}>
           <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
             新建卡片
             <Shortcut keys="Ctrl+Shift+C" />
           </span>
         </Menu.Item>
-        <Menu.Item key="new-window" onClick={handleNewWindow}>
+        <Menu.Item key="new-window" onClick={handleNewWindow} style={{ width: 260 }}>
           <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
             新建窗口
             <Shortcut keys="Ctrl+Shift+N" />
@@ -163,27 +163,27 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
       <Divider style={{ margin: '4px 0' }} />
       
       {/* 打开组 */}
-      <Menu.SubMenu key="open" title="打开">
-        <Menu.Item key="open-notes" onClick={handleOpenNotes}>
+      <Menu.SubMenu key="open" title="打开" style={{ width: 260 }}>
+        <Menu.Item key="open-notes" onClick={handleOpenNotes} style={{ width: 260 }}>
           <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
             打开笔记页
             <Shortcut keys="Ctrl+O" />
           </span>
         </Menu.Item>
-        <Menu.Item key="open-files" onClick={handleOpenFiles}>
+        <Menu.Item key="open-files" onClick={handleOpenFiles} style={{ width: 260 }}>
           <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
             打开文件库
             <Shortcut keys="Ctrl+K O" />
           </span>
         </Menu.Item>
-        <Menu.Item key="open-review" onClick={handleOpenReview}>
+        <Menu.Item key="open-review" onClick={handleOpenReview} style={{ width: 260 }}>
           <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
             开始复习
             <Shortcut keys="Ctrl+R" />
           </span>
         </Menu.Item>
-        <Menu.SubMenu key="recent" title="打开最近的文件">
-          <Menu.Item key="recent-empty" disabled>暂无最近文件</Menu.Item>
+        <Menu.SubMenu key="recent" title="打开最近的文件" style={{ width: 260 }}>
+          <Menu.Item key="recent-empty" disabled style={{ width: 260 }}>暂无最近文件</Menu.Item>
         </Menu.SubMenu>
       </Menu.SubMenu>
       
