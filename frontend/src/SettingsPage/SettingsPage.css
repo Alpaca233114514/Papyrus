@@ -99,7 +99,8 @@
 .settings-detail {
   padding: 64px 48px 64px;
   min-height: 100%;
-  max-width: 800px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* 返回按钮行 */
