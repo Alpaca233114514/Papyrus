@@ -397,6 +397,54 @@
   background: var(--color-border-2);
 }
 
+/* 设置页面次要侧边栏样式 */
+.settings-secondary-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--color-bg-1);
+  border-right: 1px solid var(--color-border-2);
+}
+
+.settings-secondary-sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--color-border-2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-secondary-sidebar-menu {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.settings-secondary-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.settings-secondary-sidebar-item:hover {
+  background: var(--color-fill-2);
+}
+
+.settings-secondary-sidebar-item.active {
+  background: rgba(32, 108, 207, 0.08);
+  color: #206CCF;
+}
+
+.settings-secondary-sidebar-item.active:hover {
+  background: rgba(32, 108, 207, 0.12);
+}
+
 /* 响应式适配 */
 @media (max-width: 768px) {
   .settings-main,
