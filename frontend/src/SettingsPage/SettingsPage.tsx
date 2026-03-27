@@ -44,6 +44,8 @@ import {
   IconMessage,
   IconArrowLeft,
   IconInfoCircle,
+  IconLeft,
+  IconDown,
 } from '@arco-design/web-react/icon';
 import IconAccessibility from '../icons/IconAccessibility';
 
@@ -239,6 +241,9 @@ const defaultProviders: Provider[] = [
 
 const SettingsPage = () => {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  
+  // 聊天设置子菜单状态
+  const [chatActiveMenu, setChatActiveMenu] = useState('general');
   
   // 模型相关状态
   const [searchQuery, setSearchQuery] = useState('');
@@ -918,8 +923,10 @@ const SettingsPage = () => {
   // 聊天设置侧边栏子菜单项
   const CHAT_MENU_ITEMS = [
     { key: 'general', label: '通用设置', icon: IconMessage },
+    { key: 'providers', label: '供应商管理', icon: IconSafe },
+    { key: 'models', label: '模型管理', icon: IconRobot },
     { key: 'completion', label: '自动补全', icon: IconBulb },
-    { key: 'model', label: '模型参数', icon: IconRobot },
+    { key: 'parameters', label: '模型参数', icon: IconSettings },
   ];
 
   // 聊天设置 - 通用设置内容
@@ -1035,24 +1042,123 @@ const SettingsPage = () => {
   );
 
   // 聊天设置 - 模型参数内容
-  const ChatModelSettings = () => (
+  const ChatProvidersSettings = () => {
+    const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set());
+    
+    const toggleExpand = (providerId: string) => {
+      const newExpanded = new Set(expandedProviders);
+      if (newExpanded.has(providerId)) {
+        newExpanded.delete(providerId);
+      } else {
+        newExpanded.add(providerId);
+      }
+      setExpandedProviders(newExpanded);
+    };
+    
+    return (
+      <>
+        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text type="secondary">管理 AI 服务提供商</Text>
+          <Button type="primary" size="small" icon={<IconPlus />} onClick={() => setAddModalVisible(true)}>
+            添加供应商
+          </Button>
+        </div>
+
+        {providers.map(provider => {
+          const isExpanded = expandedProviders.has(provider.id);
+          return (
+            <Card key={provider.id} style={{ marginBottom: 12 }} bodyStyle={{ padding: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <Text bold>{provider.name}</Text>
+                    {provider.isDefault && <Tag color="arcoblue" size="small">默认</Tag>}
+                    {!provider.enabled && <Tag color="gray" size="small">禁用</Tag>}
+                  </div>
+                  <Paragraph type="secondary" style={{ fontSize: 12, margin: 0 }}>
+                    {provider.baseUrl || '未设置 Base URL'}
+                  </Paragraph>
+                </div>
+                <Space>
+                  <Button 
+                    type="text" 
+                    size="mini" 
+                    icon={isExpanded ? <IconDown /> : <IconLeft />}
+                    onClick={() => toggleExpand(provider.id)}
+                  />
+                  <Switch size="small" checked={provider.enabled} onChange={(checked) => updateProvider(provider.id, { enabled: checked })} />
+                  <Button type="text" size="mini" icon={<IconSafe />} onClick={() => setDefault(provider.id)} disabled={provider.isDefault} />
+                  <Popconfirm title="删除供应商？" onOk={() => deleteProvider(provider.id)} disabled={provider.isDefault}>
+                    <Button type="text" size="mini" icon={<IconDelete />} status="danger" disabled={provider.isDefault} />
+                  </Popconfirm>
+                </Space>
+              </div>
+
+              {isExpanded && (
+                <>
+                  <Divider style={{ margin: '16px 0' }} />
+                  <div style={{ display: 'flex', gap: 12, flexDirection: 'column' }}>
+                    <div>
+                      <Text style={{ fontSize: 12, marginBottom: 4, display: 'block' }}>API Key</Text>
+                      <Input.Password value={provider.apiKey} onChange={(v) => updateProvider(provider.id, { apiKey: v })} placeholder="输入 API Key" />
+                    </div>
+                    <div>
+                      <Text style={{ fontSize: 12, marginBottom: 4, display: 'block' }}>Base URL</Text>
+                      <Input value={provider.baseUrl} onChange={(v) => updateProvider(provider.id, { baseUrl: v })} placeholder="https://api.example.com/v1" />
+                    </div>
+                  </div>
+                </>
+              )}
+            </Card>
+          );
+        })}
+      </>
+    );
+  };
+
+  const ChatModelsSettings = () => (
     <>
-      <div className="settings-form-row">
-        <Text className="settings-form-label">当前模型</Text>
-        <Select 
-          value={currentModelId} 
-          onChange={setCurrentModelId}
-          style={{ width: 280 }}
-        >
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Select value={selectedId} onChange={setSelectedId} style={{ width: 200 }}>
+          {providers.filter(p => p.enabled).map(p => (
+            <Option key={p.id} value={p.id}>{p.name}</Option>
+          ))}
+        </Select>
+        <Button type="primary" size="small" icon={<IconPlus />} onClick={() => openModelModal()}>添加模型</Button>
+      </div>
+
+      {providers.find(p => p.id === selectedId)?.models.map(model => (
+        <Card key={model.id} style={{ marginBottom: 10, border: currentModelId === model.id ? '1px solid #206CCF' : undefined }} bodyStyle={{ padding: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Text bold style={{ fontSize: 14 }}>{model.name}</Text>
+                {currentModelId === model.id && <Tag color="arcoblue" size="small">当前</Tag>}
+              </div>
+              <Paragraph type="secondary" style={{ fontSize: 12, margin: '4px 0 0 0' }}>{model.modelId}</Paragraph>
+            </div>
+            <Space size={4}>
+              <Button type="text" size="mini" icon={<IconSafe />} onClick={() => setCurrentModelId(model.id)} disabled={currentModelId === model.id} />
+              <Button type="text" size="mini" icon={<IconEdit />} onClick={() => openModelModal(model)} />
+              <Popconfirm title="删除模型？" onOk={() => deleteModel(model.id)}>
+                <Button type="text" size="mini" icon={<IconDelete />} status="danger" />
+              </Popconfirm>
+            </Space>
+          </div>
+        </Card>
+      ))}
+    </>
+  );
+
+  const ChatParametersSettings = () => (
+    <>
+      <div style={{ marginBottom: 24 }}>
+        <Text className="settings-form-label" style={{ display: 'block', marginBottom: 12 }}>当前模型</Text>
+        <Select value={currentModelId} onChange={setCurrentModelId} style={{ width: 280 }}>
           {providers.filter(p => p.enabled).map(p => (
             <OptGroup key={p.id} label={p.name}>
               {p.models.filter(m => m.enabled).map(m => (
-                <Option key={m.id} value={m.id}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {m.name}
-                    {renderCapabilityIcons(m.capabilities)}
-                  </span>
-                </Option>
+                <Option key={m.id} value={m.id}>{m.name}</Option>
               ))}
             </OptGroup>
           ))}
@@ -1073,25 +1179,25 @@ const SettingsPage = () => {
         </div>
       ))}
 
-      <Button type="primary" shape="round" style={{ marginTop: 16 }}>
-        保存参数
-      </Button>
+      <Button type="primary" shape="round" style={{ marginTop: 16 }}>保存参数</Button>
     </>
   );
 
   // 聊天设置主组件
   const ChatView = () => {
-    const [activeMenu, setActiveMenu] = useState('general');
-
     // 根据当前菜单渲染对应内容
     const renderContent = () => {
-      switch (activeMenu) {
+      switch (chatActiveMenu) {
         case 'general':
           return <ChatGeneralSettings />;
+        case 'providers':
+          return <ChatProvidersSettings />;
+        case 'models':
+          return <ChatModelsSettings />;
         case 'completion':
           return <ChatCompletionSettings />;
-        case 'model':
-          return <ChatModelSettings />;
+        case 'parameters':
+          return <ChatParametersSettings />;
         default:
           return <ChatGeneralSettings />;
       }
@@ -1099,7 +1205,7 @@ const SettingsPage = () => {
 
     // 获取当前菜单标题
     const getCurrentTitle = () => {
-      const item = CHAT_MENU_ITEMS.find(item => item.key === activeMenu);
+      const item = CHAT_MENU_ITEMS.find(item => item.key === chatActiveMenu);
       return item?.label || '通用设置';
     };
 
@@ -1114,8 +1220,8 @@ const SettingsPage = () => {
         <SettingsSidebar
           title="聊天设置"
           menuItems={CHAT_MENU_ITEMS}
-          activeItem={activeMenu}
-          onItemClick={setActiveMenu}
+          activeItem={chatActiveMenu}
+          onItemClick={setChatActiveMenu}
           onBack={() => setActiveCategory(null)}
         />
 
