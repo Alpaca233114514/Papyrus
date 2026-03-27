@@ -106,8 +106,8 @@ export const SettingsSidebar = ({
                   cursor: 'pointer',
                   borderRadius: '8px',
                   marginBottom: '4px',
-                  background: isActive ? '#206CCF15' : 'transparent',
-                  color: isActive ? '#206CCF' : 'var(--color-text-1)',
+                  background: isActive ? 'var(--color-primary-light)' : 'transparent',
+                  color: isActive ? 'var(--color-primary)' : 'var(--color-text-1)',
                   transition: 'all 0.2s',
                   userSelect: 'none',
                 }}
@@ -126,7 +126,7 @@ export const SettingsSidebar = ({
                 <Text
                   style={{
                     fontSize: 13,
-                    color: isActive ? '#206CCF' : 'inherit',
+                    color: isActive ? 'var(--color-primary)' : 'inherit',
                     fontWeight: isActive ? 500 : 400,
                   }}
                 >
@@ -144,7 +144,7 @@ export const SettingsSidebar = ({
         style={{
           width: '4px',
           cursor: isResizing ? 'col-resize' : 'ew-resize',
-          background: isResizing ? '#206CCF' : 'transparent',
+          background: isResizing ? 'var(--color-primary)' : 'transparent',
           transition: 'background 0.2s',
           flexShrink: 0,
         }}

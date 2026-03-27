@@ -1,0 +1,176 @@
+/* ============================================
+   全局主题样式 - 深色模式支持
+   遵循字节设计规范和 WCAG 无障碍标准
+   ============================================ */
+
+/* Arco Design 深色模式变量覆盖 */
+body[arco-theme='dark'] {
+  /* 背景色 */
+  --color-bg-1: #2a2a2b;
+  --color-bg-2: #333334;
+  --color-bg-3: #3a3a3b;
+  --color-bg-4: #424243;
+  --color-bg-5: #4a4a4b;
+  --color-bg-white: #2a2a2b;
+  
+  /* 文字色 */
+  --color-text-1: rgba(255, 255, 255, 0.9);
+  --color-text-2: rgba(255, 255, 255, 0.7);
+  --color-text-3: rgba(255, 255, 255, 0.5);
+  --color-text-4: rgba(255, 255, 255, 0.3);
+  
+  /* 填充色 */
+  --color-fill-1: rgba(255, 255, 255, 0.04);
+  --color-fill-2: rgba(255, 255, 255, 0.08);
+  --color-fill-3: rgba(255, 255, 255, 0.12);
+  --color-fill-4: rgba(255, 255, 255, 0.16);
+  
+  /* 边框色 */
+  --color-border-1: rgba(255, 255, 255, 0.08);
+  --color-border-2: rgba(255, 255, 255, 0.12);
+  --color-border-3: rgba(255, 255, 255, 0.16);
+  --color-border-4: rgba(255, 255, 255, 0.24);
+  
+  /* 主色调 */
+  --color-primary: #206CCF;
+  --color-primary-light: rgba(32, 108, 207, 0.2);
+  --color-primary-hover: #4c8fe0;
+  
+  /* 其他颜色 */
+  --color-success: #00B42A;
+  --color-success-light: rgba(0, 180, 42, 0.2);
+  --color-danger: #F53F3F;
+  --color-danger-light: rgba(245, 63, 63, 0.2);
+  --color-warning: #FF7D00;
+  --color-warning-light: rgba(255, 125, 0, 0.2);
+  
+  /* 链接色 */
+  --color-link: #206CCF;
+  --color-link-hover: #4c8fe0;
+  --color-link-active: #1654a8;
+  
+  /* 遮罩 */
+  --color-mask-bg: rgba(0, 0, 0, 0.6);
+}
+
+/* 浅色模式默认值 */
+:root {
+  /* 主色调 */
+  --color-primary: #206CCF;
+  --color-primary-light: rgba(32, 108, 207, 0.08);
+  --color-primary-hover: #1654a8;
+  
+  /* 成功/危险/警告色 */
+  --color-success: #00B42A;
+  --color-success-light: rgba(0, 180, 42, 0.08);
+  --color-danger: #F53F3F;
+  --color-danger-light: rgba(245, 63, 63, 0.08);
+  --color-warning: #FF7D00;
+  --color-warning-light: rgba(255, 125, 0, 0.08);
+  
+  /* 边框悬停色 */
+  --color-border-hover: #9FD4FD;
+  --color-border-danger: rgba(245, 63, 63, 0.5);
+}
+
+/* 全局过渡动画 - 可选 */
+@media (prefers-reduced-motion: no-preference) {
+  body,
+  body * {
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  }
+}
+
+/* 焦点样式 - 无障碍支持 */
+*:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* 按钮焦点 */
+button:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* 链接焦点 */
+a:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* 输入框焦点 */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* 减少动画 - 无障碍支持 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* 高对比度模式 - 无障碍支持 */
+@media (prefers-contrast: high) {
+  :root {
+    --color-text-1: #000000;
+    --color-text-2: #1a1a1a;
+    --color-text-3: #333333;
+    --color-border-2: #666666;
+  }
+  
+  body[arco-theme='dark'] {
+    --color-text-1: #ffffff;
+    --color-text-2: #e6e6e6;
+    --color-text-3: #cccccc;
+    --color-border-2: #999999;
+  }
+}
+
+/* Skip Link - 无障碍导航 */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--color-primary);
+  color: white;
+  padding: 8px 16px;
+  text-decoration: none;
+  z-index: 10000;
+  border-radius: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* 屏幕阅读器专用 - 无障碍 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 禁用态样式 */
+[aria-disabled="true"],
+[disabled] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}

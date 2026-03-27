@@ -1,8 +1,12 @@
+/* ============================================
+   侧边栏样式 - 支持深色模式
+   ============================================ */
+
 .sidebar {
   width: 48px;
   height: 100%;
-  background: #FFFFFF;
-  border-right: 1px solid rgba(0, 0, 0, 0.25);
+  background: var(--color-bg-1);
+  border-right: 1px solid var(--color-border-2);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -10,10 +14,6 @@
   flex-shrink: 0;
   transition: width 0.15s ease;
   overflow: hidden;
-}
-
-body[arco-theme="dark"] .sidebar {
-  background: var(--color-bg-2);
 }
 
 .sidebar-expanded {
@@ -35,18 +35,18 @@ body[arco-theme="dark"] .sidebar {
   position: relative;
   flex-shrink: 0;
   overflow: hidden;
-  transition: width 0.15s ease, padding 0.15s ease;
+  transition: width 0.15s ease, padding 0.15s ease, background 0.2s, border 0.2s, color 0.2s;
   box-sizing: border-box;
   /* Reset button styles */
   background: none;
-  border: none;
+  border: 2px solid transparent;
   font-family: inherit;
   text-align: left;
 }
 
 /* Focus visible for keyboard navigation */
 .sidebar-item:focus-visible {
-  outline: 2px solid #206CCF;
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -75,8 +75,8 @@ body[arco-theme="dark"] .sidebar {
 
 .sidebar-item:hover {
   background: transparent;
-  border: 2px solid #9FD4FD;
-  color: #000000;
+  border-color: var(--color-border-hover);
+  color: var(--color-text-1);
 }
 
 .sidebar-item:focus {
@@ -84,30 +84,15 @@ body[arco-theme="dark"] .sidebar {
 }
 
 .sidebar-item-active {
-  background: #206CCF;
-  color: #FFFFFF;
+  background: var(--color-primary);
+  color: var(--color-white);
+  border-color: var(--color-primary);
 }
 
 .sidebar-item-active:hover {
-  background: #206CCF;
-  color: #FFFFFF;
-}
-
-/* 深色模式适配 */
-body[arco-theme="dark"] .sidebar-item:hover {
-  background: transparent;
-  border: 2px solid #9FD4FD;
-  color: #FFFFFF;
-}
-
-body[arco-theme="dark"] .sidebar-item-active {
-  background: #206CCF;
-  color: #FFFFFF;
-}
-
-body[arco-theme="dark"] .sidebar-item-active:hover {
-  background: #206CCF;
-  color: #FFFFFF;
+  background: var(--color-primary);
+  color: var(--color-white);
+  border-color: var(--color-primary);
 }
 
 .sidebar-toggle {
@@ -115,21 +100,25 @@ body[arco-theme="dark"] .sidebar-item-active:hover {
 }
 
 .sidebar-toggle:hover {
-  border: 2px solid #9FD4FD;
-}
-
-body[arco-theme="dark"] .sidebar-toggle:hover {
-  border: 2px solid #9FD4FD;
+  border-color: var(--color-border-hover);
 }
 
 .sidebar-toggle.sidebar-item-active {
-  background: #206CCF;
-  border-color: #206CCF;
-  color: #FFFFFF;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-white);
 }
 
 .sidebar-toggle.sidebar-item-active:hover {
-  background: #206CCF;
-  border-color: #206CCF;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
+/* 减少动画 - 无障碍支持 */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .sidebar-item,
+  .sidebar-label {
+    transition: none;
+  }
+}

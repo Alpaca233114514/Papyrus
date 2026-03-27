@@ -1,7 +1,11 @@
+/* ============================================
+   聊天面板样式 - 支持深色模式
+   ============================================ */
+
 .chat-panel {
   height: 100%;
   background: var(--color-bg-1);
-  border-left: 1px solid rgba(0, 0, 0, 0.25);
+  border-left: 1px solid var(--color-border-2);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -14,7 +18,7 @@
   padding: 0 8px;
   height: 40px;
   flex-shrink: 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.25);
+  border-bottom: 1px solid var(--color-border-2);
 }
 
 .chat-panel-header-actions {
@@ -41,6 +45,11 @@
 .chat-panel-header-btn:hover {
   background: var(--color-fill-3);
   color: var(--color-text-1);
+}
+
+.chat-panel-header-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .chat-panel-body {
@@ -117,14 +126,20 @@
   transform: translateY(-1px);
 }
 
+.chat-message-action-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .chat-message-user .chat-message-bubble {
-  background: #206CCF;
+  background: var(--color-primary);
   border-radius: 12px;
-  color: #fff;
+  color: var(--color-white);
 }
 
 body[arco-theme="dark"] .chat-message-user .chat-message-bubble {
-  background: #1a5aad;
+  background: var(--color-primary);
+  opacity: 0.9;
 }
 
 .chat-message-assistant .chat-message-bubble {
@@ -184,6 +199,11 @@ body[arco-theme="dark"] .chat-message-user .chat-message-bubble {
   color: var(--color-text-3);
 }
 
+.chat-textarea:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
 .chat-toolbar {
   display: flex;
   align-items: center;
@@ -212,14 +232,20 @@ body[arco-theme="dark"] .chat-message-user .chat-message-bubble {
   border: none;
   background: none;
   cursor: pointer;
-  color: var(--color-text-4, var(--color-text-3));
+  color: var(--color-text-3);
   border-radius: 4px;
   font-size: 16px;
+  transition: background 0.2s, color 0.2s;
 }
 
 .chat-toolbar-btn:hover {
   background: var(--color-fill-2);
   color: var(--color-text-2);
+}
+
+.chat-toolbar-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .chat-toolbar-btn-active {
@@ -236,18 +262,24 @@ body[arco-theme="dark"] .chat-message-user .chat-message-bubble {
   gap: 8px;
   height: 28px;
   padding: 0 8px;
-  border: 1px solid var(--color-primary-light-3);
+  border: 1px solid var(--color-border-2);
   background: var(--color-fill-2);
   cursor: pointer;
   color: var(--color-text-1);
   border-radius: 4px;
   font-size: 13px;
   white-space: nowrap;
+  transition: background 0.2s, color 0.2s;
 }
 
 .chat-mode-btn:hover {
   background: var(--color-fill-3);
   color: var(--color-text-1);
+}
+
+.chat-mode-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .chat-mode-menu-item {
@@ -264,15 +296,21 @@ body[arco-theme="dark"] .chat-message-user .chat-message-bubble {
   width: 32px;
   height: 32px;
   border: none;
-  background: var(--color-primary-6);
+  background: var(--color-primary);
   color: var(--color-white);
   border-radius: 50%;
   cursor: pointer;
   font-size: 16px;
+  transition: background 0.2s;
 }
 
 .chat-send-btn:hover {
-  background: var(--color-primary-7);
+  background: var(--color-primary-hover);
+}
+
+.chat-send-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .chat-send-btn-disabled {
@@ -282,12 +320,10 @@ body[arco-theme="dark"] .chat-message-user .chat-message-bubble {
 }
 
 .chat-send-btn-stop {
-  background: var(--color-danger-6) !important;
+  background: var(--color-danger) !important;
   color: var(--color-white);
   cursor: pointer;
 }
-
-
 
 .chat-model-btn {
   display: flex;
@@ -301,9 +337,31 @@ body[arco-theme="dark"] .chat-message-user .chat-message-bubble {
   cursor: pointer;
   font-size: 14px;
   white-space: nowrap;
+  transition: background 0.2s, color 0.2s;
 }
 
 .chat-model-btn:hover {
   background: var(--color-fill-3);
   color: var(--color-text-2);
+}
+
+.chat-model-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+/* 减少动画 - 无障碍支持 */
+@media (prefers-reduced-motion: reduce) {
+  .chat-panel-header-btn,
+  .chat-message-action-btn,
+  .chat-toolbar-btn,
+  .chat-mode-btn,
+  .chat-send-btn,
+  .chat-model-btn {
+    transition: none;
+  }
+  
+  .chat-message-action-btn:hover {
+    transform: none;
+  }
 }

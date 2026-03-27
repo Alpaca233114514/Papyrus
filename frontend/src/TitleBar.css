@@ -1,14 +1,18 @@
+/* ============================================
+   标题栏样式 - 支持深色模式
+   ============================================ */
+
 .titlebar {
   display: flex;
   align-items: center;
   height: 40px;
-  background: #FFFFFF;
+  background: var(--color-bg-1);
   padding: 0;
   user-select: none;
   flex-shrink: 0;
   font-size: 13px;
   color: var(--color-text-1);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.25);
+  border-bottom: 1px solid var(--color-border-2);
   position: relative;
 }
 
@@ -51,16 +55,15 @@ body[arco-theme="dark"] .titlebar-logo-icon {
   color: var(--color-text-1) !important;
   font-size: 13px;
   border-radius: 0 !important;
+  transition: background 0.2s, color 0.2s;
 }
 
 .titlebar-menu-item:hover,
 .titlebar-menu-item:focus,
 .titlebar-menu-item.active {
   background: var(--color-fill-2) !important;
-  color: #57A9FB !important;
+  color: var(--color-primary) !important;
 }
-
-
 
 /* search - takes center */
 .titlebar-center {
@@ -91,7 +94,7 @@ body[arco-theme="dark"] .titlebar-logo-icon {
 .titlebar-search .arco-input-inner-wrapper:focus-within,
 .titlebar-center .arco-input-wrapper .arco-input-inner-wrapper:hover,
 .titlebar-center .arco-input-wrapper .arco-input-inner-wrapper:focus-within {
-  border-color: #57A9FB;
+  border-color: var(--color-primary);
 }
 
 /* avatar */
@@ -120,6 +123,7 @@ body[arco-theme="dark"] .titlebar-logo-icon {
   background: none;
   cursor: pointer;
   color: var(--color-text-1);
+  transition: background 0.2s, color 0.2s;
 }
 
 .titlebar-btn svg {
@@ -132,6 +136,17 @@ body[arco-theme="dark"] .titlebar-logo-icon {
 }
 
 .titlebar-btn-close:hover {
-  background: #e81123;
-  color: #ffffff;
+  background: var(--color-danger);
+  color: var(--color-white);
+}
+
+/* 焦点样式 - 无障碍 */
+.titlebar-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.titlebar-menu-item:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
