@@ -172,11 +172,17 @@ interface Model {
   capabilities: string[];
 }
 
+interface ApiKeyItem {
+  id: string;
+  name: string;
+  key: string;
+}
+
 interface Provider {
   id: string;
   type: string;
   name: string;
-  apiKey: string;
+  apiKeys: ApiKeyItem[];
   baseUrl: string;
   models: Model[];
   enabled: boolean;
@@ -188,7 +194,7 @@ const defaultProviders: Provider[] = [
     id: '1', 
     type: 'openai', 
     name: 'OpenAI', 
-    apiKey: '', 
+    apiKeys: [{id: '1', name: 'default', key: ''}], 
     baseUrl: 'https://api.openai.com/v1', 
     models: [
       { id: 'm1', name: 'GPT-4o', modelId: 'gpt-4o', enabled: true, port: 'openai', capabilities: ['tools', 'vision'] },
@@ -202,7 +208,7 @@ const defaultProviders: Provider[] = [
     id: '2', 
     type: 'gemini', 
     name: 'Gemini', 
-    apiKey: '', 
+    apiKeys: [{id: '1', name: 'default', key: ''}], 
     baseUrl: 'https://generativelanguage.googleapis.com', 
     models: [
       { id: 'm4', name: 'Gemini 2.5 Flash', modelId: 'gemini-2.5-flash', enabled: true, port: 'gemini', capabilities: ['tools', 'vision'] },
@@ -215,7 +221,7 @@ const defaultProviders: Provider[] = [
     id: '3', 
     type: 'deepseek', 
     name: 'DeepSeek', 
-    apiKey: '', 
+    apiKeys: [{id: '1', name: 'default', key: ''}], 
     baseUrl: 'https://api.deepseek.com', 
     models: [
       { id: 'm6', name: 'DeepSeek Chat', modelId: 'deepseek-chat', enabled: true, port: 'openai', capabilities: [] },
@@ -228,7 +234,7 @@ const defaultProviders: Provider[] = [
     id: '4', 
     type: 'anthropic', 
     name: 'Anthropic', 
-    apiKey: '', 
+    apiKeys: [{id: '1', name: 'default', key: ''}], 
     baseUrl: 'https://api.anthropic.com/v1', 
     models: [
       { id: 'm8', name: 'Claude 3.5 Sonnet', modelId: 'claude-3-5-sonnet-20241022', enabled: true, port: 'anthropic', capabilities: ['tools', 'vision'] },
@@ -241,7 +247,7 @@ const defaultProviders: Provider[] = [
     id: '5', 
     type: 'moonshot', 
     name: '月之暗面', 
-    apiKey: '', 
+    apiKeys: [{id: '1', name: 'default', key: ''}], 
     baseUrl: 'https://api.moonshot.cn/v1', 
     models: [
       { id: 'm10', name: 'Kimi K2.5', modelId: 'kimi-k2.5', enabled: true, port: 'openai', capabilities: [] },
@@ -369,7 +375,7 @@ const SettingsPage = () => {
         id: Date.now().toString(),
         type: newProviderType,
         name: values.name || preset.name,
-        apiKey: values.apiKey || '',
+        apiKeys: [{id: '1', name: 'default', key: values.apiKey || ''}],
         baseUrl: values.baseUrl || preset.baseUrl,
         models: [],
         enabled: false,
@@ -1057,6 +1063,13 @@ const SettingsPage = () => {
   // 聊天设置 - 模型参数内容
   const ChatProvidersSettings = () => {
     const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set());
+    // 本地编辑状态，离开时才保存
+    const [editingProviders, setEditingProviders] = useState<Provider[]>(providers);
+    
+    // 同步 providers 到本地编辑状态
+    useEffect(() => {
+      setEditingProviders(providers);
+    }, [providers]);
     
     const toggleExpand = (providerId: string) => {
       const newExpanded = new Set(expandedProviders);
@@ -1068,9 +1081,70 @@ const SettingsPage = () => {
       setExpandedProviders(newExpanded);
     };
     
+    // 更新本地编辑状态
+    const updateEditingProvider = (id: string, updates: Partial<Provider>) => {
+      setEditingProviders(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+    };
+    
+    // 添加 API Key
+    const addApiKey = (providerId: string) => {
+      const provider = editingProviders.find(p => p.id === providerId);
+      if (!provider) return;
+      const newKey: ApiKeyItem = {
+        id: Date.now().toString(),
+        name: `key-${provider.apiKeys.length + 1}`,
+        key: ''
+      };
+      updateEditingProvider(providerId, {
+        apiKeys: [...provider.apiKeys, newKey]
+      });
+    };
+    
+    // 删除 API Key
+    const removeApiKey = (providerId: string, keyId: string) => {
+      const provider = editingProviders.find(p => p.id === providerId);
+      if (!provider) return;
+      updateEditingProvider(providerId, {
+        apiKeys: provider.apiKeys.filter(k => k.id !== keyId)
+      });
+    };
+    
+    // 更新 API Key
+    const updateApiKey = (providerId: string, keyId: string, updates: Partial<ApiKeyItem>) => {
+      const provider = editingProviders.find(p => p.id === providerId);
+      if (!provider) return;
+      updateEditingProvider(providerId, {
+        apiKeys: provider.apiKeys.map(k => k.id === keyId ? { ...k, ...updates } : k)
+      });
+    };
+    
+    // 保存所有修改
+    const saveProviders = () => {
+      editingProviders.forEach(editingProvider => {
+        const originalProvider = providers.find(p => p.id === editingProvider.id);
+        if (originalProvider) {
+          const hasChanges = 
+            JSON.stringify(originalProvider.apiKeys) !== JSON.stringify(editingProvider.apiKeys) ||
+            originalProvider.baseUrl !== editingProvider.baseUrl;
+          if (hasChanges) {
+            updateProvider(editingProvider.id, {
+              apiKeys: editingProvider.apiKeys,
+              baseUrl: editingProvider.baseUrl
+            });
+          }
+        }
+      });
+      Message.success('保存成功');
+    };
+    
     return (
       <>
-        {providers.map(provider => {
+        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
+          <Button type="primary" onClick={saveProviders} style={{ background: '#206CCF', borderRadius: '6px' }}>
+            保存修改
+          </Button>
+        </div>
+        {editingProviders.map(provider => {
           const isExpanded = expandedProviders.has(provider.id);
           return (
             <Card key={provider.id} style={{ marginBottom: 12 }} bodyStyle={{ padding: 16 }}>
@@ -1105,28 +1179,49 @@ const SettingsPage = () => {
                   <Divider style={{ margin: '16px 0' }} />
                   <div style={{ display: 'flex', gap: 12, flexDirection: 'column' }}>
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                         <Text style={{ fontSize: 12 }}>API Key</Text>
-                        <Button type="primary" icon={<IconPlus />} size="mini" style={{ background: '#206CCF', borderRadius: '4px' }} />
                       </div>
-                      <Input.Password 
-                        defaultValue={provider.apiKey} 
-                        onPressEnter={(e) => updateProvider(provider.id, { apiKey: (e.target as HTMLInputElement).value })}
-                        onBlur={(e) => updateProvider(provider.id, { apiKey: e.target.value })}
-                        onFocus={() => {
-                          if (!isExpanded) toggleExpand(provider.id);
-                        }}
-                        placeholder="输入 API Key" 
-                        style={{ width: '100%' }}
-                        prefix={<span style={{ padding: '4px 10px', borderRight: '1px solid var(--color-border-2)', color: 'var(--color-text-2)', fontSize: 13, background: 'var(--color-fill-2)', marginLeft: '-4px', borderRadius: '4px 0 0 4px' }}>default</span>}
-                      />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {provider.apiKeys.map((apiKey, index) => (
+                          <div key={apiKey.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <Input
+                              value={apiKey.name}
+                              onChange={(v) => updateApiKey(provider.id, apiKey.id, { name: v })}
+                              style={{ width: 100, border: '1px solid var(--color-border-2)', borderRadius: '6px', background: '#fff', fontSize: 12, textAlign: 'center' }}
+                            />
+                            <Input.Password 
+                              value={apiKey.key}
+                              onChange={(v) => updateApiKey(provider.id, apiKey.id, { key: v })}
+                              placeholder="输入 API Key" 
+                              style={{ flex: 1, border: '1px solid var(--color-border-2)', borderRadius: '6px', background: '#fff' }}
+                            />
+                            {index === 0 ? (
+                              <Button 
+                                type="primary" 
+                                icon={<IconPlus />} 
+                                size="mini"
+                                onClick={() => addApiKey(provider.id)}
+                                style={{ background: '#206CCF', borderRadius: '4px' }}
+                              />
+                            ) : (
+                              <Button 
+                                type="text" 
+                                icon={<IconDelete />} 
+                                size="mini"
+                                status="danger"
+                                onClick={() => removeApiKey(provider.id, apiKey.id)}
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                     <div>
                       <Text style={{ fontSize: 12, marginBottom: 4, display: 'block' }}>Base URL</Text>
                       <Input 
-                        defaultValue={provider.baseUrl} 
-                        onPressEnter={(e) => updateProvider(provider.id, { baseUrl: (e.target as HTMLInputElement).value })}
-                        onBlur={(e) => updateProvider(provider.id, { baseUrl: e.target.value })}
+                        value={provider.baseUrl}
+                        onChange={(v) => updateEditingProvider(provider.id, { baseUrl: v })}
                         placeholder="https://api.example.com/v1" 
                         style={{ width: '100%' }} 
                       />
