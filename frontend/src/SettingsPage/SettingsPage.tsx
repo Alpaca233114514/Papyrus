@@ -1121,17 +1121,18 @@ const SettingsPage = () => {
     );
   };
 
-  const ChatModelsSettings = () => (
+  const ChatModelsSettings = () => {
+    const currentProvider = providers.find(p => p.id === selectedId);
+    return (
     <>
-      {providers.find(p => p.id === selectedId)?.models.map(model => (
+      {currentProvider?.models.map(model => (
         <Card key={model.id} style={{ marginBottom: 10, border: currentModelId === model.id ? '1px solid #206CCF' : undefined }} bodyStyle={{ padding: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Text bold style={{ fontSize: 14 }}>{model.name}</Text>
-                {currentModelId === model.id && <Tag color="arcoblue" size="small">当前</Tag>}
               </div>
-              <Paragraph type="secondary" style={{ fontSize: 12, margin: '4px 0 0 0' }}>{model.modelId}</Paragraph>
+              <Paragraph type="secondary" style={{ fontSize: 12, margin: '4px 0 0 0' }}>{currentProvider?.name}</Paragraph>
             </div>
             <Space size={4}>
               <Button type="text" size="mini" icon={<IconSafe />} onClick={() => setCurrentModelId(model.id)} disabled={currentModelId === model.id} />
@@ -1145,6 +1146,7 @@ const SettingsPage = () => {
       ))}
     </>
   );
+  };
 
   const ChatParametersSettings = () => (
     <>
@@ -1239,16 +1241,9 @@ const SettingsPage = () => {
               </Button>
             )}
             {chatActiveMenu === 'models' && (
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                <Select value={selectedId} onChange={setSelectedId} style={{ width: 200 }}>
-                  {providers.filter(p => p.enabled).map(p => (
-                    <Option key={p.id} value={p.id}>{p.name}</Option>
-                  ))}
-                </Select>
-                <Button type="primary" icon={<IconPlus />} onClick={() => openModelModal()} style={{ borderRadius: '999px', padding: '4px 16px', display: 'flex', alignItems: 'center' }}>
-                  添加模型
-                </Button>
-              </div>
+              <Button type="primary" icon={<IconPlus />} onClick={() => openModelModal()} style={{ borderRadius: '999px', padding: '4px 16px', display: 'flex', alignItems: 'center' }}>
+                添加模型
+              </Button>
             )}
           </div>
           
