@@ -7,7 +7,7 @@ import os
 import json
 import time
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 # 添加 src 到路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))

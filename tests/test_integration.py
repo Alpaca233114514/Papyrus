@@ -16,7 +16,6 @@ import tempfile
 import shutil
 from unittest.mock import MagicMock, patch
 from urllib.request import urlopen, Request
-from urllib.error import URLError
 
 # 添加 src 到路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))

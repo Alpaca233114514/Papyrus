@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import os
 import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from papyrus.data.notes_storage import Note, _generate_preview, _count_words
 
@@ -26,7 +25,7 @@ class ImportResult:
     imported_notes: list[Note] = field(default_factory=list)
 
 
-def _parse_frontmatter(content: str) -> tuple[dict, str]:
+def _parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
     """Parse YAML frontmatter from markdown content.
     
     Returns (frontmatter_dict, body_content)
@@ -59,7 +58,7 @@ def _parse_frontmatter(content: str) -> tuple[dict, str]:
                     elif not value:
                         # Might be multi-line array, skip for now
                         frontmatter[key] = []
-                    else:
+                    elif key not in frontmatter:
                         frontmatter[key] = value
     
     return frontmatter, body

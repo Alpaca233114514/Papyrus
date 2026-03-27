@@ -19,14 +19,22 @@ python -m uvicorn src.papyrus_api.main:app --reload
 
 from __future__ import annotations
 
+import json
 import os
-import re
-from typing import Literal
+from typing import Any, AsyncGenerator, Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+
+# requests is optional for completion feature
+try:
+    import requests  # type: ignore[import-untyped]
+    requests_available = True
+except ImportError:
+    requests = None
+    requests_available = False
 
 from papyrus.core import cards as card_core
 from papyrus.core.cards import CardDict, NextDueResult
@@ -34,12 +42,11 @@ from papyrus.paths import DATA_FILE, NOTES_FILE
 from papyrus.data.notes_storage import (
     Note,
     load_notes,
-    save_notes,
     create_note,
     update_note,
     delete_note as delete_note_storage,
 )
-from papyrus.integrations.obsidian import import_obsidian_vault, sync_obsidian_vault
+from papyrus.integrations.obsidian import sync_obsidian_vault
 from ai.config import AIConfig
 from papyrus.paths import DATA_DIR
 
@@ -467,9 +474,9 @@ class BackupResponse(BaseModel):
 
 
 class ExportDataResponse(BaseModel):
-    cards: list
-    notes: list
-    config: dict
+    cards: list[Any]
+    notes: list[Any]
+    config: dict[str, Any]
 
 
 class ImportDataResponse(BaseModel):
@@ -604,11 +611,11 @@ def get_ai_config_endpoint() -> AIConfigResponse:
                 for k, v in config.config["providers"].items()
             },
             parameters=ParametersConfigModel(
-                temperature=config.config["parameters"]["temperature"],
-                top_p=config.config["parameters"]["top_p"],
-                max_tokens=config.config["parameters"]["max_tokens"],
-                presence_penalty=config.config["parameters"]["presence_penalty"],
-                frequency_penalty=config.config["parameters"]["frequency_penalty"],
+                temperature=config.config["parameters"].get("temperature", 0.7),
+                top_p=config.config["parameters"].get("top_p", 0.9),
+                max_tokens=config.config["parameters"].get("max_tokens", 2000),
+                presence_penalty=config.config["parameters"].get("presence_penalty", 0.0),
+                frequency_penalty=config.config["parameters"].get("frequency_penalty", 0.0),
             ),
             features=FeaturesConfigModel(
                 auto_hint=config.config["features"]["auto_hint"],
@@ -619,8 +626,8 @@ def get_ai_config_endpoint() -> AIConfigResponse:
     )
 
 
-@app.post("/api/config/ai", response_model=dict)
-def save_ai_config_endpoint(payload: AIConfigModel) -> dict:
+@app.post("/api/config/ai", response_model=dict[str, Any])
+def save_ai_config_endpoint(payload: AIConfigModel) -> dict[str, Any]:
     """Save AI configuration."""
     try:
         config = get_ai_config()
@@ -740,16 +747,14 @@ def export_data_endpoint() -> ExportDataResponse:
             }
             for n in notes
         ],
-        config=config.config,
+        config=dict(config.config),
     )
 
 
 @app.post("/api/import", response_model=ImportDataResponse)
-def import_data_endpoint(payload: dict) -> ImportDataResponse:
+def import_data_endpoint(payload: dict[str, Any]) -> ImportDataResponse:
     """Import data from JSON."""
     try:
-        data_file = _get_data_file()
-        
         # Import cards
         cards_data = payload.get("cards", [])
         if cards_data:
@@ -760,7 +765,6 @@ def import_data_endpoint(payload: dict) -> ImportDataResponse:
         notes_data = payload.get("notes", [])
         imported_count = 0
         if notes_data:
-            existing_notes = load_notes(NOTES_FILE)
             for note_data in notes_data:
                 create_note(
                     NOTES_FILE,
@@ -791,8 +795,8 @@ def get_completion_config() -> CompletionConfigResponse:
     return CompletionConfigResponse(success=True, config=_completion_config)
 
 
-@app.post("/api/completion/config", response_model=dict)
-def save_completion_config(payload: CompletionConfigModel) -> dict:
+@app.post("/api/completion/config", response_model=dict[str, Any])
+def save_completion_config(payload: CompletionConfigModel) -> dict[str, Any]:
     """Save completion configuration."""
     global _completion_config
     _completion_config = payload
@@ -800,7 +804,7 @@ def save_completion_config(payload: CompletionConfigModel) -> dict:
 
 
 @app.post("/api/completion")
-async def create_completion(payload: CompletionRequest):
+async def create_completion(payload: CompletionRequest) -> StreamingResponse:
     """Create text completion using AI.
     
     Returns a streaming response with the completion text.
@@ -829,7 +833,7 @@ async def create_completion(payload: CompletionRequest):
     # 根据提供商类型选择调用方式
     provider_name = config.config["current_provider"]
     
-    async def generate():
+    async def generate() -> AsyncGenerator[str, None]:
         """生成补全内容的流式响应。"""
         try:
             if requests_available and requests is not None:
@@ -913,7 +917,7 @@ async def create_completion(payload: CompletionRequest):
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
     
     return StreamingResponse(
-        generate(),
+        content=generate(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
