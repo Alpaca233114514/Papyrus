@@ -1129,6 +1129,26 @@ const SettingsPage = () => {
       setEditingProviders(providers);
     }, [providers]);
     
+    // 离开界面时自动保存
+    useEffect(() => {
+      return () => {
+        editingProviders.forEach(editingProvider => {
+          const originalProvider = providers.find(p => p.id === editingProvider.id);
+          if (originalProvider) {
+            const hasChanges = 
+              JSON.stringify(originalProvider.apiKeys) !== JSON.stringify(editingProvider.apiKeys) ||
+              originalProvider.baseUrl !== editingProvider.baseUrl;
+            if (hasChanges) {
+              updateProvider(editingProvider.id, {
+                apiKeys: editingProvider.apiKeys,
+                baseUrl: editingProvider.baseUrl
+              });
+            }
+          }
+        });
+      };
+    }, [editingProviders, providers]);
+    
     const toggleExpand = (providerId: string) => {
       const newExpanded = new Set(expandedProviders);
       if (newExpanded.has(providerId)) {
@@ -1176,32 +1196,8 @@ const SettingsPage = () => {
       });
     };
     
-    // 保存所有修改
-    const saveProviders = () => {
-      editingProviders.forEach(editingProvider => {
-        const originalProvider = providers.find(p => p.id === editingProvider.id);
-        if (originalProvider) {
-          const hasChanges = 
-            JSON.stringify(originalProvider.apiKeys) !== JSON.stringify(editingProvider.apiKeys) ||
-            originalProvider.baseUrl !== editingProvider.baseUrl;
-          if (hasChanges) {
-            updateProvider(editingProvider.id, {
-              apiKeys: editingProvider.apiKeys,
-              baseUrl: editingProvider.baseUrl
-            });
-          }
-        }
-      });
-      Message.success('保存成功');
-    };
-    
     return (
       <>
-        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
-          <Button type="primary" onClick={saveProviders} style={{ background: '#206CCF', borderRadius: '6px' }}>
-            保存修改
-          </Button>
-        </div>
         {editingProviders.map(provider => {
           const isExpanded = expandedProviders.has(provider.id);
           return (
