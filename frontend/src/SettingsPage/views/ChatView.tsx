@@ -936,7 +936,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
               })()}
             </Select>
           </FormItem>
-          <FormItem label={<Title heading={6} style={{ margin: 0 }}>模型能力</FormItem>} style={{ marginBottom: 0 }}>
+          <FormItem label={<Title heading={6} style={{ margin: 0 }}>模型能力</Title>} style={{ marginBottom: 0 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {CAPABILITIES.map(cap => (
                 <FormItem 
