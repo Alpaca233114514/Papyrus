@@ -1,6 +1,7 @@
 import { Typography } from '@arco-design/web-react';
 import { PRIMARY_COLOR } from '../constants';
 import { usePageScenery } from '../../hooks/useScenery';
+import { useSceneryColor, getAdaptivePrimaryColor } from '../../hooks/useSceneryColor';
 
 interface StatsBarProps {
   noteCount: number;
@@ -11,6 +12,10 @@ interface StatsBarProps {
 
 export const StatsBar = ({ noteCount, totalWords, todayNotes, tagCount }: StatsBarProps) => {
   const { config: sceneryConfig, loaded } = usePageScenery('notes');
+  const { primaryTextColor, secondaryTextColor, averageBrightness } = useSceneryColor(
+    sceneryConfig.enabled ? sceneryConfig.image : undefined,
+    sceneryConfig.enabled
+  );
 
   // 等待设置加载完成
   if (!loaded) {
@@ -85,10 +90,10 @@ export const StatsBar = ({ noteCount, totalWords, todayNotes, tagCount }: StatsB
         display: 'flex', 
         gap: '48px' 
       }}>
-        <StatItem value={noteCount} label="笔记数" highlight />
-        <StatItem value={`${(totalWords / 1000).toFixed(1)}k`} label="总字数" />
-        <StatItem value={todayNotes} label="今日更新" />
-        <StatItem value={tagCount} label="标签" />
+        <StatItem value={noteCount} label="笔记数" highlight colorConfig={sceneryConfig.enabled ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
+        <StatItem value={`${(totalWords / 1000).toFixed(1)}k`} label="总字数" colorConfig={sceneryConfig.enabled ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
+        <StatItem value={todayNotes} label="今日更新" colorConfig={sceneryConfig.enabled ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
+        <StatItem value={tagCount} label="标签" colorConfig={sceneryConfig.enabled ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
       </div>
     </div>
   );
@@ -100,20 +105,31 @@ interface StatItemProps {
   highlight?: boolean;
 }
 
-const StatItem = ({ value, label, highlight }: StatItemProps) => (
-  <div style={{ textAlign: 'center' }}>
-    <Typography.Text style={{ 
-      fontSize: '24px', 
-      fontWeight: 600, 
-      color: highlight ? PRIMARY_COLOR : 'var(--color-text-1)' 
-    }}>
-      {value}
-    </Typography.Text>
-    <Typography.Text 
-      type='secondary' 
-      style={{ fontSize: '12px', display: 'block', marginTop: '4px' }}
-    >
-      {label}
-    </Typography.Text>
-  </div>
-);
+const StatItem = ({ value, label, highlight, colorConfig }: StatItemProps & { colorConfig?: { primary: string; secondary: string; brightness: number } }) => {
+  const primaryColor = highlight 
+    ? getAdaptivePrimaryColor(colorConfig?.brightness ?? 255, PRIMARY_COLOR)
+    : (colorConfig?.primary ?? 'var(--color-text-1)');
+  
+  return (
+    <div style={{ textAlign: 'center' }}>
+      <Typography.Text style={{ 
+        fontSize: '24px', 
+        fontWeight: 600, 
+        color: primaryColor
+      }}>
+        {value}
+      </Typography.Text>
+      <Typography.Text 
+        type='secondary' 
+        style={{ 
+          fontSize: '12px', 
+          display: 'block', 
+          marginTop: '4px',
+          color: colorConfig?.secondary
+        }}
+      >
+        {label}
+      </Typography.Text>
+    </div>
+  );
+};

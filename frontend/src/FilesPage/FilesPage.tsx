@@ -2,6 +2,7 @@ import { Typography, Button, Tag, Radio, Empty, Tooltip } from '@arco-design/web
 import { useState } from 'react';
 import { IconFolderAdd, IconUpload, IconFolder, IconImage, IconFileVideo, IconMusic, IconFile, IconDownload, IconDelete } from '@arco-design/web-react/icon';
 import { usePageScenery } from '../hooks/useScenery';
+import { useSceneryColor } from '../hooks/useSceneryColor';
 
 import ZipIcon from './ZipIcon';
 
@@ -142,6 +143,10 @@ interface StatsBarProps {
 
 const StatsBar = ({ stats, viewMode, setViewMode }: StatsBarProps) => {
   const { config: sceneryConfig, loaded } = usePageScenery('files');
+  const { primaryTextColor, secondaryTextColor } = useSceneryColor(
+    sceneryConfig.enabled ? sceneryConfig.image : undefined,
+    sceneryConfig.enabled
+  );
 
   // 等待设置加载完成
   if (!loaded) {
@@ -221,16 +226,16 @@ const StatsBar = ({ stats, viewMode, setViewMode }: StatsBarProps) => {
       {/* 统计内容 */}
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', gap: '64px' }}>
         <div>
-          <Typography.Text style={{ fontSize: '28px', fontWeight: 600 }}>{stats.totalFiles}</Typography.Text>
-          <Typography.Text type='secondary' style={{ fontSize: '13px', display: 'block', marginTop: '4px' }}>文件</Typography.Text>
+          <Typography.Text style={{ fontSize: '28px', fontWeight: 600, color: primaryTextColor }}>{stats.totalFiles}</Typography.Text>
+          <Typography.Text type='secondary' style={{ fontSize: '13px', display: 'block', marginTop: '4px', color: secondaryTextColor }}>文件</Typography.Text>
         </div>
         <div>
-          <Typography.Text style={{ fontSize: '28px', fontWeight: 600 }}>{stats.totalFolders}</Typography.Text>
-          <Typography.Text type='secondary' style={{ fontSize: '13px', display: 'block', marginTop: '4px' }}>文件夹</Typography.Text>
+          <Typography.Text style={{ fontSize: '28px', fontWeight: 600, color: primaryTextColor }}>{stats.totalFolders}</Typography.Text>
+          <Typography.Text type='secondary' style={{ fontSize: '13px', display: 'block', marginTop: '4px', color: secondaryTextColor }}>文件夹</Typography.Text>
         </div>
         <div>
-          <Typography.Text style={{ fontSize: '28px', fontWeight: 600 }}>{stats.totalSize}</Typography.Text>
-          <Typography.Text type='secondary' style={{ fontSize: '13px', display: 'block', marginTop: '4px' }}>占用空间</Typography.Text>
+          <Typography.Text style={{ fontSize: '28px', fontWeight: 600, color: primaryTextColor }}>{stats.totalSize}</Typography.Text>
+          <Typography.Text type='secondary' style={{ fontSize: '13px', display: 'block', marginTop: '4px', color: secondaryTextColor }}>占用空间</Typography.Text>
         </div>
       </div>
 

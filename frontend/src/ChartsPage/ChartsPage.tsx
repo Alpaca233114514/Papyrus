@@ -2,6 +2,7 @@ import { Typography, Card, Progress, Tooltip } from '@arco-design/web-react';
 import { useState, useMemo } from 'react';
 import { IconFire, IconClockCircle, IconCheckCircle, IconCalendar } from '@arco-design/web-react/icon';
 import { usePageScenery } from '../hooks/useScenery';
+import { useSceneryColor, getAdaptivePrimaryColor } from '../hooks/useSceneryColor';
 
 
 const PRIMARY_COLOR = '#206CCF';
@@ -268,6 +269,10 @@ const Heatmap = () => {
 // 顶部统计栏组件 - 支持窗景背景
 const StatsBar = () => {
   const { config: sceneryConfig, loaded } = usePageScenery('charts');
+  const { primaryTextColor, secondaryTextColor, averageBrightness } = useSceneryColor(
+    sceneryConfig.enabled ? sceneryConfig.image : undefined,
+    sceneryConfig.enabled
+  );
   const overallProgress = Math.round((MOCK_STATS.totalLearned / MOCK_STATS.totalCards) * 100);
 
   // 等待设置加载完成
@@ -339,11 +344,11 @@ const StatsBar = () => {
 
       {/* 统计内容 */}
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', gap: '48px' }}>
-        <StatItem label='连续学习' value={MOCK_STATS.streakDays} suffix='天' />
-        <StatItem label='已掌握' value={`${MOCK_STATS.totalLearned}/${MOCK_STATS.totalCards}`} />
-        <StatItem label='总进度' value={`${overallProgress}%`} />
-        <StatItem label='今日待复习' value={MOCK_STATS.totalDue} />
-        <StatItem label='平均正确率' value={`${MOCK_STATS.avgAccuracy}%`} />
+        <StatItem label='连续学习' value={MOCK_STATS.streakDays} suffix='天' colorConfig={sceneryConfig.enabled ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
+        <StatItem label='已掌握' value={`${MOCK_STATS.totalLearned}/${MOCK_STATS.totalCards}`} colorConfig={sceneryConfig.enabled ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
+        <StatItem label='总进度' value={`${overallProgress}%`} colorConfig={sceneryConfig.enabled ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
+        <StatItem label='今日待复习' value={MOCK_STATS.totalDue} colorConfig={sceneryConfig.enabled ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
+        <StatItem label='平均正确率' value={`${MOCK_STATS.avgAccuracy}%`} colorConfig={sceneryConfig.enabled ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import FlashcardStudy from './FlashcardStudy';
 import { api } from '../api';
 import { type SceneryContent } from '../StartPage/sceneryContent';
 import { usePageScenery } from '../hooks/useScenery';
+import { useSceneryColor, getAdaptivePrimaryColor } from '../hooks/useSceneryColor';
 
 // 类型定义
 interface Collection {
@@ -57,16 +58,22 @@ const SECONDARY_COLOR = '#9FD4FD';
 const SUCCESS_COLOR = '#00B42A';
 
 // 统计小卡片
-const StatItem = ({ label, value, color }: { label: string; value: string | number; color?: string }) => (
-  <div style={{ textAlign: 'center' }}>
-    <Typography.Text style={{ fontSize: '28px', fontWeight: 600, color: color || 'inherit' }}>
-      {value}
-    </Typography.Text>
-    <Typography.Text type='secondary' style={{ fontSize: '12px', display: 'block', marginTop: '4px' }}>
-      {label}
-    </Typography.Text>
-  </div>
-);
+const StatItem = ({ label, value, color, colorConfig }: { label: string; value: string | number; color?: string; colorConfig?: { primary: string; secondary: string; brightness: number } }) => {
+  const finalColor = color 
+    ? getAdaptivePrimaryColor(colorConfig?.brightness ?? 255, color)
+    : (colorConfig?.primary ?? 'inherit');
+  
+  return (
+    <div style={{ textAlign: 'center' }}>
+      <Typography.Text style={{ fontSize: '28px', fontWeight: 600, color: finalColor }}>
+        {value}
+      </Typography.Text>
+      <Typography.Text type='secondary' style={{ fontSize: '12px', display: 'block', marginTop: '4px', color: colorConfig?.secondary }}>
+        {label}
+      </Typography.Text>
+    </div>
+  );
+};
 
 // 统计数据栏 - 支持窗景背景（简洁版 - 无悬停效果）
 const StatsCard = ({ 
@@ -82,6 +89,10 @@ const StatsCard = ({
   scenery: SceneryContent | null;
   opacity?: number;
 }) => {
+  const { primaryTextColor, secondaryTextColor, averageBrightness } = useSceneryColor(
+    scenery?.image,
+    !!scenery
+  );
   // 窗景关闭时（scenery 为 null），显示纯背景样式
   if (!scenery) {
     return (
@@ -157,11 +168,11 @@ const StatsCard = ({
         display: 'flex', 
         gap: '48px',
       }}>
-        <StatItem label='待复习' value={dueCount} color={dueCount > 0 ? PRIMARY_COLOR : undefined} />
-        <StatItem label='已掌握' value={`${MOCK_STATS.masteredCards}/${totalCount || MOCK_STATS.totalCards}`} color={SUCCESS_COLOR} />
-        <StatItem label='总进度' value={`${overallProgress}%`} />
-        <StatItem label='今日已学' value={MOCK_STATS.todayLearned} />
-        <StatItem label='连续学习' value={`${MOCK_STATS.streakDays}天`} />
+        <StatItem label='待复习' value={dueCount} color={dueCount > 0 ? PRIMARY_COLOR : undefined} colorConfig={scenery ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
+        <StatItem label='已掌握' value={`${MOCK_STATS.masteredCards}/${totalCount || MOCK_STATS.totalCards}`} color={SUCCESS_COLOR} colorConfig={scenery ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
+        <StatItem label='总进度' value={`${overallProgress}%`} colorConfig={scenery ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
+        <StatItem label='今日已学' value={MOCK_STATS.todayLearned} colorConfig={scenery ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
+        <StatItem label='连续学习' value={`${MOCK_STATS.streakDays}天`} colorConfig={scenery ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
       </div>
     </div>
   );

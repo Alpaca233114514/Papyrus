@@ -2,6 +2,7 @@ import { Typography, Button, Tabs, Tag, Switch, Card } from '@arco-design/web-re
 import { useState } from 'react';
 import { IconPlus, IconSettings, IconDelete, IconCheckCircleFill, IconDownload, IconStarFill } from '@arco-design/web-react/icon';
 import { usePageScenery } from '../hooks/useScenery';
+import { useSceneryColor, getAdaptivePrimaryColor } from '../hooks/useSceneryColor';
 
 
 const PRIMARY_COLOR = '#206CCF';
@@ -129,6 +130,10 @@ interface StatsBarProps {
 
 const StatsBar = ({ extensions, enabledCount, updateCount }: StatsBarProps) => {
   const { config: sceneryConfig, loaded } = usePageScenery('extensions');
+  const { primaryTextColor, secondaryTextColor, averageBrightness } = useSceneryColor(
+    sceneryConfig.enabled ? sceneryConfig.image : undefined,
+    sceneryConfig.enabled
+  );
 
   // 等待设置加载完成
   if (!loaded) {
@@ -212,20 +217,20 @@ const StatsBar = ({ extensions, enabledCount, updateCount }: StatsBarProps) => {
       {/* 统计内容 */}
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', gap: '48px' }}>
         <div style={{ textAlign: 'center' }}>
-          <Typography.Text style={{ fontSize: '24px', fontWeight: 600, color: PRIMARY_COLOR }}>{extensions.length}</Typography.Text>
-          <Typography.Text type='secondary' style={{ fontSize: '12px', display: 'block', marginTop: '4px' }}>已安装</Typography.Text>
+          <Typography.Text style={{ fontSize: '24px', fontWeight: 600, color: getAdaptivePrimaryColor(averageBrightness, PRIMARY_COLOR) }}>{extensions.length}</Typography.Text>
+          <Typography.Text type='secondary' style={{ fontSize: '12px', display: 'block', marginTop: '4px', color: secondaryTextColor }}>已安装</Typography.Text>
         </div>
         <div style={{ textAlign: 'center' }}>
-          <Typography.Text style={{ fontSize: '24px', fontWeight: 600, color: SUCCESS_COLOR }}>{enabledCount}</Typography.Text>
-          <Typography.Text type='secondary' style={{ fontSize: '12px', display: 'block', marginTop: '4px' }}>已启用</Typography.Text>
+          <Typography.Text style={{ fontSize: '24px', fontWeight: 600, color: getAdaptivePrimaryColor(averageBrightness, SUCCESS_COLOR) }}>{enabledCount}</Typography.Text>
+          <Typography.Text type='secondary' style={{ fontSize: '12px', display: 'block', marginTop: '4px', color: secondaryTextColor }}>已启用</Typography.Text>
         </div>
         <div style={{ textAlign: 'center' }}>
-          <Typography.Text style={{ fontSize: '24px', fontWeight: 600, color: updateCount > 0 ? '#FF7D00' : 'inherit' }}>{updateCount}</Typography.Text>
-          <Typography.Text type='secondary' style={{ fontSize: '12px', display: 'block', marginTop: '4px' }}>有更新</Typography.Text>
+          <Typography.Text style={{ fontSize: '24px', fontWeight: 600, color: updateCount > 0 ? '#FF7D00' : primaryTextColor }}>{updateCount}</Typography.Text>
+          <Typography.Text type='secondary' style={{ fontSize: '12px', display: 'block', marginTop: '4px', color: secondaryTextColor }}>有更新</Typography.Text>
         </div>
         <div style={{ textAlign: 'center' }}>
-          <Typography.Text style={{ fontSize: '24px', fontWeight: 600 }}>65.8k</Typography.Text>
-          <Typography.Text type='secondary' style={{ fontSize: '12px', display: 'block', marginTop: '4px' }}>总下载</Typography.Text>
+          <Typography.Text style={{ fontSize: '24px', fontWeight: 600, color: primaryTextColor }}>65.8k</Typography.Text>
+          <Typography.Text type='secondary' style={{ fontSize: '12px', display: 'block', marginTop: '4px', color: secondaryTextColor }}>总下载</Typography.Text>
         </div>
       </div>
 
