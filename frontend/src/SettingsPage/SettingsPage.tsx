@@ -36,7 +36,7 @@ import {
   IconEye,
   IconTool,
   IconBulb,
-  IconCompass,
+  IconFileImage,
   IconPalette,
   IconMessage,
   IconArrowLeft,
@@ -70,7 +70,7 @@ const SETTING_CATEGORIES = [
     key: 'scenery',
     title: '窗景',
     desc: '各界面背景窗景设置',
-    icon: IconCompass,
+    icon: IconFileImage,
     color: '#722ED1',
   },
   {
