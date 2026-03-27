@@ -451,14 +451,14 @@ class TestConnectionResponse(BaseModel):
 class CompletionRequest(BaseModel):
     prefix: str = Field(..., description="当前输入的文本前缀")
     context: str = Field(default="", description="笔记的完整内容作为上下文")
-    max_tokens: int = Field(default=50, description="最大生成token数")
+    max_tokens: int = Field(default=150, description="最大生成token数")
 
 
 class CompletionConfigModel(BaseModel):
     enabled: bool = True
     require_confirm: bool = False  # 二次确认开关
     trigger_delay: int = 500  # 防抖延迟(ms)
-    max_tokens: int = 50
+    max_tokens: int = 150
 
 
 class CompletionConfigResponse(BaseModel):
@@ -823,8 +823,7 @@ async def create_completion(payload: CompletionRequest) -> StreamingResponse:
 要求：
 1. 续写内容要自然流畅，与上下文保持一致
 2. 只输出续写的文本，不要解释
-3. 续写长度控制在50字以内
-4. 如果是列表、代码块等特殊格式，保持格式一致"""
+3. 如果是列表、代码块等特殊格式，保持格式一致"""
 
     user_prompt = f"""请根据以下内容续写：
 
