@@ -2,55 +2,82 @@
 
 ## 🚀 5分钟上手
 
-### 步骤 1：安装依赖（可选）
+### 环境要求
 
-如果你想使用 AI 功能 或 FastAPI API：
+| 组件 | 版本要求 |
+|------|----------|
+| Python | 3.14+ |
+| Node.js | 24.14+ (前端开发) |
+| npm | 11.9+ |
+
+### 步骤 1：安装依赖
+
+**Python 依赖**
 ```bash
 pip install -r requirements.txt
 ```
 
-如果只使用基础学习功能，可以跳过此步骤。
+**前端依赖（如需开发/修改前端）**
+```bash
+cd frontend
+npm install
+```
+
+---
 
 ### 步骤 2：启动程序
 
+**方式 1：同时启动前后端（推荐开发）**
+
+```bash
+# 终端 1：启动后端 API
+python -m uvicorn src.papyrus_api.main:app --reload --host 127.0.0.1 --port 8000
+
+# 终端 2：启动前端（在另一个终端）
+cd frontend
+npm run dev
+```
+
+访问 http://localhost:5173 查看应用。
+
+**方式 2：通过主入口启动**
+
 ```bash
 python src/Papyrus.pyw
-# 或
-python src/Papyrus.py
 ```
 
-### 步骤 3：开始学习
+---
 
-#### 添加卡片
-1. 点击菜单 "操作" → "添加新卷轴"
-2. 输入题目和答案
-3. 点击保存
+## 📝 基础使用
 
-#### 批量导入
+### 添加卡片
+
+1. 点击侧边栏 "卷轴" 进入复习页面
+2. 点击 "添加新卷轴" 按钮
+3. 输入题目和答案
+4. 点击保存
+
+### 批量导入
+
 1. 准备 TXT 文件，格式：`题目===答案`
-2. 点击菜单 "操作" → "批量导入 (TXT)"
-3. 选择文件
+2. 在卷轴页面点击导入按钮
+3. 选择文件并确认
 
-#### 复习卡片
-- **Space**：显示答案
-- **1**：忘记（1天后复习）
-- **2**：模糊（正常间隔）
-- **3**：秒杀（快速增长）
+### 复习卡片
 
-## 🌐 FastAPI（可选：给前端提供接口）
+- **Space**: 显示答案
+- **1**: 忘记（1天后复习）
+- **2**: 模糊（正常间隔）
+- **3**: 秒杀（快速增长）
 
-启动 FastAPI：
-```bash
-python -m uvicorn src.papyrus_api.main:app --reload --host 127.0.0.1 --port 8000
-```
+---
 
-前端将通过 `/api/*` 与后端通信（详见 docs/guides/API_FASTAPI.md）。
-
+## 🤖 AI 功能配置
 
 ### 方式 1：使用 OpenAI
 
 1. 获取 API Key：https://platform.openai.com/api-keys
-2. 点击 AI 助手的 "⚙" 按钮
+2. 进入设置页面 → AI 配置
 3. 在 "API配置" → "OPENAI" 中输入 API Key
 4. 在 "模型管理" 中选择模型（如 gpt-3.5-turbo）
 5. 保存设置
@@ -132,6 +159,16 @@ AI：[显示统计信息]
 - **🗑️ 删除**：删除不需要的模型
 - **🔄 从API刷新**：自动获取可用模型列表
 
+### 无障碍设置
+
+在设置 → 无障碍标签页：
+
+- **减少动画**：减弱界面动画
+- **高对比度**：增强文字对比度
+- **屏幕阅读器优化**：优化 ARIA 标签
+- **焦点指示器**：始终显示键盘焦点
+- **大光标**：放大鼠标指针
+
 ---
 
 ## 📊 学习技巧
@@ -156,10 +193,10 @@ AI：[显示统计信息]
 
 ### AI 功能不可用
 
-**问题**：右侧显示占位面板
+**问题**：聊天面板显示占位信息
 
 **解决**：
-1. 检查是否安装 requests：`pip list | grep requests`
+1. 检查是否安装依赖：`pip list | findstr requests` (Windows) 或 `pip list | grep requests` (Linux/Mac)
 2. 重启程序
 3. 查看控制台错误信息
 
@@ -184,12 +221,27 @@ AI：[显示统计信息]
 
 ---
 
+## 🌐 FastAPI（可选：给前端提供接口）
+
+启动 FastAPI：
+```bash
+python -m uvicorn src.papyrus_api.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+前端将通过 `/api/*` 与后端通信：
+- Health: http://127.0.0.1:8000/api/health
+- Docs: http://127.0.0.1:8000/docs
+
+详见 [API_FASTAPI.md](API_FASTAPI.md)
+
+---
+
 ## 📚 更多资源
 
-- [完整文档](README.md)
+- [完整文档](../README.md)
 - [更新日志](CHANGELOG.md)
 - [版本信息](VERSION.md)
-- [AI 功能详解](AI_TOOLS_DEMO.md)
+- [AI 功能详解](../AI_TOOLS_DEMO.md)
 
 ---
 

@@ -20,93 +20,165 @@
 - **改进错误提示**：保存失败时显示具体原因
 - **增强稳定性**：防止提供商和模型不匹配导致的问题
 
+---
 
-### 📦 安装说明
+## 📦 安装说明
 
-#### 基础功能（无需额外依赖）
+### 环境要求
+
+| 组件 | 版本 |
+|------|------|
+| Python | 3.14+ |
+| Node.js | 24.14+ (前端开发) |
+| npm | 11.9+ |
+
+### 基础功能（无需额外依赖）
 - SM-2 算法
 - 卡片学习
 - 数据管理
 
-#### AI 功能（需要安装依赖）
+### AI 功能（需要安装依赖）
 ```bash
 pip install -r requirements.txt
-
 ```
 
-### 🚀 快速开始
+---
 
-#### 1. 启动程序
+## 🚀 快速开始
+
+### 1. 安装依赖
+
+```bash
+# Python 依赖
+pip install -r requirements.txt
+
+# 前端依赖（如需开发前端）
+cd frontend
+npm install
+```
+
+### 2. 启动程序
+
+**开发模式（推荐）**
+```bash
+# 终端 1：启动后端
+python -m uvicorn src.papyrus_api.main:app --reload --host 127.0.0.1 --port 8000
+
+# 终端 2：启动前端
+cd frontend
+npm run dev
+```
+
+访问 http://localhost:5173 查看应用。
+
+**或通过主入口启动**
 ```bash
 python src/Papyrus.pyw
-# 或
-python src/Papyrus.py
 ```
 
-
-#### 2. 配置 AI（可选）
-1. 点击右侧 AI 助手的 "⚙" 按钮
+### 3. 配置 AI（可选）
+1. 访问设置页面
 2. 在 "API配置" 标签页输入 API Key
 3. 在 "模型管理" 标签页选择模型
 4. 保存设置
 
-#### 3. 使用 AI 对话
+### 4. 使用 AI 对话
 直接在输入框输入问题：
 - "帮我解释这道题"
 - "创建一张关于递归的卡片"
 - "搜索所有 Python 相关的题"
 
-### 📊 数据格式变更
+---
 
-新版本卡片数据新增字段（向后兼容）：
+## 📊 数据格式
+
+### 卡片数据
 ```json
 {
+  "id": "uuid-string",
   "q": "题目",
   "a": "答案",
-  "next_review": 0,
+  "next_review": 1234567890,
   "interval": 0,
-  "ef": 2.5,           // 新增：难度系数
-  "repetitions": 0     // 新增：连续正确次数
+  "ef": 2.5,
+  "repetitions": 0
 }
 ```
 
-旧数据会自动适配，无需手动迁移。
+### 笔记数据
+```json
+{
+  "id": "uuid-string",
+  "title": "笔记标题",
+  "folder": "文件夹",
+  "content": "笔记内容",
+  "tags": ["tag1", "tag2"],
+  "created_at": 1234567890,
+  "updated_at": 1234567890
+}
+```
 
-### 🔧 技术架构
+---
+
+## 🔧 技术架构
 
 ```
 Papyrus/
 ├── src/
-│   ├── Papyrus.pyw          # 兼容入口（推荐运行：python src/Papyrus.pyw）
-│   ├── Papyrus.py           # 兼容入口（旧导入支持：from Papyrus import ...）
-│   ├── papyrus/             # 新版主程序包（模块化实现）
-│   ├── papyrus_api/         # FastAPI 后端（预留：给前端提供 /api/*）
+│   ├── papyrus/             # 主程序包
+│   │   ├── core/            # 核心逻辑
+│   │   │   ├── cards.py     # 卡片操作
+│   │   │   └── ...
+│   │   ├── data/            # 数据存储
+│   │   ├── logic/           # 算法
+│   │   │   └── sm2.py       # SM-2 算法
+│   │   └── integrations/    # 第三方集成
+│   ├── papyrus_api/         # FastAPI 后端
+│   │   └── main.py
 │   └── ai/                  # AI 模块
 │       ├── config.py        # 配置管理
 │       ├── provider.py      # AI 提供商接口
 │       ├── sidebar_v3.py    # AI 侧边栏 UI
 │       └── tools.py         # 工具调用系统
-├── frontend/                # TS + React + Arco 前端（预留）
+├── frontend/                # React + TypeScript 前端
+│   ├── src/
+│   │   ├── StartPage/       # 开始页面
+│   │   ├── ScrollPage/      # 卷轴复习
+│   │   ├── NotesPage/       # 笔记管理
+│   │   ├── SettingsPage/    # 设置（含无障碍）
+│   │   └── ...
+│   └── package.json
 ├── data/
 │   ├── Papyrusdata.json     # 学习数据
 │   └── ai_config.json       # AI 配置
-├── backup/                  # 自动备份
-├── requirements.txt         # Python 依赖
-├── CHANGELOG.md             # 详细更新日志
-└── README.md                # 项目说明
+└── backup/                  # 自动备份
 ```
 
+### 技术栈
 
+| 层级 | 技术 |
+|------|------|
+| 后端 | Python 3.14, FastAPI, Uvicorn |
+| 前端 | React 19, TypeScript, Arco Design, Vite |
+| 算法 | SM-2 间隔重复 |
+| 存储 | JSON 文件 |
 
-### 🌐 FastAPI（可选：给前端提供接口）
+---
 
+## 🌐 API 服务
+
+### 启动 FastAPI
 ```bash
 python -m uvicorn src.papyrus_api.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
+### 端点
 - Health: http://127.0.0.1:8000/api/health
+- Docs: http://127.0.0.1:8000/docs
 
+---
 
+## ⚠️ 已知问题
 
 1. **Windows 控制台编码警告**
    - 不影响使用
@@ -116,7 +188,9 @@ python -m uvicorn src.papyrus_api.main:app --reload --host 127.0.0.1 --port 8000
    - 待完善
    - 可手动添加模型名称
 
-### 🔮 未来计划
+---
+
+## 🔮 未来计划
 
 - [ ] 语音输入/输出（TTS/STT）
 - [ ] 图片识别（拍照题目）
@@ -124,22 +198,27 @@ python -m uvicorn src.papyrus_api.main:app --reload --host 127.0.0.1 --port 8000
 - [ ] 学习进度统计面板
 - [ ] 社区卡片分享
 - [ ] 移动端支持
+- [ ] 多用户协作
 
-### 📝 更新日志
+---
+
+## 📝 更新日志
 
 详细的版本历史请查看 [CHANGELOG.md](CHANGELOG.md)
 
-### 💬 反馈与支持
+---
+
+## 💬 反馈与支持
 
 - 问题反馈：[GitHub Issues](https://github.com/Alpaca233114514/Papyrus/issues)
 - 功能建议：欢迎提交 Pull Request
 
-### 📄 开源协议
+---
+
+## 📄 开源协议
 
 MIT License
 
 ---
 
 **Papyrus v1.2.2** - 让学习更智能，让记忆更科学。
-
-

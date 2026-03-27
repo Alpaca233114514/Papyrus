@@ -1,5 +1,25 @@
 # Papyrus 更新日志
 
+## [Unreleased]
+
+### 🎉 新增功能
+- **无障碍改进**: 达到 WCAG 2.1 AAA 级标准
+  - 新增全局无障碍样式 (`frontend/src/a11y.css`)
+  - 新增无障碍设置面板（减少动画、高对比度、屏幕阅读器优化等）
+  - 完善 ARIA 属性支持
+  - 优化键盘导航
+  - 新增 Skip Link 导航
+  - 新增无障碍图标
+
+### 🚀 架构升级
+- **前端**: 全新 React 19 + TypeScript + Arco Design 实现
+  - 全新设计的开始页面、卷轴页面、笔记页面
+  - 聊天面板支持 AI 对话
+  - 设置页面包含无障碍选项
+  - 响应式布局和动画效果
+
+---
+
 ## v1.2.2 (2026-03-13)
 
 ### 🐛 Bug 修复
@@ -16,7 +36,9 @@
 
 ---
 
-### v1.2.1 更新内容
+## v1.2.1 (2026-03-11)
+
+### 🎉 新增功能
 #### 1. SM-2 科学记忆算法
 - 替换原有简单算法，采用经过验证的 SM-2 间隔重复算法
 - 根据答题质量动态调整复习间隔
@@ -29,7 +51,7 @@
 - **上下文感知**：AI 自动知道你在学习哪张卡片
 
 #### 3. 多模型支持
-- **OpenAI**：GPT系列
+- **OpenAI**：GPT 系列
 - **Anthropic**：Claude Opus, Sonnet 等
 - **Ollama**：本地运行，完全免费
 - **自定义**：支持任何兼容 OpenAI API 的服务
@@ -52,7 +74,7 @@
 - 支持本地模型（Ollama），数据不出本地
 
 #### 7. 跨平台
-- 新增Apple Silicon MacOS，Linux版本支持。（Mac版本暂时使用默认头像）
+- 新增 Apple Silicon macOS、Linux 版本支持
 
 ### 📦 安装说明
 
@@ -63,8 +85,10 @@
 
 #### AI 功能（需要安装依赖）
 ```bash
-pip install requests
+pip install -r requirements.txt
 ```
+
+---
 
 ## v1.2.1-beta+macOS.arm64 (2026-03-11)
 
@@ -78,7 +102,7 @@ pip install requests
 
 - **优化打包配置**
   - 改进 PyInstaller spec 文件，支持跨平台图标配置
-  - Windows 使用 .ico 图 标，macOS 使用默认图标
+  - Windows 使用 .ico 图标，macOS 使用默认图标
   - 自动化构建 Windows x86_64 和 macOS ARM64 版本
 
 - **完善自动发布流程**
@@ -247,7 +271,7 @@ pip install requests
 
 ---
 
-## v1.1.0 (2025-01-XX)
+## v1.1.0 (2025-01)
 
 ### 新增功能
 - 批量导入 TXT 文件
@@ -260,11 +284,15 @@ pip install requests
 
 ---
 
-## v1.0.0 (2025-01-XX)
+## v1.0.0 (2025-01)
 
 ### 首次发布
 - 基础卡片学习功能
 - 简单间隔重复算法
 - 数据持久化
 - 备份恢复功能
-</content>
+
+---
+
+**维护者**: Papyrus 开发团队  
+**协议**: MIT License
