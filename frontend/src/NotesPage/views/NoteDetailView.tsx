@@ -12,8 +12,11 @@ import {
   IconPlus,
   IconH1,
   IconH2,
-  IconH3
+  IconH3,
+  IconLink,
+  IconMindMapping,
 } from '@arco-design/web-react/icon';
+import { RelationsPanel, RelationGraph } from '../components/Relations';
 import type { Note, CreateNoteParams, UpdateNoteParams } from '../types';
 import { PRIMARY_COLOR } from '../constants';
 
@@ -41,6 +44,10 @@ export const NoteDetailView = ({
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   const [isEditing, setIsEditing] = useState(isCreateMode);
+  
+  // 关联功能状态
+  const [showRelationsPanel, setShowRelationsPanel] = useState(false);
+  const [showGraphDrawer, setShowGraphDrawer] = useState(false);
   
   // SmartTextArea ref
   const textAreaRef = useRef<SmartTextAreaRef>(null);
@@ -265,6 +272,24 @@ export const NoteDetailView = ({
               icon={<IconEdit />}
               onClick={() => setIsEditing(true)}
             />
+          )}
+          {!isCreateMode && (
+            <>
+              <Button
+                type={showRelationsPanel ? 'primary' : 'secondary'}
+                icon={<IconLink />}
+                onClick={() => setShowRelationsPanel(!showRelationsPanel)}
+              >
+                关联
+              </Button>
+              <Button
+                type='secondary'
+                icon={<IconMindMapping />}
+                onClick={() => setShowGraphDrawer(true)}
+              >
+                图谱
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -497,7 +522,52 @@ export const NoteDetailView = ({
             </div>
           )}
         </div>
+
+        {/* 关联面板 */}
+        {showRelationsPanel && note && (
+          <div
+            style={{
+              width: '320px',
+              borderLeft: '1px solid var(--color-border-2)',
+              background: 'var(--color-bg-1)',
+            }}
+          >
+            <RelationsPanel
+              noteId={note.id}
+              onNavigateToNote={(targetId) => {
+                // 保存当前笔记后跳转
+                if ((isEditing || isCreateMode) && title.trim()) {
+                  handleSave(false);
+                }
+                onBack();
+                // 这里可以添加跳转到目标笔记的逻辑
+              }}
+            />
+          </div>
+        )}
       </div>
+
+      {/* 关联图谱弹窗 */}
+      <Modal
+        title="关联图谱"
+        visible={showGraphDrawer}
+        onCancel={() => setShowGraphDrawer(false)}
+        footer={null}
+        width={800}
+      >
+        {note && (
+          <div style={{ height: '500px' }}>
+            <RelationGraph
+              noteId={note.id}
+              depth={1}
+              onNodeClick={(nodeId) => {
+                setShowGraphDrawer(false);
+                // 可以添加跳转到对应笔记的逻辑
+              }}
+            />
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

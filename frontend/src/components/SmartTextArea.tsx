@@ -226,6 +226,9 @@ export const SmartTextArea = forwardRef<SmartTextAreaRef, SmartTextAreaProps>(
             position: 'relative',
             zIndex: 1,
             background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            boxShadow: 'none',
           }}
         />
         
