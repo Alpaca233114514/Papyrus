@@ -3,6 +3,7 @@ import { NoteListView } from './views/NoteListView';
 import { NoteDetailView } from './views/NoteDetailView';
 import { FileTree } from './components/FileTree';
 import { useNotes } from './useNotes';
+import { Modal, Message } from '@arco-design/web-react';
 
 import type { Note } from './types';
 
@@ -27,6 +28,8 @@ const NotesPage = () => {
     setActiveFolder,
     saveNote,
     deleteNote,
+    importFromObsidian,
+    refreshNotes,
   } = useNotes();
 
   // 获取所有文件夹名称
@@ -83,6 +86,48 @@ const NotesPage = () => {
     deleteNote(id);
     setViewMode('list');
   }, [deleteNote]);
+
+  // 从 Obsidian 导入
+  const handleImportObsidian = useCallback(() => {
+    Modal.confirm({
+      title: '从 Obsidian 导入',
+      content: (
+        <div style={{ marginTop: '16px' }}>
+          <p>请输入 Obsidian Vault 的完整路径：</p>
+          <input
+            id="vault-path-input"
+            type="text"
+            placeholder="例如: C:\\Users\\用户名\\Documents\\Obsidian Vault"
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              borderRadius: '4px',
+              border: '1px solid var(--color-border-2)',
+              background: 'var(--color-bg-2)',
+              color: 'var(--color-text-1)',
+              marginTop: '8px',
+            }}
+          />
+        </div>
+      ),
+      onOk: async () => {
+        const input = document.getElementById('vault-path-input') as HTMLInputElement;
+        const vaultPath = input?.value.trim();
+        if (!vaultPath) {
+          Message.error('请输入 Vault 路径');
+          return Promise.reject('Empty path');
+        }
+        try {
+          const result = await importFromObsidian(vaultPath);
+          Message.success(`导入完成: ${result.imported} 条已导入, ${result.skipped} 条已跳过`);
+          await refreshNotes();
+        } catch (err) {
+          Message.error('导入失败: ' + (err as Error).message);
+          return Promise.reject(err);
+        }
+      },
+    });
+  }, [importFromObsidian, refreshNotes]);
 
   // 侧边栏拖拽调整
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -156,6 +201,7 @@ const NotesPage = () => {
             onFolderChange={setActiveFolder}
             onNoteClick={handleNoteClick}
             onCreateClick={handleCreateClick}
+            onImportObsidian={handleImportObsidian}
           />
         ) : (
           <NoteDetailView
