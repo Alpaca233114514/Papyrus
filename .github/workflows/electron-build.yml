@@ -58,8 +58,8 @@ jobs:
             frontend/package-lock.json
 
       - name: Install Dependencies
-        run: npm install
-
+        run: |
+          npm install
           cd frontend && npm install 
 
       - name: Build Frontend
@@ -105,13 +105,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/Papyrus-win-x64/**/*.exe
-            artifacts/Papyrus-win-x64/**/*.zip
-            artifacts/Papyrus-macos-arm64/**/*.dmg
-            artifacts/Papyrus-macos-arm64/**/*.zip
-            artifacts/Papyrus-linux-x64/**/*.AppImage
-            artifacts/Papyrus-linux-x64/**/*.deb
-            artifacts/Papyrus-linux-x64/**/*.tar.gz
+            artifacts/Papyrus-Win-x64/**/*.exe
+            artifacts/Papyrus-Win-x64/**/*.zip
+            artifacts/Papyrus-Apple Silicon-arm64/**/*.dmg
+            artifacts/Papyrus-Apple Silicon-arm64/**/*.zip
+            artifacts/Papyrus-Linux-x64/**/*.AppImage
+            artifacts/Papyrus-Linux-x64/**/*.deb
+            artifacts/Papyrus-Linux-x64/**/*.tar.gz
           draft: true
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
           generate_release_notes: true
