@@ -79,10 +79,16 @@ const App = () => {
         跳转到主内容
       </a>
       
+      {/* 返回顶部按钮 - 根据 ChatPanel 状态动态定位 */}
       {activePage === 'start' && (
         <BackTop
           visibleHeight={200}
-          className="tw-absolute tw-right-16 tw-bottom-16"
+          style={{
+            position: 'absolute',
+            right: chatOpen ? chatWidth + 48 : 48,
+            bottom: 48,
+            transition: 'right 0.3s ease',
+          }}
           target={() => document.getElementById('start-page-scroll')!}
         />
       )}
