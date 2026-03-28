@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Dropdown, Menu, Avatar, Tooltip, Empty, Message as ArcoMessage, Tag } from '@arco-design/web-react';
-import { IconArrowUp, IconAt, IconFile, IconMessage, IconDown, IconBulb, IconRecordStop, IconTool, IconRefresh, IconEdit, IconCopy, IconDelete, IconTranslate, IconSave, IconPlus, IconHistory, IconClose, IconImage, IconFilePdf } from '@arco-design/web-react/icon';
+import { Dropdown, Menu, Avatar, Tooltip, Empty, Message as ArcoMessage, Tag, Button } from '@arco-design/web-react';
+import { IconArrowUp, IconAt, IconFile, IconMessage, IconDown, IconBulb, IconRecordStop, IconTool, IconRefresh, IconEdit, IconCopy, IconDelete, IconTranslate, IconSave, IconPlus, IconHistory, IconClose, IconImage, IconFilePdf, IconSettings } from '@arco-design/web-react/icon';
 import IconAgentMode from './icons/IconAgentMode';
 import { ReasoningChain } from './components/ReasoningChain';
 import { ToolCallCard } from './components/ToolCallCard';
@@ -74,6 +74,19 @@ interface UserProfile {
   avatarUrl: string | null;
 }
 
+// AI 配置类型
+interface ProviderConfig {
+  api_key?: string;
+  base_url?: string;
+  models: string[];
+}
+
+interface AIConfig {
+  current_provider: string;
+  current_model: string;
+  providers: Record<string, ProviderConfig>;
+}
+
 // 从 localStorage 加载用户设置
 const loadUserProfile = (): UserProfile => {
   try {
@@ -97,6 +110,8 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   const [inputHeight, setInputHeight] = useState(118);
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile>(loadUserProfile());
+  const [aiConfig, setAiConfig] = useState<AIConfig | null>(null);
+  const [configChecked, setConfigChecked] = useState(false);
   const dragStartY = useRef<number>(0);
   const dragStartHeight = useRef<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -117,6 +132,71 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('papyrus_user_profile_changed', handleStorageChange);
     };
+  }, []);
+
+  // 加载 AI 配置
+  const loadAIConfig = useCallback(async () => {
+    try {
+      const response = await fetch('/api/config/ai');
+      if (response.ok) {
+        const data = await response.json();
+        setAiConfig(data);
+      }
+    } catch (error) {
+      console.error('Failed to load AI config:', error);
+    } finally {
+      setConfigChecked(true);
+    }
+  }, []);
+
+  // 组件挂载时加载配置
+  useEffect(() => {
+    if (open) {
+      loadAIConfig();
+    }
+  }, [open, loadAIConfig]);
+
+  // 检查 AI 配置是否有效
+  const checkAIConfig = useCallback((): { valid: boolean; message?: string } => {
+    if (!aiConfig) {
+      return { valid: false, message: '正在加载配置，请稍候...' };
+    }
+
+    // 检查是否有配置的 provider
+    if (!aiConfig.current_provider) {
+      return { valid: false, message: '请先配置 AI 供应商' };
+    }
+
+    const provider = aiConfig.providers[aiConfig.current_provider];
+    if (!provider) {
+      return { valid: false, message: '当前供应商配置无效，请前往设置页面重新配置' };
+    }
+
+    // 检查 API key
+    if (!provider.api_key || provider.api_key.trim() === '') {
+      return { valid: false, message: `请先配置 ${aiConfig.current_provider} 的 API Key` };
+    }
+
+    // 检查是否有可用的模型
+    if (!aiConfig.current_model) {
+      return { valid: false, message: '请先选择 AI 模型' };
+    }
+
+    if (!provider.models || provider.models.length === 0) {
+      return { valid: false, message: '当前供应商没有可用的模型，请前往设置页面添加' };
+    }
+
+    if (!provider.models.includes(aiConfig.current_model)) {
+      return { valid: false, message: '当前选择的模型不可用，请前往设置页面重新选择' };
+    }
+
+    return { valid: true };
+  }, [aiConfig]);
+
+  // 跳转到设置页面
+  const goToSettings = useCallback(() => {
+    // 触发自定义事件，让主应用切换到设置页面
+    window.dispatchEvent(new CustomEvent('papyrus_open_settings', { detail: { section: 'chat' } }));
   }, []);
 
   // 滚动到底部
@@ -353,6 +433,13 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
     const trimmedText = text.trim();
     if ((!trimmedText && selectedFiles.length === 0) || isGenerating) return;
 
+    // 检查 AI 配置
+    const configCheck = checkAIConfig();
+    if (!configCheck.valid) {
+      ArcoMessage.error(configCheck.message || 'AI 配置不完整');
+      return;
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -452,13 +539,38 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
         console.log('Request aborted');
       } else {
         console.error('Failed to send message:', error);
-        ArcoMessage.error('发送消息失败，请重试');
+        // 根据错误类型显示不同的错误信息
+        let errorMessage = '发送消息失败，请重试';
+        if (error instanceof Error) {
+          if (error.message.includes('Failed to fetch')) {
+            errorMessage = '无法连接到服务器，请检查后端是否已启动';
+          } else if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+            errorMessage = 'API Key 无效或已过期，请前往设置页面检查配置';
+          } else if (error.message.includes('429')) {
+            errorMessage = '请求过于频繁，请稍后再试';
+          } else if (error.message.includes('500') || error.message.includes('502') || error.message.includes('503')) {
+            errorMessage = 'AI 服务暂时不可用，请稍后再试';
+          } else if (error.message.includes('API key') || error.message.includes('api key')) {
+            errorMessage = 'API Key 配置错误，请前往设置页面检查';
+          }
+        }
+        ArcoMessage.error(errorMessage);
+        
+        // 更新最后一条助手消息显示错误
+        setMessages((prev) => {
+          const newMessages = [...prev];
+          const lastMsg = newMessages[newMessages.length - 1];
+          if (lastMsg && lastMsg.role === 'assistant') {
+            lastMsg.content = '❌ ' + errorMessage;
+          }
+          return newMessages;
+        });
       }
     } finally {
       setIsGenerating(false);
       abortControllerRef.current = null;
     }
-  }, [text, isGenerating, messages, model, mode, reasoning, selectedFiles, handleSSEStream]);
+  }, [text, isGenerating, messages, model, mode, reasoning, selectedFiles, handleSSEStream, checkAIConfig]);
 
   // 停止生成
   const stopGeneration = useCallback(() => {
@@ -594,8 +706,24 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
       </div>
       <div className="chat-panel-body">
         {messages.length === 0 ? (
-          <div className="tw-flex-1 tw-flex tw-items-center tw-justify-center tw-p-8">
-            <Empty description="开始新的对话" />
+          <div className="tw-flex-1 tw-flex tw-flex-col tw-items-center tw-justify-center tw-p-8">
+            {configChecked && aiConfig && !checkAIConfig().valid ? (
+              <div className="chat-config-warning">
+                <IconSettings style={{ fontSize: 48, color: 'var(--color-warning)', marginBottom: 16 }} />
+                <div className="chat-config-warning-title">AI 配置不完整</div>
+                <div className="chat-config-warning-desc">{checkAIConfig().message}</div>
+                <Button 
+                  type="primary" 
+                  icon={<IconSettings />}
+                  onClick={goToSettings}
+                  className="chat-config-warning-btn"
+                >
+                  前往设置
+                </Button>
+              </div>
+            ) : (
+              <Empty description="开始新的对话" />
+            )}
           </div>
         ) : (
           <div className="chat-messages">

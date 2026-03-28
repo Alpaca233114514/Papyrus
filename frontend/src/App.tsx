@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { BackTop, Message } from '@arco-design/web-react';
 import TitleBar from './TitleBar';
 import Sidebar from './Sidebar';
@@ -35,6 +35,18 @@ const App = () => {
       setActivePage('scroll');
       Message.success('跳转到复习页面');
     }
+  }, []);
+
+  // 监听来自 ChatPanel 的设置页面跳转事件
+  useEffect(() => {
+    const handleOpenSettings = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setActivePage('settings');
+      // 如果有指定 section，可以通过其他方式传递，这里先简单跳转到设置页
+      console.log('Opening settings section:', detail?.section);
+    };
+    window.addEventListener('papyrus_open_settings', handleOpenSettings);
+    return () => window.removeEventListener('papyrus_open_settings', handleOpenSettings);
   }, []);
 
   const onChatDragStart = useCallback((e: React.MouseEvent) => {

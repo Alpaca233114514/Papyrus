@@ -6,12 +6,12 @@ import IconScroll from './icons/IconScroll';
 import './Sidebar.css';
 
 const items = [
-  { key: 'start', icon: <IconPlayArrow />, label: '开始' },
-  { key: 'scroll', icon: <IconScroll />, label: '卷轴' },
-  { key: 'notes', icon: <IconMindMapping />, label: '结构笔记' },
-  { key: 'charts', icon: <IconCharts />, label: '数据' },
-  { key: 'files', icon: <IconFolder />, label: '文件库' },
-  { key: 'extensions', icon: <IconCommon />, label: '扩展管理' },
+  { key: 'start', icon: IconPlayArrow, label: '开始' },
+  { key: 'scroll', icon: IconScroll, label: '卷轴' },
+  { key: 'notes', icon: IconMindMapping, label: '结构笔记' },
+  { key: 'charts', icon: IconCharts, label: '数据' },
+  { key: 'files', icon: IconFolder, label: '文件库' },
+  { key: 'extensions', icon: IconCommon, label: '扩展管理' },
 ];
 
 interface SidebarProps {
@@ -61,23 +61,26 @@ const Sidebar = ({ collapsed, onToggle, chatOpen, onChatToggle, activePage, onPa
         aria-expanded={!collapsed}
         type="button"
       >
-        <IconNav aria-hidden="true" />
+        <span className="sidebar-icon"><IconNav /></span>
         <span className="sidebar-label">侧边栏</span>
       </button>
-      {items.map((item) => (
-        <Tooltip key={item.key} content={item.label} position="right" mini disabled={!collapsed}>
-          <button
-            className={`sidebar-item${activePage === item.key ? ' sidebar-item-active' : ''}`}
-            onClick={() => onPageChange(item.key)}
-            aria-current={activePage === item.key ? 'page' : undefined}
-            aria-label={item.label}
-            type="button"
-          >
-            <span aria-hidden="true">{item.icon}</span>
-            <span className="sidebar-label">{item.label}</span>
-          </button>
-        </Tooltip>
-      ))}
+      {items.map((item) => {
+        const IconComponent = item.icon;
+        return (
+          <Tooltip key={item.key} content={item.label} position="right" mini disabled={!collapsed}>
+            <button
+              className={`sidebar-item${activePage === item.key ? ' sidebar-item-active' : ''}`}
+              onClick={() => onPageChange(item.key)}
+              aria-current={activePage === item.key ? 'page' : undefined}
+              aria-label={item.label}
+              type="button"
+            >
+              <span className="sidebar-icon"><IconComponent /></span>
+              <span className="sidebar-label">{item.label}</span>
+            </button>
+          </Tooltip>
+        );
+      })}
       <div className="tw-flex-1" />
       <Tooltip content="聊天" position="right" mini disabled={!collapsed}>
         <button 
@@ -87,7 +90,7 @@ const Sidebar = ({ collapsed, onToggle, chatOpen, onChatToggle, activePage, onPa
           aria-pressed={chatOpen}
           type="button"
         >
-          <IconRobot aria-hidden="true" />
+          <span className="sidebar-icon"><IconRobot /></span>
           <span className="sidebar-label">聊天</span>
         </button>
       </Tooltip>
@@ -99,7 +102,7 @@ const Sidebar = ({ collapsed, onToggle, chatOpen, onChatToggle, activePage, onPa
           aria-pressed={dark}
           type="button"
         >
-          {dark ? <IconMoon aria-hidden="true" /> : <IconSun aria-hidden="true" />}
+          <span className="sidebar-icon">{dark ? <IconMoon /> : <IconSun />}</span>
           <span className="sidebar-label">{dark ? '夜间模式' : '日间模式'}</span>
         </button>
       </Tooltip>
@@ -111,7 +114,7 @@ const Sidebar = ({ collapsed, onToggle, chatOpen, onChatToggle, activePage, onPa
           aria-pressed={locked}
           type="button"
         >
-          {locked ? <IconLock aria-hidden="true" /> : <IconUnlock aria-hidden="true" />}
+          <span className="sidebar-icon">{locked ? <IconLock /> : <IconUnlock />}</span>
           <span className="sidebar-label">{locked ? '锁定编辑' : '解锁编辑'}</span>
         </button>
       </Tooltip>
@@ -123,7 +126,7 @@ const Sidebar = ({ collapsed, onToggle, chatOpen, onChatToggle, activePage, onPa
           aria-label="设置"
           type="button"
         >
-          <IconSettings aria-hidden="true" />
+          <span className="sidebar-icon"><IconSettings /></span>
           <span className="sidebar-label">设置</span>
         </button>
       </Tooltip>

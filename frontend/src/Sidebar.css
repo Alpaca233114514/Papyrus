@@ -20,57 +20,74 @@
   width: 160px;
 }
 
+/* 侧边栏按钮基础样式 - 收起状态 */
 .sidebar-item {
   width: 32px;
   height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  padding-left: 8px;
   border-radius: 8px;
   cursor: pointer;
   color: var(--color-text-2);
-  font-size: 18px;
   margin-bottom: 8px;
   position: relative;
   flex-shrink: 0;
-  overflow: hidden;
-  transition: width 0.15s ease, padding 0.15s ease, background 0.2s, border 0.2s, color 0.2s;
+  transition: all 0.15s ease;
   box-sizing: border-box;
   /* Reset button styles */
   background: none;
   border: 2px solid transparent;
   font-family: inherit;
-  text-align: left;
+  padding: 0;
+  /* 图标居中 - 使用 flex */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 展开状态下的按钮 */
+.sidebar-expanded .sidebar-item {
+  width: 144px;
+  padding: 0 6px;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+/* 图标容器 */
+.sidebar-icon {
+  display: inline-flex;
+  vertical-align: middle;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+
+/* 展开状态下的图标 */
+.sidebar-expanded .sidebar-icon {
+  flex-shrink: 0;
+}
+
+/* 标签文字 - 收起时隐藏 */
+.sidebar-label {
+  font-size: 13px;
+  white-space: nowrap;
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+  transition: opacity 0.1s ease;
+  pointer-events: none;
+  vertical-align: middle;
+}
+
+.sidebar-expanded .sidebar-label {
+  opacity: 1;
+  width: auto;
+  pointer-events: auto;
 }
 
 /* Focus visible for keyboard navigation */
 .sidebar-item:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
-}
-
-.sidebar-item > svg {
-  flex-shrink: 0;
-}
-
-.sidebar-expanded .sidebar-item {
-  width: 144px;
-  padding-left: 8px;
-}
-
-.sidebar-label {
-  font-size: 13px;
-  white-space: nowrap;
-  margin-left: 8px;
-  opacity: 0;
-  transition: opacity 0.1s ease;
-  pointer-events: none;
-}
-
-.sidebar-expanded .sidebar-label {
-  opacity: 1;
-  pointer-events: auto;
 }
 
 .sidebar-item:hover {
@@ -83,6 +100,7 @@
   outline: none;
 }
 
+/* 激活状态 */
 .sidebar-item-active {
   background: var(--color-primary);
   color: var(--color-white);
@@ -95,6 +113,7 @@
   border-color: var(--color-primary);
 }
 
+/* 切换按钮特殊样式 */
 .sidebar-toggle {
   border: 1px solid var(--color-border-2);
 }
