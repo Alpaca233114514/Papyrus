@@ -1,4 +1,4 @@
-"""MCP 本地服务器 - 通过 HTTP 暴露卡片工具接口"""
+"""MCP 本地服务器 - 通过 HTTP 暴露卡片工具接口和Vault工具接口"""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ import json
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Protocol, TypedDict, cast
-
 
 class LoggerProtocol(Protocol):
     def info(self, message: str) -> None: ...
@@ -21,6 +20,7 @@ class ToolResult(TypedDict, total=False):
     params: dict[str, object]
     tools: list[str]
     status: str
+    categories: dict[str, list[str]]
 
 
 class CallRequest(TypedDict):
@@ -32,10 +32,15 @@ class CardToolsProtocol(Protocol):
     def execute_tool(self, tool_name: str, params: dict[str, object]) -> ToolResult: ...
 
 
+class VaultToolsProtocol(Protocol):
+    def execute_tool(self, tool_name: str, params: dict[str, object]) -> dict[str, object]: ...
+
+
 class _ReusableHTTPServer(HTTPServer):
     allow_reuse_address = True
     mcp_logger: LoggerProtocol | None
     mcp_card_tools: CardToolsProtocol | None
+    mcp_vault_tools: VaultToolsProtocol | None
 
 
 class _MCPHandler(BaseHTTPRequestHandler):
@@ -94,15 +99,26 @@ class _MCPHandler(BaseHTTPRequestHandler):
         if self.path == "/health":
             self._send_json({"status": "ok"})
         elif self.path == "/tools":
+            card_tools = [
+                "search_cards",
+                "get_card_stats",
+                "create_card",
+                "update_card",
+                "delete_card",
+            ]
+            vault_tools = [
+                "vault_index",
+                "vault_read",
+                "vault_watch",
+                "vault_emergency_sample",
+            ]
             self._send_json(
                 {
-                    "tools": [
-                        "search_cards",
-                        "get_card_stats",
-                        "create_card",
-                        "update_card",
-                        "delete_card",
-                    ]
+                    "tools": card_tools + vault_tools,
+                    "categories": {
+                        "cards": card_tools,
+                        "vault": vault_tools,
+                    }
                 }
             )
         else:
@@ -114,8 +130,11 @@ class _MCPHandler(BaseHTTPRequestHandler):
             return
 
         card_tools = self._typed_server.mcp_card_tools
-        if card_tools is None:
-            self._send_json({"error": "CardTools 未初始化"}, 503)
+        vault_tools = self._typed_server.mcp_vault_tools
+        
+        # 检查至少有一个工具集可用
+        if card_tools is None and vault_tools is None:
+            self._send_json({"error": "工具未初始化"}, 503)
             return
 
         try:
@@ -141,8 +160,24 @@ class _MCPHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "请求体格式无效"}, 400)
             return
 
-        result = card_tools.execute_tool(request["tool"], request["params"])
-        self._send_json(result)
+        tool_name = request["tool"]
+        params = request["params"]
+        
+        # 判断工具类型并路由
+        vault_tool_names = {"vault_index", "vault_read", "vault_watch", "vault_emergency_sample"}
+        
+        if tool_name in vault_tool_names:
+            if vault_tools is None:
+                self._send_json({"error": "Vault工具未初始化"}, 503)
+                return
+            result = vault_tools.execute_tool(tool_name, params)
+        else:
+            if card_tools is None:
+                self._send_json({"error": "Card工具未初始化"}, 503)
+                return
+            result = card_tools.execute_tool(tool_name, params)
+        
+        self._send_json(cast(ToolResult, result))
 
 
 class MCPServer:
@@ -154,11 +189,13 @@ class MCPServer:
         port: int = 9100,
         logger: LoggerProtocol | None = None,
         card_tools: CardToolsProtocol | None = None,
+        vault_tools: VaultToolsProtocol | None = None,
     ) -> None:
         self.host = host
         self.port = port
         self.logger = logger
         self.card_tools = card_tools
+        self.vault_tools = vault_tools
         self._httpd: _ReusableHTTPServer | None = None
         self._thread: threading.Thread | None = None
 
@@ -170,6 +207,7 @@ class MCPServer:
         self._httpd = _ReusableHTTPServer((self.host, self.port), _MCPHandler)
         self._httpd.mcp_logger = self.logger
         self._httpd.mcp_card_tools = self.card_tools
+        self._httpd.mcp_vault_tools = self.vault_tools
 
         self._thread = threading.Thread(target=self._httpd.serve_forever, daemon=True)
         self._thread.start()

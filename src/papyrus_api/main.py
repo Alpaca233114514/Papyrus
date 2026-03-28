@@ -48,7 +48,8 @@ from papyrus.data.notes_storage import (
 )
 from papyrus.integrations.obsidian import sync_obsidian_vault
 from ai.config import AIConfig
-from papyrus.paths import DATA_DIR
+from papyrus.paths import DATA_DIR, DATABASE_FILE
+from mcp.vault_tools import create_vault_tools, VaultTools
 
 
 def _get_data_file() -> str:
@@ -69,6 +70,17 @@ app = FastAPI(title="Papyrus API", version="0.2.0")
 
 # AI Config 实例
 _ai_config: AIConfig | None = None
+
+# Vault Tools 实例（懒加载）
+_vault_tools: VaultTools | None = None
+
+
+def get_vault_tools() -> VaultTools:
+    """获取VaultTools实例（懒加载）"""
+    global _vault_tools
+    if _vault_tools is None:
+        _vault_tools = create_vault_tools(DATABASE_FILE)
+    return _vault_tools
 
 
 def get_ai_config() -> AIConfig:
@@ -160,6 +172,10 @@ class NoteDict(BaseModel):
     created_at: float
     updated_at: float
     word_count: int
+    hash: str = ""
+    headings: list[dict] = []
+    outgoing_links: list[str] = []
+    incoming_count: int = 0
 
 
 class NotesListResponse(BaseModel):
@@ -219,6 +235,10 @@ def _note_to_dict(note: Note) -> NoteDict:
         created_at=note.created_at,
         updated_at=note.updated_at,
         word_count=note.word_count,
+        hash=getattr(note, 'hash', ''),
+        headings=getattr(note, 'headings', []),
+        outgoing_links=getattr(note, 'outgoing_links', []),
+        incoming_count=getattr(note, 'incoming_count', 0),
     )
 
 
@@ -382,6 +402,104 @@ def import_obsidian_endpoint(payload: ObsidianImportIn) -> ObsidianImportRespons
         skipped=result.skipped,
         errors=result.errors,
     )
+
+
+# ========== Vault MCP API ==========
+
+class VaultIndexIn(BaseModel):
+    filter_tags: list[str] | None = None
+    query: str | None = None
+    limit: int = 50
+    cursor: str | None = None
+
+
+class VaultIndexResponse(BaseModel):
+    success: bool
+    notes: list[dict]
+    total: int
+    cursor: str | None
+    error: str | None
+
+
+class VaultReadIn(BaseModel):
+    ids: list[str]
+    format: str = "summary"  # "summary" | "full" | "block"
+    block_ref: str | None = None
+    include_links: bool = False
+
+
+class VaultReadResponse(BaseModel):
+    success: bool
+    notes: list[dict]
+    error: str | None
+
+
+class VaultWatchIn(BaseModel):
+    since: int
+
+
+class VaultWatchResponse(BaseModel):
+    success: bool
+    data: dict | None
+    error: str | None
+
+
+class VaultEmergencyIn(BaseModel):
+    sample_size: int = 5
+    content_limit: int = 500
+
+
+class VaultEmergencyResponse(BaseModel):
+    success: bool
+    emergency_mode: bool
+    notes: list[dict]
+    warning: str
+    error: str | None
+
+
+@app.post("/api/vault/index", response_model=VaultIndexResponse)
+def vault_index_endpoint(payload: VaultIndexIn) -> VaultIndexResponse:
+    """Vault第一层：获取笔记骨架索引（元数据+大纲+链接关系）"""
+    tools = get_vault_tools()
+    result = tools.vault_index(
+        filter_tags=payload.filter_tags,
+        query=payload.query,
+        limit=payload.limit,
+        cursor=payload.cursor,
+    )
+    return VaultIndexResponse(**result)
+
+
+@app.post("/api/vault/read", response_model=VaultReadResponse)
+def vault_read_endpoint(payload: VaultReadIn) -> VaultReadResponse:
+    """Vault第二层：按需加载笔记内容"""
+    tools = get_vault_tools()
+    result = tools.vault_read(
+        ids=payload.ids,
+        format=payload.format,
+        block_ref=payload.block_ref,
+        include_links=payload.include_links,
+    )
+    return VaultReadResponse(**result)
+
+
+@app.post("/api/vault/watch", response_model=VaultWatchResponse)
+def vault_watch_endpoint(payload: VaultWatchIn) -> VaultWatchResponse:
+    """Vault增量同步：检查笔记变更"""
+    tools = get_vault_tools()
+    result = tools.vault_watch(since=payload.since)
+    return VaultWatchResponse(**result)
+
+
+@app.post("/api/vault/emergency", response_model=VaultEmergencyResponse)
+def vault_emergency_endpoint(payload: VaultEmergencyIn) -> VaultEmergencyResponse:
+    """Vault应急层：数据库失效时扫描文件系统"""
+    tools = get_vault_tools()
+    result = tools.vault_emergency_sample(
+        sample_size=payload.sample_size,
+        content_limit=payload.content_limit,
+    )
+    return VaultEmergencyResponse(**result)
 
 
 # ========== Search API ==========
