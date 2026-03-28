@@ -44,6 +44,7 @@ from papyrus_api.routers import (
     relations_router,
     progress_router,
     logs_router,
+    update_router,
 )
 
 # MCP Server 实例
@@ -120,3 +121,4 @@ app.include_router(data_router, prefix="/api")
 app.include_router(relations_router, prefix="/api")
 app.include_router(progress_router, prefix="/api")
 app.include_router(logs_router, prefix="/api")
+app.include_router(update_router, prefix="/api")

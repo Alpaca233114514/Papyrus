@@ -23,6 +23,7 @@ from .data import router as data_router
 from .relations import router as relations_router
 from .progress import router as progress_router
 from .logs import router as logs_router
+from .update import router as update_router
 
 __all__ = [
     "cards_router",
@@ -35,4 +36,5 @@ __all__ = [
     "relations_router",
     "progress_router",
     "logs_router",
+    "update_router",
 ]
