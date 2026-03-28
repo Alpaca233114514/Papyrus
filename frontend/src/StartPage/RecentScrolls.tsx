@@ -1,25 +1,18 @@
-import { Typography } from '@arco-design/web-react';
-import { useState } from 'react';
+import { Typography, Spin } from '@arco-design/web-react';
+import { useState, useEffect } from 'react';
+import { api, type Card } from '../api';
 
 interface Collection {
   id: string;
   title: string;
   scrollCount: number;
   dueCount: number;
-  lastUsed: string; // 显示用字符串，如 "今天"、"3天前"
-  // i18n: reserved for future localization
+  lastUsed: string;
   color: string;
 }
 
-// 样板数据
-const MOCK_COLLECTIONS: Collection[] = [
-  { id: '1', title: '高等数学', scrollCount: 128, dueCount: 12, lastUsed: '今天', color: '#206CCF' },
-  { id: '2', title: 'English Vocabulary', scrollCount: 340, dueCount: 0, lastUsed: '昨天', color: '#206CCF' },
-  { id: '3', title: '操作系统', scrollCount: 76, dueCount: 5, lastUsed: '3天前', color: '#206CCF' },
-  { id: '4', title: '日本語 N2', scrollCount: 210, dueCount: 31, lastUsed: '5天前', color: '#206CCF' },
-];
-
 const SECONDARY_COLOR = '#9FD4FD';
+const PRIMARY_COLOR = '#206CCF';
 
 const CollectionCard = ({ collection }: { collection: Collection }) => {
   const [hovered, setHovered] = useState(false);
@@ -84,7 +77,7 @@ const CollectionCard = ({ collection }: { collection: Collection }) => {
       {/* 底部：卡片数 + 最近使用 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         <Typography.Text type='secondary' style={{ fontSize: '13px' }}>
-          {collection.scrollCount} 张卷轴
+          {collection.scrollCount} 张卡片
         </Typography.Text>
         <Typography.Text type='secondary' style={{ fontSize: '13px' }}>
           {collection.lastUsed}
@@ -99,20 +92,111 @@ interface RecentScrollsProps {
   height: number;
 }
 
-const RecentScrolls = ({ height }: RecentScrollsProps) => (
-  <div style={{
-    display: 'flex',
-    flexDirection: 'row',
-    gap: '16px',
-    height: `${height}px`,
-    overflowX: 'auto',
-    overflowY: 'hidden',
-    paddingBottom: '4px',
-  }}>
-    {MOCK_COLLECTIONS.map(c => (
-      <CollectionCard key={c.id} collection={c} />
-    ))}
-  </div>
-);
+// 辅助函数：从卡片内容提取分类（基于问题的前几个字或预设分类）
+function categorizeCards(cards: Card[]): Collection[] {
+  // 简单的分类规则：基于卡片问题关键词分组
+  const categories: Record<string, Card[]> = {
+    '待复习': [],
+    '已掌握': [],
+  };
+
+  const now = Date.now() / 1000;
+
+  cards.forEach(card => {
+    if ((card.next_review || 0) <= now) {
+      categories['待复习'].push(card);
+    } else {
+      categories['已掌握'].push(card);
+    }
+  });
+
+  return [
+    {
+      id: 'due',
+      title: '待复习卡片',
+      scrollCount: categories['待复习'].length,
+      dueCount: categories['待复习'].length,
+      lastUsed: '今天',
+      color: PRIMARY_COLOR,
+    },
+    {
+      id: 'mastered',
+      title: '已掌握卡片',
+      scrollCount: categories['已掌握'].length,
+      dueCount: 0,
+      lastUsed: '最近',
+      color: '#00B42A',
+    },
+  ].filter(c => c.scrollCount > 0);
+}
+
+const RecentScrolls = ({ height }: RecentScrollsProps) => {
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCards = async () => {
+      try {
+        const response = await api.listCards();
+        if (response.success) {
+          const cats = categorizeCards(response.cards);
+          setCollections(cats);
+        }
+      } catch (err) {
+        console.error('获取卡片列表失败:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCards();
+  }, []);
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'row',
+        gap: '16px',
+        height: `${height}px`,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <Spin size={24} />
+      </div>
+    );
+  }
+
+  if (collections.length === 0) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'row',
+        gap: '16px',
+        height: `${height}px`,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <Typography.Text type="secondary">暂无卡片</Typography.Text>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'row',
+      gap: '16px',
+      height: `${height}px`,
+      overflowX: 'auto',
+      overflowY: 'hidden',
+      paddingBottom: '4px',
+    }}>
+      {collections.map(c => (
+        <CollectionCard key={c.id} collection={c} />
+      ))}
+    </div>
+  );
+};
 
 export default RecentScrolls;

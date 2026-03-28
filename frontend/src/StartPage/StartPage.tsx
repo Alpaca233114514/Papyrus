@@ -6,10 +6,12 @@ import ReviewQueue from './ReviewQueue';
 import { getSolarTerm, fetchSolarTerm } from './solarTerms';
 import { type SceneryContent, fetchSceneryContent } from './sceneryContent';
 import FlashcardStudy from '../ScrollPage/FlashcardStudy';
+import { api } from '../api';
 
 
 type StartPageStats = {
   cardsDue: number;
+  totalCards: number;
   streakDays: number;
   todayProgress: number;
 };
@@ -20,6 +22,7 @@ type StartPageData = {
   solarTerm: string | null;
   scenery: SceneryContent | null;
   stats: StartPageStats;
+  loading: boolean;
 };
 
 type StartPageProps = {
@@ -31,6 +34,7 @@ type PendingCardProps = {
   greeting: string;
   dateLabel: string;
   solarTerm: string | null;
+  loading: boolean;
   onStartStudy?: () => void;
 };
 
@@ -38,11 +42,7 @@ const PRIMARY_COLOR = '#206CCF';
 const SECONDARY_COLOR = '#9FD4FD';
 const CARD_HEIGHT_EXPR = 'calc(61.8vh - 128px)';
 
-const MOCK_STATS: StartPageStats = {
-  cardsDue: 0,
-  streakDays: 7,
-  todayProgress: 100,
-};
+
 
 const cardStyle: CSSProperties = {
   position: 'absolute',
@@ -71,15 +71,23 @@ function useStartPageData(): StartPageData {
   const [today] = useState(() => new Date());
   const [solarTerm, setSolarTerm] = useState<string | null>(() => getSolarTerm(today));
   const [scenery, setScenery] = useState<SceneryContent | null>(null);
+  const [stats, setStats] = useState<StartPageStats>({
+    cardsDue: 0,
+    totalCards: 0,
+    streakDays: 7,
+    todayProgress: 0,
+  });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
 
     void (async () => {
       try {
-        const [remoteSolarTerm, nextScenery] = await Promise.all([
+        const [remoteSolarTerm, nextScenery, nextDueRes] = await Promise.all([
           fetchSolarTerm(today),
           fetchSceneryContent(),
+          api.nextDue(),
         ]);
 
         if (cancelled) return;
@@ -89,9 +97,25 @@ function useStartPageData(): StartPageData {
         }
 
         setScenery(nextScenery);
+
+        // 获取真实统计数据
+        if (nextDueRes.success) {
+          setStats({
+            cardsDue: nextDueRes.due_count,
+            totalCards: nextDueRes.total_count,
+            streakDays: 7, // 暂时使用默认值，后续可从后端获取
+            todayProgress: nextDueRes.total_count > 0
+              ? Math.round(((nextDueRes.total_count - nextDueRes.due_count) / nextDueRes.total_count) * 100)
+              : 100,
+          });
+        }
       } catch {
         if (!cancelled) {
           setScenery(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
         }
       }
     })();
@@ -106,7 +130,8 @@ function useStartPageData(): StartPageData {
     dateLabel: formatDateLabel(today),
     solarTerm,
     scenery,
-    stats: MOCK_STATS,
+    stats,
+    loading,
   };
 }
 
@@ -212,13 +237,13 @@ const LatticeBackground = () => {
   );
 };
 
-const PendingCard = ({ stats, greeting, dateLabel, solarTerm, onStartStudy }: PendingCardProps) => {
+const PendingCard = ({ stats, greeting, dateLabel, solarTerm, loading, onStartStudy }: PendingCardProps) => {
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
   const [rippleKey, setRippleKey] = useState(0);
 
   const highlighted = hovered || pressed;
-  
+
   const handleClick = () => {
     onStartStudy?.();
   };
@@ -241,10 +266,16 @@ const PendingCard = ({ stats, greeting, dateLabel, solarTerm, onStartStudy }: Pe
           spacing='close'
           style={{ margin: 0, fontSize: '48px', fontWeight: 600 }}
         >
-          你有 <Typography.Text bold>{stats.cardsDue}</Typography.Text> 张卡片待复习
+          {loading ? (
+            '加载中...'
+          ) : (
+            <>
+              你有 <Typography.Text bold>{stats.cardsDue}</Typography.Text> 张卡片待复习
+            </>
+          )}
         </Typography.Paragraph>
         <Typography.Text className='scenery-sub-text' style={{ fontSize: '24px' }}>
-          已连续精进 {stats.streakDays} 天 | 今日目标已完成 {stats.todayProgress}%
+          {loading ? '' : `已连续精进 ${stats.streakDays} 天 | 今日目标已完成 ${stats.todayProgress}%`}
         </Typography.Text>
       </div>
 
@@ -471,7 +502,7 @@ const DoneCard = ({ scenery }: { scenery: SceneryContent | null }) => {
 
 const StartPage = ({ onDoneChange }: StartPageProps) => {
   const data = useStartPageData();
-  const done = data.stats.cardsDue === 0;
+  const done = !data.loading && data.stats.cardsDue === 0;
   const [isStudying, setIsStudying] = useState(false);
 
   useEffect(() => {
@@ -505,6 +536,7 @@ const StartPage = ({ onDoneChange }: StartPageProps) => {
             greeting={data.greeting}
             dateLabel={data.dateLabel}
             solarTerm={data.solarTerm}
+            loading={data.loading}
             onStartStudy={() => setIsStudying(true)}
           />
         )}

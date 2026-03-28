@@ -1,9 +1,9 @@
-import { Typography, Button } from '@arco-design/web-react';
+import { Typography, Button, Empty, Spin } from '@arco-design/web-react';
 import { IconPlus, IconClockCircle, IconBook, IconPlayCircle, IconEye } from '@arco-design/web-react/icon';
 import { useState, useEffect } from 'react';
 import FlashcardStudy from './FlashcardStudy';
 
-import { api } from '../api';
+import { api, type Card } from '../api';
 import { type SceneryContent } from '../StartPage/sceneryContent';
 import { usePageScenery } from '../hooks/useScenery';
 import { useSceneryColor, getAdaptivePrimaryColor } from '../hooks/useSceneryColor';
@@ -25,33 +25,6 @@ interface Scroll {
   masteredCount: number;
   lastStudied: string;
 }
-
-// 模拟数据
-const MOCK_STATS = {
-  totalDue: 43,
-  totalScrolls: 6,
-  totalCards: 186,
-  masteredCards: 123,
-  todayLearned: 24,
-  streakDays: 42,
-};
-
-const MOCK_COLLECTIONS: Collection[] = [
-  { id: '1', title: '高等数学', scrollCount: 5, totalCards: 128 },
-  { id: '2', title: '英语词汇', scrollCount: 12, totalCards: 340 },
-  { id: '3', title: '操作系统', scrollCount: 3, totalCards: 76 },
-  { id: '4', title: '日本語 N2', scrollCount: 8, totalCards: 210 },
-  { id: '5', title: '计算机网络', scrollCount: 4, totalCards: 156 },
-];
-
-const MOCK_SCROLLS: Scroll[] = [
-  { id: '1', title: '极限与连续', collection: '高等数学', cardCount: 24, dueCount: 5, masteredCount: 18, lastStudied: '今天' },
-  { id: '2', title: '导数与微分', collection: '高等数学', cardCount: 32, dueCount: 0, masteredCount: 28, lastStudied: '昨天' },
-  { id: '3', title: '托福核心词汇', collection: '英语词汇', cardCount: 50, dueCount: 12, masteredCount: 35, lastStudied: '今天' },
-  { id: '4', title: '进程管理', collection: '操作系统', cardCount: 18, dueCount: 3, masteredCount: 12, lastStudied: '2天前' },
-  { id: '5', title: '内存管理', collection: '操作系统', cardCount: 22, dueCount: 8, masteredCount: 10, lastStudied: '3天前' },
-  { id: '6', title: '动词变形', collection: '日本語 N2', cardCount: 40, dueCount: 15, masteredCount: 20, lastStudied: '今天' },
-];
 
 const PRIMARY_COLOR = '#206CCF';
 const SECONDARY_COLOR = '#9FD4FD';
@@ -75,25 +48,44 @@ const StatItem = ({ label, value, color, colorConfig }: { label: string; value: 
   );
 };
 
-// 统计数据栏 - 支持窗景背景（简洁版 - 无悬停效果）
+// 统计数据栏
 const StatsCard = ({ 
   dueCount, 
   totalCount, 
   overallProgress, 
   scenery,
   opacity = 0.15,
+  loading,
 }: { 
   dueCount: number; 
   totalCount: number; 
   overallProgress: number; 
   scenery: SceneryContent | null;
   opacity?: number;
+  loading: boolean;
 }) => {
   const { primaryTextColor, secondaryTextColor, averageBrightness } = useSceneryColor(
     scenery?.image,
     !!scenery
   );
-  // 窗景关闭时（scenery 为 null），显示纯背景样式
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: '24px',
+        marginBottom: '40px',
+        borderRadius: '12px',
+        border: '1px solid var(--color-text-3)',
+        background: 'var(--color-bg-1)',
+      }}>
+        <Spin size={24} />
+      </div>
+    );
+  }
+
   if (!scenery) {
     return (
       <div style={{
@@ -108,21 +100,16 @@ const StatsCard = ({
       }}>
         <div style={{ display: 'flex', gap: '48px' }}>
           <StatItem label='待复习' value={dueCount} color={dueCount > 0 ? PRIMARY_COLOR : undefined} />
-          <StatItem label='已掌握' value={`${MOCK_STATS.masteredCards}/${totalCount || MOCK_STATS.totalCards}`} color={SUCCESS_COLOR} />
+          <StatItem label='已掌握' value={`${Math.round(totalCount * overallProgress / 100)}/${totalCount}`} color={SUCCESS_COLOR} />
           <StatItem label='总进度' value={`${overallProgress}%`} />
-          <StatItem label='今日已学' value={MOCK_STATS.todayLearned} />
-          <StatItem label='连续学习' value={`${MOCK_STATS.streakDays}天`} />
         </div>
       </div>
     );
   }
 
-  // 窗景开启时，显示图片 + 固定透明度遮罩
   const image = scenery.image;
-  const poem = scenery.poem ?? '且将新火试新茶，诗酒趁年华。';
-  const source = scenery.source ?? '[宋] 苏轼《望江南·超然台作》';
-
-  // 计算遮罩透明度 (0.25 ~ 0.75)
+  const poem = '且将新火试新茶，诗酒趁年华。';
+  const source = '[宋] 苏轼《望江南·超然台作》';
   const overlayOpacity = Math.max(0.25, Math.min(0.75, opacity));
 
   return (
@@ -139,7 +126,6 @@ const StatsCard = ({
         overflow: 'hidden',
       }}
     >
-      {/* 窗景背景图 */}
       <img
         src={image}
         alt={`窗景图片：${poem} —— ${source}`}
@@ -151,8 +137,6 @@ const StatsCard = ({
           objectFit: 'cover',
         }}
       />
-
-      {/* 固定透明度遮罩层 */}
       <div
         style={{
           position: 'absolute',
@@ -160,8 +144,6 @@ const StatsCard = ({
           background: `rgba(255, 255, 255, ${overlayOpacity})`,
         }}
       />
-
-      {/* 统计内容 */}
       <div style={{ 
         position: 'relative', 
         zIndex: 1, 
@@ -169,16 +151,14 @@ const StatsCard = ({
         gap: '48px',
       }}>
         <StatItem label='待复习' value={dueCount} color={dueCount > 0 ? PRIMARY_COLOR : undefined} colorConfig={scenery ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
-        <StatItem label='已掌握' value={`${MOCK_STATS.masteredCards}/${totalCount || MOCK_STATS.totalCards}`} color={SUCCESS_COLOR} colorConfig={scenery ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
+        <StatItem label='已掌握' value={`${Math.round(totalCount * overallProgress / 100)}/${totalCount}`} color={SUCCESS_COLOR} colorConfig={scenery ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
         <StatItem label='总进度' value={`${overallProgress}%`} colorConfig={scenery ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
-        <StatItem label='今日已学' value={MOCK_STATS.todayLearned} colorConfig={scenery ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
-        <StatItem label='连续学习' value={`${MOCK_STATS.streakDays}天`} colorConfig={scenery ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
       </div>
     </div>
   );
 };
 
-// 通用卡片样式 - 与开始界面统一
+// 通用卡片样式
 const useCardStyle = (hovered: boolean) => ({
   borderRadius: '16px',
   border: `2px solid ${hovered ? SECONDARY_COLOR : 'var(--color-text-3)'}`,
@@ -244,6 +224,19 @@ const CollectionCard = ({ collection }: { collection: Collection }) => {
   );
 };
 
+// 从卡片生成集合
+function generateCollections(cards: CardType[]): Collection[] {
+  const now = Date.now() / 1000;
+  const dueCards = cards.filter(c => (c.next_review || 0) <= now);
+  const masteredCards = cards.filter(c => (c.interval || 0) > 1);
+  
+  return [
+    { id: 'all', title: '全部卡片', scrollCount: 1, totalCards: cards.length },
+    { id: 'due', title: '待复习', scrollCount: 1, totalCards: dueCards.length },
+    { id: 'mastered', title: '已掌握', scrollCount: 1, totalCards: masteredCards.length },
+  ].filter(c => c.totalCards > 0);
+}
+
 // 卷轴卡片
 const ScrollCard = ({ scroll, onStudy }: { scroll: Scroll; onStudy?: () => void }) => {
   const [hovered, setHovered] = useState(false);
@@ -277,7 +270,6 @@ const ScrollCard = ({ scroll, onStudy }: { scroll: Scroll; onStudy?: () => void 
         position: 'relative',
       }}
     >
-      {/* 快速学习按钮 */}
       {scroll.dueCount > 0 && hovered && (
         <div
           onClick={(e) => {
@@ -297,7 +289,6 @@ const ScrollCard = ({ scroll, onStudy }: { scroll: Scroll; onStudy?: () => void 
             justifyContent: 'center',
             cursor: 'pointer',
             boxShadow: '0 2px 8px rgba(32, 108, 207, 0.3)',
-            transition: 'transform 0.2s',
           }}
         >
           <IconPlayCircle style={{ fontSize: '18px', color: '#fff' }} />
@@ -422,22 +413,39 @@ const ShelfTitle = ({ children }: { children: React.ReactNode }) => (
 const ScrollPage = () => {
   const [isStudying, setIsStudying] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
-  const [dueCount, setDueCount] = useState(MOCK_STATS.totalDue);
-  const [totalCount, setTotalCount] = useState(MOCK_STATS.totalCards);
-  const overallProgress = Math.round((MOCK_STATS.masteredCards / MOCK_STATS.totalCards) * 100);
+  const [dueCount, setDueCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [masteredCount, setMasteredCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [cards, setCards] = useState<CardType[]>([]);
   
-  // 窗景配置（使用卷轴页面独立配置）
   const { config: sceneryConfig } = usePageScenery('scroll');
 
-  // 获取真实的待复习数量
+  const overallProgress = totalCount > 0 ? Math.round((masteredCount / totalCount) * 100) : 0;
+
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await api.nextDue();
-        setDueCount(res.due_count);
-        setTotalCount(res.total_count);
+        setLoading(true);
+        const [nextDueRes, cardsRes] = await Promise.all([
+          api.nextDue(),
+          api.listCards(),
+        ]);
+        
+        if (nextDueRes.success) {
+          setDueCount(nextDueRes.due_count);
+          setTotalCount(nextDueRes.total_count);
+        }
+        
+        if (cardsRes.success) {
+          setCards(cardsRes.cards);
+          const mastered = cardsRes.cards.filter(c => (c.interval || 0) > 1).length;
+          setMasteredCount(mastered);
+        }
       } catch (err) {
         console.error('获取统计失败:', err);
+      } finally {
+        setLoading(false);
       }
     };
     
@@ -446,13 +454,11 @@ const ScrollPage = () => {
     }
   }, [isStudying]);
 
-  // 开始学习（真实模式）
   const startStudy = () => {
     setIsDemo(false);
     setIsStudying(true);
   };
 
-  // 开始演示
   const startDemo = () => {
     setIsDemo(true);
     setIsStudying(true);
@@ -467,7 +473,45 @@ const ScrollPage = () => {
     paddingBottom: '8px',
   };
 
-  // 学习模式
+  // 从真实卡片生成 scrolls
+  const generateScrolls = (cards: CardType[]): Scroll[] => {
+    const now = Date.now() / 1000;
+    const dueCards = cards.filter(c => (c.next_review || 0) <= now);
+    const newCards = cards.filter(c => (c.interval || 0) === 0);
+    const reviewCards = cards.filter(c => (c.interval || 0) > 0);
+
+    const scrolls: Scroll[] = [];
+    
+    if (newCards.length > 0) {
+      scrolls.push({
+        id: 'new',
+        title: '新卡片',
+        collection: '学习',
+        cardCount: newCards.length,
+        dueCount: newCards.length,
+        masteredCount: 0,
+        lastStudied: '今天',
+      });
+    }
+    
+    if (reviewCards.length > 0) {
+      scrolls.push({
+        id: 'review',
+        title: '复习卡片',
+        collection: '复习',
+        cardCount: reviewCards.length,
+        dueCount: reviewCards.filter(c => (c.next_review || 0) <= now).length,
+        masteredCount: reviewCards.filter(c => (c.interval || 0) > 1).length,
+        lastStudied: '最近',
+      });
+    }
+
+    return scrolls;
+  };
+
+  const collections = generateCollections(cards);
+  const scrolls = generateScrolls(cards);
+
   if (isStudying) {
     return (
       <div style={{ 
@@ -481,10 +525,8 @@ const ScrollPage = () => {
     );
   }
 
-  // 列表模式
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '48px 64px 64px' }}>
-      {/* 标题行 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <Typography.Title
           heading={1}
@@ -493,7 +535,6 @@ const ScrollPage = () => {
           卷轴
         </Typography.Title>
         <div style={{ display: 'flex', gap: '12px' }}>
-          {/* 演示按钮 */}
           <Button
             shape='round'
             size='large'
@@ -507,7 +548,6 @@ const ScrollPage = () => {
           >
             预览学习界面
           </Button>
-          {/* 开始学习按钮 */}
           <Button
             shape='round'
             type='primary'
@@ -527,7 +567,6 @@ const ScrollPage = () => {
         </div>
       </div>
 
-      {/* 数据小栏 - 带窗景背景 */}
       <StatsCard 
         dueCount={dueCount} 
         totalCount={totalCount} 
@@ -539,30 +578,37 @@ const ScrollPage = () => {
           source: '[宋] 苏轼《望江南·超然台作》'
         } : null}
         opacity={sceneryConfig.opacity}
+        loading={loading}
       />
 
-      {/* 卷帙分类 */}
       <section style={{ marginBottom: '40px' }}>
         <ShelfTitle>卷帙</ShelfTitle>
-        <div style={shelfContainerStyle}>
-          {MOCK_COLLECTIONS.map(c => <CollectionCard key={c.id} collection={c} />)}
-          <AddCard label='新建卷帙' />
-        </div>
+        {collections.length === 0 ? (
+          <Empty description="暂无卷帙" />
+        ) : (
+          <div style={shelfContainerStyle}>
+            {collections.map(c => <CollectionCard key={c.id} collection={c} />)}
+            <AddCard label='新建卷帙' />
+          </div>
+        )}
       </section>
 
-      {/* 最近卷轴 */}
       <section>
         <ShelfTitle>最近使用</ShelfTitle>
-        <div style={shelfContainerStyle}>
-          {MOCK_SCROLLS.map(s => (
-            <ScrollCard 
-              key={s.id} 
-              scroll={s} 
-              onStudy={s.dueCount > 0 ? startStudy : undefined}
-            />
-          ))}
-          <AddCard label='新建卷轴' />
-        </div>
+        {scrolls.length === 0 ? (
+          <Empty description="暂无卷轴" />
+        ) : (
+          <div style={shelfContainerStyle}>
+            {scrolls.map(s => (
+              <ScrollCard 
+                key={s.id} 
+                scroll={s} 
+                onStudy={s.dueCount > 0 ? startStudy : undefined}
+              />
+            ))}
+            <AddCard label='新建卷轴' />
+          </div>
+        )}
       </section>
 
       <div style={{ height: '32px' }} />

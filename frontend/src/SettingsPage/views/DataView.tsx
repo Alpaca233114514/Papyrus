@@ -2,6 +2,8 @@ import { useState } from 'react';
 import {
   Button,
   Typography,
+  Message,
+  Spin,
 } from '@arco-design/web-react';
 import {
   IconArrowLeft,
@@ -11,6 +13,7 @@ import {
   IconCloud,
   IconFolder,
 } from '@arco-design/web-react/icon';
+import { api } from '../../api';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -26,6 +29,48 @@ const DATA_MENU_ITEMS = [
 
 const DataView = ({ onBack }: DataViewProps) => {
   const [activeMenu, setActiveMenu] = useState('backup');
+  const [loading, setLoading] = useState(false);
+
+  // 创建备份
+  const handleBackup = async () => {
+    setLoading(true);
+    try {
+      const result = await api.createBackup();
+      if (result.success) {
+        Message.success(`备份成功: ${result.path}`);
+      } else {
+        Message.error('备份失败');
+      }
+    } catch (err) {
+      Message.error(`备份失败: ${err instanceof Error ? err.message : '未知错误'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 导出数据
+  const handleExport = async () => {
+    setLoading(true);
+    try {
+      const result = await api.exportData();
+      // 创建下载
+      const dataStr = JSON.stringify(result, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `papyrus_export_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      Message.success('导出成功');
+    } catch (err) {
+      Message.error(`导出失败: ${err instanceof Error ? err.message : '未知错误'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // 备份与恢复内容
   const BackupSettings = () => (
@@ -46,8 +91,13 @@ const DataView = ({ onBack }: DataViewProps) => {
               </Paragraph>
             </div>
           </div>
-          <Button type="primary" shape="round">
-            立即备份
+          <Button 
+            type="primary" 
+            shape="round"
+            onClick={handleBackup}
+            disabled={loading}
+          >
+            {loading ? <Spin size={14} /> : '立即备份'}
           </Button>
         </div>
 
@@ -66,8 +116,12 @@ const DataView = ({ onBack }: DataViewProps) => {
               </Paragraph>
             </div>
           </div>
-          <Button shape="round">
-            导出数据
+          <Button 
+            shape="round"
+            onClick={handleExport}
+            disabled={loading}
+          >
+            {loading ? <Spin size={14} /> : '导出数据'}
           </Button>
         </div>
 
@@ -86,7 +140,7 @@ const DataView = ({ onBack }: DataViewProps) => {
               </Paragraph>
             </div>
           </div>
-          <Button status="danger" shape="round">
+          <Button status="danger" shape="round" disabled>
             重置
           </Button>
         </div>
@@ -120,7 +174,7 @@ const DataView = ({ onBack }: DataViewProps) => {
               </Paragraph>
             </div>
           </div>
-          <Button shape="round">
+          <Button shape="round" disabled>
             查看位置
           </Button>
         </div>

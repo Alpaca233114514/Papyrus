@@ -1,19 +1,13 @@
-import { Typography } from '@arco-design/web-react';
-import { useState } from 'react';
+import { Typography, Spin } from '@arco-design/web-react';
+import { useState, useEffect } from 'react';
+import { api, type Card } from '../api';
 
 interface ReviewItem {
   id: string;
-  collectionTitle: string; // 所属卷帙
-  scrollCount: number;     // 待复习卷轴数
+  collectionTitle: string;
+  scrollCount: number;
   estimatedMinutes: number;
-  // i18n: reserved for future localization
 }
-
-const MOCK_REVIEW: ReviewItem[] = [
-  { id: '1', collectionTitle: '高等数学', scrollCount: 12, estimatedMinutes: 8 },
-  { id: '2', collectionTitle: '日本語 N2', scrollCount: 31, estimatedMinutes: 20 },
-  { id: '3', collectionTitle: '操作系统', scrollCount: 5, estimatedMinutes: 4 },
-];
 
 const SECONDARY_COLOR = '#9FD4FD';
 
@@ -70,20 +64,109 @@ interface ReviewQueueProps {
   height: number;
 }
 
-const ReviewQueue = ({ height }: ReviewQueueProps) => (
-  <div style={{
-    display: 'flex',
-    flexDirection: 'row',
-    gap: '16px',
-    height: `${height}px`,
-    overflowX: 'auto',
-    overflowY: 'hidden',
-    paddingBottom: '4px',
-  }}>
-    {MOCK_REVIEW.map(r => (
-      <ReviewCard key={r.id} item={r} />
-    ))}
-  </div>
-);
+// 计算待复习队列
+function calculateReviewQueue(cards: Card[]): ReviewItem[] {
+  const now = Date.now() / 1000;
+  const dueCards = cards.filter(c => (c.next_review || 0) <= now);
+
+  if (dueCards.length === 0) {
+    return [];
+  }
+
+  // 按间隔时间分组
+  const newCards = dueCards.filter(c => (c.interval || 0) === 0);
+  const reviewCards = dueCards.filter(c => (c.interval || 0) > 0);
+
+  const queue: ReviewItem[] = [];
+
+  if (newCards.length > 0) {
+    queue.push({
+      id: 'new',
+      collectionTitle: '新卡片',
+      scrollCount: newCards.length,
+      estimatedMinutes: Math.ceil(newCards.length * 0.5),
+    });
+  }
+
+  if (reviewCards.length > 0) {
+    queue.push({
+      id: 'review',
+      collectionTitle: '复习卡片',
+      scrollCount: reviewCards.length,
+      estimatedMinutes: Math.ceil(reviewCards.length * 0.3),
+    });
+  }
+
+  return queue;
+}
+
+const ReviewQueue = ({ height }: ReviewQueueProps) => {
+  const [items, setItems] = useState<ReviewItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCards = async () => {
+      try {
+        const response = await api.listCards();
+        if (response.success) {
+          const queue = calculateReviewQueue(response.cards);
+          setItems(queue);
+        }
+      } catch (err) {
+        console.error('获取待复习卡片失败:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCards();
+  }, []);
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'row',
+        gap: '16px',
+        height: `${height}px`,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <Spin size={24} />
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'row',
+        gap: '16px',
+        height: `${height}px`,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <Typography.Text type="secondary">暂无待复习卡片</Typography.Text>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'row',
+      gap: '16px',
+      height: `${height}px`,
+      overflowX: 'auto',
+      overflowY: 'hidden',
+      paddingBottom: '4px',
+    }}>
+      {items.map(r => (
+        <ReviewCard key={r.id} item={r} />
+      ))}
+    </div>
+  );
+};
 
 export default ReviewQueue;

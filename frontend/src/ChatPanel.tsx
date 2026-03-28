@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { Dropdown, Menu, Avatar, Tooltip } from '@arco-design/web-react';
+import { Dropdown, Menu, Avatar, Tooltip, Empty } from '@arco-design/web-react';
 import { IconArrowUp, IconAt, IconImage, IconMessage, IconDown, IconBulb, IconRecordStop, IconTool, IconRefresh, IconEdit, IconCopy, IconDelete, IconTranslate, IconSave, IconPlus, IconHistory, IconClose } from '@arco-design/web-react/icon';
 import IconAgentMode from './icons/IconAgentMode';
 import './ChatPanel.css';
@@ -28,14 +28,9 @@ interface Message {
   content: string;
 }
 
-const MOCK_MESSAGES: Message[] = [
-  { id: '1', role: 'user', content: '你好，给我介绍一下《双城记》的开篇。' },
-  { id: '2', role: 'assistant', content: '那是最美好的时代，那是最糟糕的时代； 那是智慧的年头，那是愚昧的年头； 那是信仰的时期，那是怀疑的时期； 那是光明的季节，那是黑暗的季节； 那是希望之春，那是失望之冬； 我们全都在直奔天堂，我们全都在直奔相反的方向—— 简而言之，那个时代和现在这个时代是如此相似，以至于它的一些最喧嚣的权威人士坚持要用最高级的形容词来形容它，不管是好是坏。' },
-];
-
 const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   const [text, setText] = useState('');
-  const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [mode, setMode] = useState('agent');
   const [model, setModel] = useState('claude-sonnet-4');
   const [reasoning, setReasoning] = useState(false);
@@ -82,44 +77,56 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
           </button>
         </Dropdown>
         <div className="chat-panel-header-actions">
-          <Tooltip content="新建对话" mini><button className="chat-panel-header-btn" onClick={() => {}}><IconPlus /></button></Tooltip>
+          <Tooltip content="新建对话" mini><button className="chat-panel-header-btn" onClick={() => setMessages([])}><IconPlus /></button></Tooltip>
           <Tooltip content="历史记录" mini><button className="chat-panel-header-btn" onClick={() => {}}><IconHistory /></button></Tooltip>
           <Tooltip content="关闭" mini><button className="chat-panel-header-btn" onClick={onClose}><IconClose /></button></Tooltip>
         </div>
       </div>
       <div className="chat-panel-body">
-        <div className="chat-messages">
-          {messages.map((msg) => (
-            <div key={msg.id} className={`chat-message chat-message-${msg.role}`}>
-              {msg.role === 'user' && (
-                <div className="chat-message-with-avatar">
-                  <Avatar size={28} style={{ backgroundColor: '#206CCF', fontSize: 12, flexShrink: 0 }}>P</Avatar>
-                  <div className="chat-message-bubble">{msg.content}</div>
-                  <div className="chat-message-actions">
-                    <Tooltip content="重新生成" mini><button className="chat-message-action-btn"><IconRefresh /></button></Tooltip>
-                    <Tooltip content="编辑" mini><button className="chat-message-action-btn"><IconEdit /></button></Tooltip>
-                    <Tooltip content="复制" mini><button className="chat-message-action-btn"><IconCopy /></button></Tooltip>
-                    <Tooltip content="删除" mini><button className="chat-message-action-btn"><IconDelete /></button></Tooltip>
+        {messages.length === 0 ? (
+          <div style={{ 
+            flex: 1, 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            padding: '32px'
+          }}>
+            <Empty description="开始新的对话" />
+          </div>
+        ) : (
+          <div className="chat-messages">
+            {messages.map((msg) => (
+              <div key={msg.id} className={`chat-message chat-message-${msg.role}`}>
+                {msg.role === 'user' && (
+                  <div className="chat-message-with-avatar">
+                    <Avatar size={28} style={{ backgroundColor: '#206CCF', fontSize: 12, flexShrink: 0 }}>P</Avatar>
+                    <div className="chat-message-bubble">{msg.content}</div>
+                    <div className="chat-message-actions">
+                      <Tooltip content="重新生成" mini><button className="chat-message-action-btn"><IconRefresh /></button></Tooltip>
+                      <Tooltip content="编辑" mini><button className="chat-message-action-btn"><IconEdit /></button></Tooltip>
+                      <Tooltip content="复制" mini><button className="chat-message-action-btn"><IconCopy /></button></Tooltip>
+                      <Tooltip content="删除" mini><button className="chat-message-action-btn"><IconDelete /></button></Tooltip>
+                    </div>
                   </div>
-                </div>
-              )}
-              {msg.role === 'assistant' && (
-                <div className="chat-message-with-avatar" style={{ alignItems: 'flex-start' }}>
-                  <span className="chat-message-model-label">{models.find((m) => m.key === model)!.label}</span>
-                  <div className="chat-message-bubble">{msg.content}</div>
-                  <div className="chat-message-actions">
-                    <Tooltip content="重新生成" mini><button className="chat-message-action-btn"><IconRefresh /></button></Tooltip>
-                    <Tooltip content="编辑" mini><button className="chat-message-action-btn"><IconEdit /></button></Tooltip>
-                    <Tooltip content="复制" mini><button className="chat-message-action-btn"><IconCopy /></button></Tooltip>
-                    <Tooltip content="翻译" mini><button className="chat-message-action-btn"><IconTranslate /></button></Tooltip>
-                    <Tooltip content="保存到笔记" mini><button className="chat-message-action-btn"><IconSave /></button></Tooltip>
-                    <Tooltip content="删除" mini><button className="chat-message-action-btn"><IconDelete /></button></Tooltip>
+                )}
+                {msg.role === 'assistant' && (
+                  <div className="chat-message-with-avatar" style={{ alignItems: 'flex-start' }}>
+                    <span className="chat-message-model-label">{models.find((m) => m.key === model)!.label}</span>
+                    <div className="chat-message-bubble">{msg.content}</div>
+                    <div className="chat-message-actions">
+                      <Tooltip content="重新生成" mini><button className="chat-message-action-btn"><IconRefresh /></button></Tooltip>
+                      <Tooltip content="编辑" mini><button className="chat-message-action-btn"><IconEdit /></button></Tooltip>
+                      <Tooltip content="复制" mini><button className="chat-message-action-btn"><IconCopy /></button></Tooltip>
+                      <Tooltip content="翻译" mini><button className="chat-message-action-btn"><IconTranslate /></button></Tooltip>
+                      <Tooltip content="保存到笔记" mini><button className="chat-message-action-btn"><IconSave /></button></Tooltip>
+                      <Tooltip content="删除" mini><button className="chat-message-action-btn"><IconDelete /></button></Tooltip>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div className="chat-input-resize-handle" onMouseDown={onDragStart} />
       <div className="chat-input-area" style={{ height: inputHeight }}>

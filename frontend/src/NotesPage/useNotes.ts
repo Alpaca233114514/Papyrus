@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { api } from '../api';
 import type { Note, Folder, CreateNoteParams, UpdateNoteParams } from './types';
-import { MOCK_NOTES } from './mock';
+
 
 export interface UseNotesReturn {
   // 数据
@@ -44,9 +44,7 @@ const generateTags = (notes: Note[]): string[] => {
   return Array.from(tagSet);
 };
 
-// ===== Mock 数据模式 =====
-// 设为 true 使用 mock 数据，false 则调用真实 API
-const USE_MOCK = true;
+
 
 export const useNotes = (): UseNotesReturn => {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -54,19 +52,8 @@ export const useNotes = (): UseNotesReturn => {
   const [error, setError] = useState<string | null>(null);
   const [activeFolder, setActiveFolder] = useState('全部笔记');
 
-  // 从 API 或 Mock 加载笔记
+  // 从 API 加载笔记
   const refreshNotes = useCallback(async () => {
-    if (USE_MOCK) {
-      // Mock 模式：直接使用 mock 数据
-      setIsLoading(true);
-      // 模拟网络延迟
-      await new Promise(resolve => setTimeout(resolve, 300));
-      setNotes(MOCK_NOTES);
-      setIsLoading(false);
-      return;
-    }
-
-    // 真实 API 模式
     try {
       setIsLoading(true);
       setError(null);
@@ -118,46 +105,9 @@ export const useNotes = (): UseNotesReturn => {
 
   // 保存笔记
   const saveNote = useCallback(async (
-    params: UpdateNoteParams | CreateNoteParams, 
+    params: UpdateNoteParams | CreateNoteParams,
     isCreate: boolean
   ) => {
-    if (USE_MOCK) {
-      // Mock 模式：本地更新数据
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      if (isCreate) {
-        const newNote: Note = {
-          id: 'mock_' + Date.now(),
-          title: params.title,
-          folder: params.folder,
-          content: params.content,
-          preview: params.content.slice(0, 100) + '...',
-          tags: params.tags,
-          updatedAt: '今天',
-          wordCount: params.content.length,
-        };
-        setNotes(prev => [newNote, ...prev]);
-      } else {
-        setNotes(prev => prev.map(n => {
-          if (n.id === params.id) {
-            return {
-              ...n,
-              title: params.title,
-              folder: params.folder,
-              content: params.content,
-              preview: params.content.slice(0, 100) + '...',
-              tags: params.tags,
-              updatedAt: '今天',
-              wordCount: params.content.length,
-            };
-          }
-          return n;
-        }));
-      }
-      return;
-    }
-
-    // 真实 API 模式
     if (isCreate) {
       const createParams = params as CreateNoteParams;
       await api.createNote(
@@ -180,26 +130,12 @@ export const useNotes = (): UseNotesReturn => {
 
   // 删除笔记
   const deleteNote = useCallback(async (id: string) => {
-    if (USE_MOCK) {
-      // Mock 模式：本地删除
-      await new Promise(resolve => setTimeout(resolve, 200));
-      setNotes(prev => prev.filter(n => n.id !== id));
-      return;
-    }
-
-    // 真实 API 模式
     await api.deleteNote(id);
     await refreshNotes();
   }, [refreshNotes]);
 
   // 从 Obsidian 导入
   const importFromObsidian = useCallback(async (vaultPath: string) => {
-    if (USE_MOCK) {
-      // Mock 模式：模拟导入
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return { imported: 5, skipped: 2 };
-    }
-
     const result = await api.importObsidian(vaultPath);
     await refreshNotes();
     return { imported: result.imported, skipped: result.skipped };
