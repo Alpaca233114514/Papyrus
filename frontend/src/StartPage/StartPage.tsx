@@ -172,7 +172,8 @@ const ShelfSection = ({ label, children }: { label: string; children: ReactNode 
       style={{
         fontWeight: 200,
         lineHeight: 1,
-        margin: '0 0 24px',
+        margin: '0 0 24px 0',
+        padding: 0,
         fontSize: '16px',
         color: 'var(--color-text-3)',
       }}
@@ -545,7 +546,7 @@ const StartPage = ({ onDoneChange }: StartPageProps) => {
       <div style={{ padding: '48px 64px 64px' }}>
         <Typography.Title
           heading={2}
-          style={{ fontWeight: 400, lineHeight: 1, margin: 0, marginBottom: '16px', fontSize: '28px' }}
+          style={{ fontWeight: 400, lineHeight: 1, margin: '0 0 16px 0', padding: 0, fontSize: '28px' }}
         >
           书架
         </Typography.Title>

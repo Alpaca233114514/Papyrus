@@ -1,4 +1,4 @@
-import { Typography, Spin } from '@arco-design/web-react';
+import { Typography, Spin, Empty } from '@arco-design/web-react';
 import { useState, useEffect } from 'react';
 import { api, type Card } from '../api';
 
@@ -141,13 +141,13 @@ const ReviewQueue = ({ height }: ReviewQueueProps) => {
     return (
       <div style={{
         display: 'flex',
-        flexDirection: 'row',
-        gap: '16px',
+        flexDirection: 'column',
+        gap: '8px',
         height: `${height}px`,
         alignItems: 'center',
         justifyContent: 'center',
       }}>
-        <Typography.Text type="secondary">暂无待复习卡片</Typography.Text>
+        <Empty description="暂无待复习卡片" />
       </div>
     );
   }

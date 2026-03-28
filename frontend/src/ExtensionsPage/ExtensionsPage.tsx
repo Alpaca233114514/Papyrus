@@ -1,6 +1,6 @@
 import { Typography, Button, Tabs, Tag, Switch, Card, Empty, Spin } from '@arco-design/web-react';
 import { useState, useEffect } from 'react';
-import { IconPlus, IconSettings, IconDelete, IconCheckCircleFill, IconDownload, IconStarFill } from '@arco-design/web-react/icon';
+import { IconPlus, IconSettings, IconDelete, IconCheckCircleFill, IconDownload, IconStarFill, IconRefresh } from '@arco-design/web-react/icon';
 import { usePageScenery } from '../hooks/useScenery';
 import { useSceneryColor, getAdaptivePrimaryColor } from '../hooks/useSceneryColor';
 
@@ -152,7 +152,7 @@ const StatsBar = ({ extensions, enabledCount, updateCount, loading }: StatsBarPr
   }
 
   const content = (
-    <div style={{ display: 'flex', gap: '48px' }}>
+    <div style={{ display: 'flex', gap: '48px', alignItems: 'center' }}>
       <div style={{ textAlign: 'center' }}>
         <Typography.Text style={{ fontSize: '24px', fontWeight: 600, color: sceneryConfig.enabled ? getAdaptivePrimaryColor(averageBrightness, PRIMARY_COLOR) : PRIMARY_COLOR }}>{extensions.length}</Typography.Text>
         <Typography.Text type='secondary' style={{ fontSize: '12px', display: 'block', marginTop: '4px', color: sceneryConfig.enabled ? secondaryTextColor : undefined }}>已安装</Typography.Text>
@@ -161,10 +161,17 @@ const StatsBar = ({ extensions, enabledCount, updateCount, loading }: StatsBarPr
         <Typography.Text style={{ fontSize: '24px', fontWeight: 600, color: sceneryConfig.enabled ? getAdaptivePrimaryColor(averageBrightness, SUCCESS_COLOR) : SUCCESS_COLOR }}>{enabledCount}</Typography.Text>
         <Typography.Text type='secondary' style={{ fontSize: '12px', display: 'block', marginTop: '4px', color: sceneryConfig.enabled ? secondaryTextColor : undefined }}>已启用</Typography.Text>
       </div>
-      <div style={{ textAlign: 'center' }}>
-        <Typography.Text style={{ fontSize: '24px', fontWeight: 600, color: updateCount > 0 ? '#FF7D00' : (sceneryConfig.enabled ? primaryTextColor : undefined) }}>{updateCount}</Typography.Text>
-        <Typography.Text type='secondary' style={{ fontSize: '12px', display: 'block', marginTop: '4px', color: sceneryConfig.enabled ? secondaryTextColor : undefined }}>有更新</Typography.Text>
-      </div>
+      <Button 
+        shape='round' 
+        type='primary'
+        icon={<IconRefresh />}
+        style={{ 
+          backgroundColor: PRIMARY_COLOR,
+          borderRadius: '20px',
+        }}
+      >
+        {updateCount > 0 ? `检查更新 (${updateCount})` : '检查更新'}
+      </Button>
     </div>
   );
 
@@ -181,7 +188,6 @@ const StatsBar = ({ extensions, enabledCount, updateCount, loading }: StatsBarPr
         background: 'var(--color-bg-1)',
       }}>
         {content}
-        <Button shape='round' type='primary' size='large' style={{ height: '40px', padding: '0 20px', fontSize: '14px', backgroundColor: PRIMARY_COLOR }}>检查更新</Button>
       </div>
     );
   }
@@ -223,9 +229,6 @@ const StatsBar = ({ extensions, enabledCount, updateCount, loading }: StatsBarPr
       />
       <div style={{ position: 'relative', zIndex: 1 }}>
         {content}
-      </div>
-      <div style={{ position: 'relative', zIndex: 1 }}>
-        <Button shape='round' type='primary' size='large' style={{ height: '40px', padding: '0 20px', fontSize: '14px', backgroundColor: PRIMARY_COLOR }}>检查更新</Button>
       </div>
     </div>
   );

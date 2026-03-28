@@ -5,6 +5,16 @@ import { usePageScenery } from '../hooks/useScenery';
 import { useSceneryColor, getAdaptivePrimaryColor } from '../hooks/useSceneryColor';
 import { api, type Card as CardType } from '../api';
 
+// 进度数据类型
+interface StreakData {
+  current_streak: number;
+  longest_streak: number;
+  today_completed: boolean;
+  today_cards: number;
+  daily_target: number;
+  progress_percent: number;
+}
+
 const PRIMARY_COLOR = '#206CCF';
 const SUCCESS_COLOR = '#00B42A';
 
@@ -15,6 +25,8 @@ interface StatsData {
   dueCards: number;
   streakDays: number;
   todayProgress: number;
+  todayCards: number;
+  dailyTarget: number;
 }
 
 // 统计项
@@ -84,8 +96,8 @@ const StatCard = ({ title, value, suffix, icon }: { title: string; value: string
   );
 };
 
-// 从卡片数据计算统计
-function calculateStats(cards: CardType[]): StatsData {
+// 从卡片数据和进度数据计算统计
+function calculateStats(cards: CardType[], streakData: StreakData | null): StatsData {
   const now = Date.now() / 1000;
   const totalCards = cards.length;
   const dueCards = cards.filter(c => (c.next_review || 0) <= now).length;
@@ -95,8 +107,10 @@ function calculateStats(cards: CardType[]): StatsData {
     totalCards,
     masteredCards,
     dueCards,
-    streakDays: 7, // 默认值
-    todayProgress: totalCards > 0 ? Math.round(((totalCards - dueCards) / totalCards) * 100) : 0,
+    streakDays: streakData?.current_streak || 0,
+    todayProgress: streakData?.progress_percent || 0,
+    todayCards: streakData?.today_cards || 0,
+    dailyTarget: streakData?.daily_target || 20,
   };
 }
 
@@ -308,8 +322,8 @@ const StatsBar = ({ stats, loading }: { stats: StatsData; loading: boolean }) =>
       <StatItem label='连续学习' value={stats.streakDays} suffix='天' colorConfig={sceneryConfig.enabled ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
       <StatItem label='已掌握' value={`${stats.masteredCards}/${stats.totalCards}`} colorConfig={sceneryConfig.enabled ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
       <StatItem label='总进度' value={`${overallProgress}%`} colorConfig={sceneryConfig.enabled ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
-      <StatItem label='今日待复习' value={stats.dueCards} colorConfig={sceneryConfig.enabled ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
-      <StatItem label='平均正确率' value={`${overallProgress}%`} colorConfig={sceneryConfig.enabled ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
+      <StatItem label='今日已复习' value={stats.todayCards} suffix={`/${stats.dailyTarget}`} colorConfig={sceneryConfig.enabled ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
+      <StatItem label='今日目标' value={`${stats.todayProgress}%`} colorConfig={sceneryConfig.enabled ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
     </div>
   );
 
@@ -374,17 +388,24 @@ const StatsBar = ({ stats, loading }: { stats: StatsData; loading: boolean }) =>
 
 const ChartsPage = () => {
   const [cards, setCards] = useState<CardType[]>([]);
+  const [streakData, setStreakData] = useState<StreakData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await api.listCards();
-        if (response.success) {
-          setCards(response.cards);
+        const [cardsRes, streakRes] = await Promise.all([
+          api.listCards(),
+          fetch('http://127.0.0.1:8000/api/progress/streak').then(r => r.json()),
+        ]);
+        if (cardsRes.success) {
+          setCards(cardsRes.cards);
+        }
+        if (streakRes.success) {
+          setStreakData(streakRes);
         }
       } catch (err) {
-        console.error('获取卡片数据失败:', err);
+        console.error('获取数据失败:', err);
       } finally {
         setLoading(false);
       }
@@ -393,7 +414,7 @@ const ChartsPage = () => {
     fetchData();
   }, []);
 
-  const stats = useMemo(() => calculateStats(cards), [cards]);
+  const stats = useMemo(() => calculateStats(cards, streakData), [cards, streakData]);
 
   // 分组统计
   const cardGroups = useMemo(() => {
