@@ -35,7 +35,7 @@ jobs:
             ext: ".exe"
           - platform: "macos"
             os: macos-latest
-            arch: arm
+            arch: arm64
             artifact_name: "Papyrus-Apple Silicon-arm64"
             ext: ".app"
           - platform: "linux"
