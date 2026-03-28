@@ -45,6 +45,7 @@ export default {
           4: 'var(--color-bg-4)',
           5: 'var(--color-bg-5)',
           white: 'var(--color-bg-white)',
+          popup: 'var(--color-bg-popup)',
         },
         // Arco 文字色
         'arco-text': {

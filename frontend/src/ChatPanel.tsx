@@ -73,7 +73,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
         >
           <button className="chat-model-btn">
             <span>{models.find((m) => m.key === model)!.label}</span>
-            <IconDown style={{ fontSize: 12 }} />
+            <IconDown className="tw-text-xs" />
           </button>
         </Dropdown>
         <div className="chat-panel-header-actions">
@@ -84,13 +84,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
       </div>
       <div className="chat-panel-body">
         {messages.length === 0 ? (
-          <div style={{ 
-            flex: 1, 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            padding: '32px'
-          }}>
+          <div className="tw-flex-1 tw-flex tw-items-center tw-justify-center tw-p-8">
             <Empty description="开始新的对话" />
           </div>
         ) : (
@@ -99,7 +93,13 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
               <div key={msg.id} className={`chat-message chat-message-${msg.role}`}>
                 {msg.role === 'user' && (
                   <div className="chat-message-with-avatar">
-                    <Avatar size={28} style={{ backgroundColor: '#206CCF', fontSize: 12, flexShrink: 0 }}>P</Avatar>
+                    <Avatar 
+                      size={28} 
+                      className="tw-flex-shrink-0"
+                      style={{ backgroundColor: '#206CCF', fontSize: 12 }}
+                    >
+                      P
+                    </Avatar>
                     <div className="chat-message-bubble">{msg.content}</div>
                     <div className="chat-message-actions">
                       <Tooltip content="重新生成" mini><button className="chat-message-action-btn"><IconRefresh /></button></Tooltip>
@@ -110,7 +110,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
                   </div>
                 )}
                 {msg.role === 'assistant' && (
-                  <div className="chat-message-with-avatar" style={{ alignItems: 'flex-start' }}>
+                  <div className="chat-message-with-avatar tw-items-start">
                     <span className="chat-message-model-label">{models.find((m) => m.key === model)!.label}</span>
                     <div className="chat-message-bubble">{msg.content}</div>
                     <div className="chat-message-actions">

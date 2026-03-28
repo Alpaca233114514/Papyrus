@@ -53,7 +53,10 @@ const App = () => {
   }, [chatWidth]);
 
   return (
-    <div style={{ width: '1440px', height: '900px', margin: '0 auto', background: 'var(--color-bg-1)', border: '1px solid var(--color-border-2)', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+    <div 
+      className="tw-relative tw-flex tw-flex-col tw-mx-auto tw-bg-arco-bg-1 tw-border tw-border-arco-border-2"
+      style={{ width: '1440px', height: '900px' }}
+    >
       {/* Skip Link - 无障碍导航 */}
       <a href="#main-content" className="skip-link">
         跳转到主内容
@@ -62,34 +65,39 @@ const App = () => {
       {activePage === 'start' && (
         <BackTop
           visibleHeight={200}
-          style={{ position: 'absolute', right: '64px', bottom: '64px' }}
+          className="tw-absolute tw-right-16 tw-bottom-16"
           target={() => document.getElementById('start-page-scroll')!}
         />
       )}
       <TitleBar onPageChange={setActivePage} onSearchResult={handleSearchResult} />
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-
-        <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} chatOpen={chatOpen} onChatToggle={() => setChatOpen(!chatOpen)} activePage={activePage} onPageChange={setActivePage} />
+      
+      <div className="tw-flex tw-flex-1 tw-overflow-hidden">
+        <Sidebar 
+          collapsed={sidebarCollapsed} 
+          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} 
+          chatOpen={chatOpen} 
+          onChatToggle={() => setChatOpen(!chatOpen)} 
+          activePage={activePage} 
+          onPageChange={setActivePage} 
+        />
         
         {/* 主内容区域 - 无障碍标记 */}
         <main 
           id="main-content" 
           ref={mainContentRef}
           tabIndex={-1}
-          style={{ flex: 1, overflow: 'hidden', display: 'flex', position: 'relative', outline: 'none' }}
+          className="tw-relative tw-flex-1 tw-flex tw-overflow-hidden tw-outline-none"
         >
           {/* 完成状态：顶部绿色光晕，仅今日完成时显示 */}
           {activePage === 'start' && todayDone && (
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              height: '160px',
-              background: 'linear-gradient(to bottom, rgba(232, 255, 234, 0.45) 0%, transparent 100%)',
-              pointerEvents: 'none',
-              zIndex: 0,
-            }} />
+            <div 
+              className="tw-absolute tw-inset-x-0 tw-top-0 tw-pointer-events-none"
+              style={{ 
+                height: '160px', 
+                background: 'linear-gradient(to bottom, rgba(232, 255, 234, 0.45) 0%, transparent 100%)',
+                zIndex: 0 
+              }} 
+            />
           )}
           {activePage === 'start' && <StartPage onDoneChange={setTodayDone} />}
           {activePage === 'scroll' && <ScrollPage />}
@@ -101,14 +109,24 @@ const App = () => {
         </main>
         
         {chatOpen && (
-          <div style={{ display: 'flex', flexShrink: 0 }}>
+          <div className="tw-flex tw-flex-shrink-0">
             <div
-              style={{ width: 4, cursor: activePage === 'start' ? 'default' : 'ew-resize', background: 'transparent', flexShrink: 0 }}
+              className="tw-flex-shrink-0 tw-transition-colors tw-duration-200"
+              style={{ 
+                width: 4, 
+                cursor: activePage === 'start' ? 'default' : 'ew-resize'
+              }}
               onMouseDown={activePage !== 'start' ? onChatDragStart : undefined}
-              onMouseEnter={e => { if (activePage !== 'start') e.currentTarget.style.background = 'var(--color-border-2)'; }}
+              onMouseEnter={e => { 
+                if (activePage !== 'start') e.currentTarget.style.background = 'var(--color-border-2)'; 
+              }}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             />
-            <ChatPanel open={chatOpen} width={activePage === 'start' ? CHAT_DEFAULT_WIDTH : chatWidth} onClose={() => setChatOpen(false)} />
+            <ChatPanel 
+              open={chatOpen} 
+              width={activePage === 'start' ? CHAT_DEFAULT_WIDTH : chatWidth} 
+              onClose={() => setChatOpen(false)} 
+            />
           </div>
         )}
       </div>

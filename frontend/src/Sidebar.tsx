@@ -78,7 +78,7 @@ const Sidebar = ({ collapsed, onToggle, chatOpen, onChatToggle, activePage, onPa
           </button>
         </Tooltip>
       ))}
-      <div style={{ flex: 1 }} />
+      <div className="tw-flex-1" />
       <Tooltip content="聊天" position="right" mini disabled={!collapsed}>
         <button 
           className={`sidebar-item${chatOpen ? ' sidebar-item-active' : ''}`} 

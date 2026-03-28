@@ -164,7 +164,7 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
     const parts = text.split(regex);
     return parts.map((part, i) => 
       regex.test(part) ? (
-        <span key={i} style={{ backgroundColor: 'rgba(32, 108, 207, 0.2)', fontWeight: 500 }}>
+        <span key={i} className="tw-bg-primary-light tw-font-medium">
           {part}
         </span>
       ) : (
@@ -176,9 +176,9 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
   // 获取图标
   const getTypeIcon = (type: string) => {
     if (type === 'note') {
-      return <IconFile style={{ fontSize: 16, color: 'var(--color-text-2)' }} />;
+      return <IconFile className="tw-text-base tw-text-arco-text-2" />;
     }
-    return <IconBook style={{ fontSize: 16, color: 'var(--color-text-2)' }} />;
+    return <IconBook className="tw-text-base tw-text-arco-text-2" />;
   };
 
   // 获取匹配字段显示
@@ -194,7 +194,7 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
   };
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+    <div ref={containerRef} className="tw-relative tw-w-full">
       <Input
         ref={inputRef}
         placeholder={`搜索 (${getShortcutDisplay('search')})`}
@@ -224,45 +224,38 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
           id="search-results-listbox"
           role="listbox"
           aria-label="搜索结果"
+          className="tw-absolute tw-left-0 tw-right-0 tw-z-50 tw-overflow-auto tw-bg-arco-bg-popup tw-rounded-arco-lg tw-border tw-border-arco-border-2"
           style={{
-            position: 'absolute',
             top: 'calc(100% + 8px)',
-            left: 0,
-            right: 0,
-            backgroundColor: 'var(--color-bg-popup)',
-            borderRadius: '8px',
             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
-            border: '1px solid var(--color-border-2)',
             maxHeight: '400px',
-            overflow: 'auto',
-            zIndex: 1000,
             minWidth: '360px',
           }}
         >
           {/* 加载状态 */}
           {isLoading && (
-            <div style={{ padding: '24px', textAlign: 'center' }}>
+            <div className="tw-p-6 tw-text-center">
               <Spin size={24} />
             </div>
           )}
 
           {/* 空状态 */}
           {!isLoading && query.trim() && results.length === 0 && (
-            <div style={{ padding: '32px 24px' }}>
+            <div className="tw-py-8 tw-px-6">
               <Empty description="未找到相关结果" />
             </div>
           )}
 
           {/* 初始状态 */}
           {!isLoading && !query.trim() && (
-            <div style={{ padding: '24px' }}>
-              <Text type="secondary" style={{ fontSize: '13px' }}>
+            <div className="tw-p-6">
+              <Text type="secondary" className="tw-text-sm">
                 输入关键词搜索笔记和卡片...
               </Text>
-              <div style={{ marginTop: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <Tag size="small" style={{ fontSize: '12px' }}>↑↓ 导航</Tag>
-                <Tag size="small" style={{ fontSize: '12px' }}>↵ 选择</Tag>
-                <Tag size="small" style={{ fontSize: '12px' }}>Esc 关闭</Tag>
+              <div className="tw-mt-4 tw-flex tw-gap-2 tw-flex-wrap">
+                <Tag size="small" className="tw-text-xs">↑↓ 导航</Tag>
+                <Tag size="small" className="tw-text-xs">↵ 选择</Tag>
+                <Tag size="small" className="tw-text-xs">Esc 关闭</Tag>
               </div>
             </div>
           )}
@@ -271,19 +264,11 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
           {!isLoading && results.length > 0 && (
             <div>
               {/* 统计信息 */}
-              <div
-                style={{
-                  padding: '10px 16px',
-                  borderBottom: '1px solid var(--color-border-2)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <Text type="secondary" style={{ fontSize: '12px' }}>
+              <div className="tw-px-4 tw-py-2.5 tw-border-b tw-border-arco-border-2 tw-flex tw-justify-between tw-items-center">
+                <Text type="secondary" className="tw-text-xs">
                   找到 {results.length} 个结果
                 </Text>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div className="tw-flex tw-gap-2">
                   {results.some(r => r.type === 'note') && (
                     <Tag size="small" color="arcoblue">
                       笔记 {results.filter(r => r.type === 'note').length}
@@ -306,45 +291,23 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
                   aria-selected={selectedIndex === index}
                   onClick={() => handleResultClick(result)}
                   onMouseEnter={() => setSelectedIndex(index)}
+                  className={`tw-px-4 tw-py-3 tw-cursor-pointer tw-transition-colors tw-duration-150 tw-flex tw-items-start tw-gap-3 ${
+                    selectedIndex === index ? 'tw-bg-arco-fill-2' : 'tw-bg-transparent'
+                  }`}
                   style={{
-                    padding: '12px 16px',
-                    cursor: 'pointer',
-                    backgroundColor: selectedIndex === index 
-                      ? 'var(--color-fill-2)' 
-                      : 'transparent',
                     borderBottom: '1px solid var(--color-border-1)',
-                    transition: 'background-color 0.15s',
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '12px',
                   }}
                 >
                   {/* 图标 */}
-                  <div style={{ 
-                    marginTop: '4px',
-                    flexShrink: 0,
-                  }}>
+                  <div className="tw-mt-1 tw-flex-shrink-0">
                     {getTypeIcon(result.type)}
                   </div>
 
                   {/* 内容 */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="tw-flex-1 tw-min-w-0">
                     {/* 标题行 */}
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '8px',
-                      marginBottom: '8px',
-                    }}>
-                      <Text 
-                        style={{ 
-                          fontWeight: 500, 
-                          fontSize: '14px',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
+                    <div className="tw-flex tw-items-center tw-gap-2 tw-mb-2">
+                      <Text className="tw-font-medium tw-text-sm tw-truncate">
                         {highlightMatch(result.title, query)}
                       </Text>
                       <Tag size="mini" color="gray">
@@ -355,38 +318,27 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
                     {/* 预览 */}
                     <Text
                       type="secondary"
-                      style={{
-                        fontSize: '13px',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        display: 'block',
-                      }}
+                      className="tw-text-sm tw-truncate tw-block"
                     >
                       {highlightMatch(result.preview, query)}
                     </Text>
 
                     {/* 标签和文件夹 */}
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '8px',
-                      marginTop: '8px',
-                    }}>
+                    <div className="tw-flex tw-items-center tw-gap-2 tw-mt-2">
                       {result.folder && (
-                        <Text type="secondary" style={{ fontSize: '12px' }}>
+                        <Text type="secondary" className="tw-text-xs">
                           📁 {result.folder}
                         </Text>
                       )}
                       {result.tags && result.tags.length > 0 && (
-                        <div style={{ display: 'flex', gap: '4px' }}>
+                        <div className="tw-flex tw-gap-1">
                           {result.tags.slice(0, 3).map(tag => (
-                            <Tag key={tag} size="mini" color="arcoblue" style={{ fontSize: '11px' }}>
+                            <Tag key={tag} size="mini" color="arcoblue" className="tw-text-xs">
                               {tag}
                             </Tag>
                           ))}
                           {result.tags.length > 3 && (
-                            <Tag size="mini" color="gray" style={{ fontSize: '11px' }}>
+                            <Tag size="mini" color="gray" className="tw-text-xs">
                               +{result.tags.length - 3}
                             </Tag>
                           )}

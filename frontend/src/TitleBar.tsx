@@ -6,15 +6,9 @@ import { useState } from 'react';
 import SearchBox from './SearchBox';
 import { useShortcuts } from './hooks/useShortcuts';
 
-// 快捷键提示组件
+// 快捷键提示组件 - 使用 Tailwind
 const Shortcut = ({ keys }: { keys: string }) => (
-  <span style={{ 
-    marginLeft: 'auto', 
-    paddingLeft: '16px',
-    color: 'var(--color-text-3)', 
-    fontSize: '12px',
-    fontFamily: 'Consolas, monospace'
-  }}>
+  <span className="tw-ml-auto tw-pl-4 tw-text-arco-text-3 tw-text-xs tw-font-mono">
     {keys}
   </span>
 );
@@ -143,19 +137,19 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
       {/* 新建组 */}
       <Menu.SubMenu key="new" title="新建" style={{ width: 260 }}>
         <Menu.Item key="new-note" onClick={handleNewNote} style={{ width: 260 }}>
-          <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+          <span className="tw-flex tw-items-center tw-w-full">
             新建笔记
             <Shortcut keys={getShortcutDisplay('newNote')} />
           </span>
         </Menu.Item>
         <Menu.Item key="new-card" onClick={handleNewCard} style={{ width: 260 }}>
-          <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+          <span className="tw-flex tw-items-center tw-w-full">
             新建卡片
             <Shortcut keys={getShortcutDisplay('newCard')} />
           </span>
         </Menu.Item>
         <Menu.Item key="new-window" onClick={handleNewWindow} style={{ width: 260 }}>
-          <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+          <span className="tw-flex tw-items-center tw-w-full">
             新建窗口
             <Shortcut keys={getShortcutDisplay('newWindow')} />
           </span>
@@ -167,19 +161,19 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
       {/* 打开组 */}
       <Menu.SubMenu key="open" title="打开" style={{ width: 260 }}>
         <Menu.Item key="open-notes" onClick={handleOpenNotes} style={{ width: 260 }}>
-          <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+          <span className="tw-flex tw-items-center tw-w-full">
             打开笔记页
             <Shortcut keys={getShortcutDisplay('openNotes')} />
           </span>
         </Menu.Item>
         <Menu.Item key="open-files" onClick={handleOpenFiles} style={{ width: 260 }}>
-          <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+          <span className="tw-flex tw-items-center tw-w-full">
             打开文件库
             <Shortcut keys={getShortcutDisplay('openFiles')} />
           </span>
         </Menu.Item>
         <Menu.Item key="open-review" onClick={handleOpenReview} style={{ width: 260 }}>
-          <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+          <span className="tw-flex tw-items-center tw-w-full">
             开始复习
             <Shortcut keys={getShortcutDisplay('openReview')} />
           </span>
@@ -193,7 +187,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
       
       {/* 导入/导出组 */}
       <Menu.Item key="import" onClick={handleImportTxt}>
-        <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+        <span className="tw-flex tw-items-center tw-w-full">
           从文本导入卡片...
           <Shortcut keys={getShortcutDisplay('importTxt')} />
         </span>
@@ -203,13 +197,13 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
       
       {/* 保存组 */}
       <Menu.Item key="save" onClick={handleSave}>
-        <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+        <span className="tw-flex tw-items-center tw-w-full">
           保存
           <Shortcut keys={getShortcutDisplay('save')} />
         </span>
       </Menu.Item>
       <Menu.Item key="save-all" onClick={handleSaveAll}>
-        <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+        <span className="tw-flex tw-items-center tw-w-full">
           全部保存
           <Shortcut keys={getShortcutDisplay('saveAll')} />
         </span>
@@ -219,7 +213,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
       
       {/* 首选项 */}
       <Menu.Item key="preferences" onClick={handlePreferences}>
-        <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+        <span className="tw-flex tw-items-center tw-w-full">
           首选项
           <Shortcut keys={getShortcutDisplay('preferences')} />
         </span>
@@ -229,13 +223,13 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
       
       {/* 关闭组 */}
       <Menu.Item key="close-editor" onClick={handleCloseEditor}>
-        <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+        <span className="tw-flex tw-items-center tw-w-full">
           关闭编辑器
           <Shortcut keys={getShortcutDisplay('closeEditor')} />
         </span>
       </Menu.Item>
       <Menu.Item key="exit" onClick={handleExit}>
-        <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+        <span className="tw-flex tw-items-center tw-w-full">
           退出
           <Shortcut keys={getShortcutDisplay('exit')} />
         </span>
@@ -247,45 +241,45 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
   const editMenu = (
     <Menu style={{ width: 240, maxHeight: 'none', overflow: 'visible' }}>
       <Menu.Item key="undo">
-        <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+        <span className="tw-flex tw-items-center tw-w-full">
           撤销
           <Shortcut keys={getShortcutDisplay('undo')} />
         </span>
       </Menu.Item>
       <Menu.Item key="redo">
-        <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+        <span className="tw-flex tw-items-center tw-w-full">
           重做
           <Shortcut keys={getShortcutDisplay('redo')} />
         </span>
       </Menu.Item>
       <Divider style={{ margin: '4px 0' }} />
       <Menu.Item key="cut">
-        <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+        <span className="tw-flex tw-items-center tw-w-full">
           剪切
           <Shortcut keys={getShortcutDisplay('cut')} />
         </span>
       </Menu.Item>
       <Menu.Item key="copy">
-        <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+        <span className="tw-flex tw-items-center tw-w-full">
           复制
           <Shortcut keys={getShortcutDisplay('copy')} />
         </span>
       </Menu.Item>
       <Menu.Item key="paste">
-        <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+        <span className="tw-flex tw-items-center tw-w-full">
           粘贴
           <Shortcut keys={getShortcutDisplay('paste')} />
         </span>
       </Menu.Item>
       <Divider style={{ margin: '4px 0' }} />
       <Menu.Item key="select-all">
-        <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+        <span className="tw-flex tw-items-center tw-w-full">
           全选
           <Shortcut keys={getShortcutDisplay('selectAll')} />
         </span>
       </Menu.Item>
       <Menu.Item key="find">
-        <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+        <span className="tw-flex tw-items-center tw-w-full">
           查找
           <Shortcut keys={getShortcutDisplay('find')} />
         </span>
@@ -324,7 +318,14 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
         {/* window controls */}
         <div className="titlebar-controls">
           <div className="titlebar-avatar">
-            <Avatar size={28} style={{ backgroundColor: 'rgb(32, 108, 207)', fontSize: 12, cursor: 'pointer' }} aria-label="用户头像">P</Avatar>
+            <Avatar 
+              size={28} 
+              className="tw-cursor-pointer"
+              style={{ backgroundColor: 'rgb(32, 108, 207)', fontSize: 12 }} 
+              aria-label="用户头像"
+            >
+              P
+            </Avatar>
           </div>
           <button className="titlebar-btn" aria-label="最小化">
             <IconMinus />
@@ -347,8 +348,8 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
         okText="导入"
         cancelText="取消"
       >
-        <div style={{ marginBottom: 16 }}>
-          <p style={{ marginBottom: 8, color: 'var(--color-text-2)' }}>
+        <div className="tw-mb-4">
+          <p className="tw-mb-2 tw-text-arco-text-2">
             输入格式：<code>问题 === 答案</code>，每组一行
           </p>
           <Input.TextArea
