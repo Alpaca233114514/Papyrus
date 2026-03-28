@@ -21,7 +21,8 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, AsyncGenerator, Literal
+from contextlib import asynccontextmanager
+from typing import Any, AsyncGenerator, Literal, cast
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -50,6 +51,7 @@ from papyrus.integrations.obsidian import sync_obsidian_vault
 from ai.config import AIConfig
 from papyrus.paths import DATA_DIR, DATABASE_FILE
 from mcp.vault_tools import create_vault_tools, VaultTools
+from mcp.server import MCPServer
 
 
 def _get_data_file() -> str:
@@ -66,13 +68,14 @@ def _pick_card_text(*values: str | None) -> str:
     return ""
 
 
-app = FastAPI(title="Papyrus API", version="0.2.0")
-
 # AI Config 实例
 _ai_config: AIConfig | None = None
 
 # Vault Tools 实例（懒加载）
 _vault_tools: VaultTools | None = None
+
+# MCP Server 实例
+_mcp_server: MCPServer | None = None
 
 
 def get_vault_tools() -> VaultTools:
@@ -89,6 +92,44 @@ def get_ai_config() -> AIConfig:
         _ai_config = AIConfig(DATA_DIR)
     return _ai_config
 
+
+class _MCPLogger:
+    """MCP 服务器用的简单 logger"""
+    def info(self, message: str) -> None:
+        print(f"[MCP] {message}")
+
+    def warning(self, message: str) -> None:
+        print(f"[MCP] WARNING: {message}")
+
+    def error(self, message: str) -> None:
+        print(f"[MCP] ERROR: {message}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """应用生命周期管理：启动/停止 MCP 服务器"""
+    global _mcp_server, _vault_tools
+    
+    # 初始化 VaultTools
+    _vault_tools = create_vault_tools(DATABASE_FILE)
+    
+    # 启动 MCP 服务器
+    _mcp_server = MCPServer(
+        host="127.0.0.1",
+        port=9100,
+        logger=_MCPLogger(),
+        vault_tools=_vault_tools,
+    )
+    _mcp_server.start()
+    
+    yield
+    
+    # 关闭 MCP 服务器
+    _mcp_server.stop()
+    _mcp_server = None
+
+
+app = FastAPI(title="Papyrus API", version="0.2.0", lifespan=lifespan)
 
 # Frontend dev server (vite) defaults to 5173
 app.add_middleware(
@@ -173,7 +214,7 @@ class NoteDict(BaseModel):
     updated_at: float
     word_count: int
     hash: str = ""
-    headings: list[dict] = []
+    headings: list[dict[str, Any]] = []
     outgoing_links: list[str] = []
     incoming_count: int = 0
 
@@ -415,7 +456,7 @@ class VaultIndexIn(BaseModel):
 
 class VaultIndexResponse(BaseModel):
     success: bool
-    notes: list[dict]
+    notes: list[dict[str, Any]]
     total: int
     cursor: str | None
     error: str | None
@@ -430,7 +471,7 @@ class VaultReadIn(BaseModel):
 
 class VaultReadResponse(BaseModel):
     success: bool
-    notes: list[dict]
+    notes: list[dict[str, Any]]
     error: str | None
 
 
@@ -440,7 +481,7 @@ class VaultWatchIn(BaseModel):
 
 class VaultWatchResponse(BaseModel):
     success: bool
-    data: dict | None
+    data: dict[str, Any] | None
     error: str | None
 
 
@@ -452,7 +493,7 @@ class VaultEmergencyIn(BaseModel):
 class VaultEmergencyResponse(BaseModel):
     success: bool
     emergency_mode: bool
-    notes: list[dict]
+    notes: list[dict[str, Any]]
     warning: str
     error: str | None
 
@@ -467,7 +508,7 @@ def vault_index_endpoint(payload: VaultIndexIn) -> VaultIndexResponse:
         limit=payload.limit,
         cursor=payload.cursor,
     )
-    return VaultIndexResponse(**result)
+    return VaultIndexResponse(**cast(dict[str, Any], result))
 
 
 @app.post("/api/vault/read", response_model=VaultReadResponse)
@@ -480,7 +521,7 @@ def vault_read_endpoint(payload: VaultReadIn) -> VaultReadResponse:
         block_ref=payload.block_ref,
         include_links=payload.include_links,
     )
-    return VaultReadResponse(**result)
+    return VaultReadResponse(**cast(dict[str, Any], result))
 
 
 @app.post("/api/vault/watch", response_model=VaultWatchResponse)
@@ -488,7 +529,7 @@ def vault_watch_endpoint(payload: VaultWatchIn) -> VaultWatchResponse:
     """Vault增量同步：检查笔记变更"""
     tools = get_vault_tools()
     result = tools.vault_watch(since=payload.since)
-    return VaultWatchResponse(**result)
+    return VaultWatchResponse(**cast(dict[str, Any], result))
 
 
 @app.post("/api/vault/emergency", response_model=VaultEmergencyResponse)
@@ -499,7 +540,7 @@ def vault_emergency_endpoint(payload: VaultEmergencyIn) -> VaultEmergencyRespons
         sample_size=payload.sample_size,
         content_limit=payload.content_limit,
     )
-    return VaultEmergencyResponse(**result)
+    return VaultEmergencyResponse(**cast(dict[str, Any], result))
 
 
 # ========== Search API ==========
