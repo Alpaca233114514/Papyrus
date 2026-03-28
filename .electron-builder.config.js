@@ -73,8 +73,8 @@ module.exports = {
   // macOS configuration
   mac: {
     target: [
-      { target: 'dmg', arch: ['arm64', 'x64'] },
-      { target: 'zip', arch: ['arm64', 'x64'] },
+      { target: 'dmg', arch: ['arm64'] },
+      { target: 'zip', arch: ['arm64'] },
     ],
     icon: 'assets/icon.icns',
     category: 'public.app-category.productivity',
