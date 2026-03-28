@@ -113,10 +113,3 @@ def get_tool_manager_instance() -> ToolManager:
     return _tool_manager
 
 
-def reset_singletons_for_test() -> None:
-    """重置单例状态（仅用于测试）。"""
-    global _ai_config, _vault_tools, _logger, _tool_manager
-    _ai_config = None
-    _vault_tools = None
-    _logger = None
-    _tool_manager = None

@@ -9,7 +9,6 @@ from ai.tool_manager import (
     ToolExecutionResult,
     ToolManager,
     get_tool_manager,
-    reset_tool_manager,
 )
 from ai.tools import (
     AIResponseParser,
@@ -29,7 +28,6 @@ __all__ = [
     "ToolCallRecord",
     "ToolExecutionResult",
     "get_tool_manager",
-    "reset_tool_manager",
     # Tools and Parser
     "CardTools",
     "AIResponseParser",

@@ -28,20 +28,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: "Windows"
+          - platform: "windows"
             os: windows-latest
             arch: x64
-            artifact_name: "Papyrus-win32-x64"
+            artifact_name: "Papyrus-Win-x64"
             ext: ".exe"
-          - platform: "macOS"
+          - platform: "macos"
             os: macos-latest
-            arch: x64
-            artifact_name: "Papyrus-darwin-x64"
+            arch: arm
+            artifact_name: "Papyrus-Apple Silicon-arm64"
             ext: ".app"
-          - platform: "Linux"
+          - platform: "linux"
             os: ubuntu-latest
             arch: x64
-            artifact_name: "Papyrus-linux-x64"
+            artifact_name: "Papyrus-Linux-x64"
             ext: ""
 
     steps:
@@ -51,7 +51,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json

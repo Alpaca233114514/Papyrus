@@ -93,3 +93,96 @@ def get_history(days: int = 30) -> ProgressHistoryResponse:
         ],
         days=len(history),
     )
+
+
+# ========== 热力图数据 ==========
+
+class HeatmapItem(BaseModel):
+    """热力图单日数据."""
+    date: str  # YYYY-MM-DD
+    count: int  # 学习卡片数量
+    level: int  # 0-3 热度等级
+
+
+class HeatmapResponse(BaseModel):
+    """热力图数据响应."""
+    success: bool
+    data: list[HeatmapItem]
+    total_days: int  # 有记录的天数
+    total_cards: int  # 总学习卡片数
+
+
+@router.get("/progress/heatmap", response_model=HeatmapResponse)
+def get_heatmap_data(days: int = 365) -> HeatmapResponse:
+    """获取热力图数据 - 过去一年学习记录.
+    
+    Args:
+        days: 返回多少天的数据（默认365天，即一年）
+    
+    Returns:
+        按日期排序的热力图数据，包含学习数量和热度等级
+    """
+    import sqlite3
+    import time
+    from datetime import datetime, timedelta
+    
+    from papyrus.data.progress import init_progress_table
+    
+    init_progress_table(DATABASE_FILE)
+    
+    # 生成过去一年的所有日期
+    today = datetime.now()
+    date_range = [(today - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(days)]
+    date_range.reverse()  # 从最早到最近
+    
+    # 从数据库获取学习记录
+    with sqlite3.connect(DATABASE_FILE) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT date, cards_reviewed, cards_created
+            FROM daily_progress
+            WHERE date >= ?
+            ORDER BY date
+        """, (date_range[0],))
+        
+        records = {row["date"]: row for row in cursor.fetchall()}
+    
+    # 构建热力图数据
+    result = []
+    total_cards = 0
+    record_days = 0
+    
+    for date_str in date_range:
+        record = records.get(date_str)
+        # 计算总数：复习卡片 + 新创建卡片
+        count = 0
+        if record:
+            count = record["cards_reviewed"] + record["cards_created"]
+            total_cards += count
+            if count > 0:
+                record_days += 1
+        
+        # 计算热度等级：0-3
+        if count == 0:
+            level = 0
+        elif count < 5:
+            level = 1
+        elif count < 15:
+            level = 2
+        else:
+            level = 3
+        
+        result.append(HeatmapItem(
+            date=date_str,
+            count=count,
+            level=level
+        ))
+    
+    return HeatmapResponse(
+        success=True,
+        data=result,
+        total_days=record_days,
+        total_cards=total_cards
+    )

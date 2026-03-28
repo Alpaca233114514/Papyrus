@@ -16,6 +16,9 @@ __pycache__/
 .Python
 *.egg-info/
 dist-python/
+# PyInstaller build files (保留配置文件)
+!Papyrus.spec
+!PapyrusAPI.spec
 *.spec
 
 # Electron
@@ -43,6 +46,13 @@ Papyrusdata.json.bak
 # OS
 .DS_Store
 Thumbs.db
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+
+# Tools
+tools/code_backups/
 
 # Misc
 .env

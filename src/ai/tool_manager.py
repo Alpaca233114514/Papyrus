@@ -331,7 +331,3 @@ def get_tool_manager() -> ToolManager:
     return _tool_manager
 
 
-def reset_tool_manager() -> None:
-    """重置工具管理器（用于测试）。"""
-    global _tool_manager
-    _tool_manager = None

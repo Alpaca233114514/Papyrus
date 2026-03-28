@@ -94,40 +94,8 @@ interface RecentScrollsProps {
 
 // 辅助函数：从卡片内容提取分类（基于问题的前几个字或预设分类）
 function categorizeCards(cards: Card[]): Collection[] {
-  // 简单的分类规则：基于卡片问题关键词分组
-  const categories: Record<string, Card[]> = {
-    '待复习': [],
-    '已掌握': [],
-  };
-
-  const now = Date.now() / 1000;
-
-  cards.forEach(card => {
-    if ((card.next_review || 0) <= now) {
-      categories['待复习'].push(card);
-    } else {
-      categories['已掌握'].push(card);
-    }
-  });
-
-  return [
-    {
-      id: 'due',
-      title: '待复习卡片',
-      scrollCount: categories['待复习'].length,
-      dueCount: categories['待复习'].length,
-      lastUsed: '今天',
-      color: PRIMARY_COLOR,
-    },
-    {
-      id: 'mastered',
-      title: '已掌握卡片',
-      scrollCount: categories['已掌握'].length,
-      dueCount: 0,
-      lastUsed: '最近',
-      color: '#00B42A',
-    },
-  ].filter(c => c.scrollCount > 0);
+  // 不再生成默认分类，只返回空数组
+  return [];
 }
 
 const RecentScrolls = ({ height }: RecentScrollsProps) => {

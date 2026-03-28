@@ -226,15 +226,8 @@ const CollectionCard = ({ collection }: { collection: Collection }) => {
 
 // 从卡片生成集合
 function generateCollections(cards: CardType[]): Collection[] {
-  const now = Date.now() / 1000;
-  const dueCards = cards.filter(c => (c.next_review || 0) <= now);
-  const masteredCards = cards.filter(c => (c.interval || 0) > 1);
-  
-  return [
-    { id: 'all', title: '全部卡片', scrollCount: 1, totalCards: cards.length },
-    { id: 'due', title: '待复习', scrollCount: 1, totalCards: dueCards.length },
-    { id: 'mastered', title: '已掌握', scrollCount: 1, totalCards: masteredCards.length },
-  ].filter(c => c.totalCards > 0);
+  // 不再生成默认卷帙，只返回空数组
+  return [];
 }
 
 // 卷轴卡片

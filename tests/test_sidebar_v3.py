@@ -21,13 +21,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 class _FakeBooleanVar:
     """替代 tk.BooleanVar，不依赖 Tk root"""
 
-    def __init__(self, value=False, **_kw):
+    def __init__(self, value=False, **_kw): # pyright: ignore[reportMissingParameterType]
         self._val = bool(value)
 
     def get(self):
         return self._val
 
-    def set(self, value):
+    def set(self, value): # type: ignore
         self._val = bool(value)
 
 

@@ -15,6 +15,20 @@ interface StreakData {
   progress_percent: number;
 }
 
+// 热力图数据类型
+interface HeatmapItem {
+  date: string;
+  count: number;
+  level: number;
+}
+
+interface HeatmapResponse {
+  success: boolean;
+  data: HeatmapItem[];
+  total_days: number;
+  total_cards: number;
+}
+
 const PRIMARY_COLOR = '#206CCF';
 const SUCCESS_COLOR = '#00B42A';
 
@@ -216,39 +230,27 @@ const WeekChart = ({ cards }: { cards: CardType[] }) => {
   );
 };
 
-// 热力图
-const Heatmap = ({ cards }: { cards: CardType[] }) => {
+// 热力图 - 使用真实数据
+const Heatmap = ({ data }: { data: HeatmapItem[] }) => {
   const weeks = useMemo(() => {
     const weeks: { date: string; count: number; level: number }[][] = [];
-    const today = new Date();
-    const dayOfWeek = today.getDay();
-    const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    const currentWeekStart = new Date(today);
-    currentWeekStart.setDate(today.getDate() - daysSinceMonday);
     
-    // 基于卡片数量生成数据
-    const baseActivity = Math.max(1, Math.floor(cards.length / 50));
-    
-    for (let w = 51; w >= 0; w--) {
+    // 将数据按周分组
+    for (let i = 0; i < data.length; i += 7) {
       const weekData: { date: string; count: number; level: number }[] = [];
-      const weekStart = new Date(currentWeekStart);
-      weekStart.setDate(currentWeekStart.getDate() - w * 7);
-      
-      for (let d = 0; d < 7; d++) {
-        const date = new Date(weekStart);
-        date.setDate(weekStart.getDate() + d);
-        const count = Math.random() > 0.4 ? Math.floor(Math.random() * baseActivity * 10) + 5 : 0;
-        const level = count === 0 ? 0 : count < 15 ? 1 : count < 30 ? 2 : 3;
+      for (let d = 0; d < 7 && i + d < data.length; d++) {
+        const item = data[i + d];
+        const date = new Date(item.date);
         weekData.push({
           date: date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }),
-          count,
-          level,
+          count: item.count,
+          level: item.level,
         });
       }
       weeks.push(weekData);
     }
     return weeks;
-  }, [cards]);
+  }, [data]);
   
   const getColor = (level: number) => {
     const colors = [
@@ -259,6 +261,14 @@ const Heatmap = ({ cards }: { cards: CardType[] }) => {
     ];
     return colors[level];
   };
+
+  if (data.length === 0) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '120px' }}>
+        <Typography.Text type="secondary">暂无学习记录</Typography.Text>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
@@ -389,20 +399,25 @@ const StatsBar = ({ stats, loading }: { stats: StatsData; loading: boolean }) =>
 const ChartsPage = () => {
   const [cards, setCards] = useState<CardType[]>([]);
   const [streakData, setStreakData] = useState<StreakData | null>(null);
+  const [heatmapData, setHeatmapData] = useState<HeatmapItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [cardsRes, streakRes] = await Promise.all([
+        const [cardsRes, streakRes, heatmapRes] = await Promise.all([
           api.listCards(),
           fetch('http://127.0.0.1:8000/api/progress/streak').then(r => r.json()),
+          fetch('http://127.0.0.1:8000/api/progress/heatmap').then(r => r.json()),
         ]);
         if (cardsRes.success) {
           setCards(cardsRes.cards);
         }
         if (streakRes.success) {
           setStreakData(streakRes);
+        }
+        if (heatmapRes.success) {
+          setHeatmapData(heatmapRes.data);
         }
       } catch (err) {
         console.error('获取数据失败:', err);
@@ -498,7 +513,7 @@ const ChartsPage = () => {
             </div>
           </div>
           <div style={{ overflowX: 'auto', paddingBottom: '8px' }}>
-            <Heatmap cards={cards} />
+            <Heatmap data={heatmapData} />
           </div>
         </Card>
       </div>

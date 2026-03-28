@@ -94,7 +94,7 @@ def _search_cards(cards: list[CardDict], query: str) -> list[SearchResultItem]:
                 type="card",
                 title=title,
                 preview=card.get("a", "")[:100],
-                folder="复习卡片",
+                folder="",
                 tags=[],
                 matched_field=matched_field,
             ))
