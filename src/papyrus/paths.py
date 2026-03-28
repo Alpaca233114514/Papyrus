@@ -23,3 +23,6 @@ BACKUP_FILE = str(Path(BACKUP_DIR) / "Papyrusdata.json.bak")
 SCROLLS_FILE = str(Path(DATA_DIR) / "scrolls.json")
 NOTES_FILE = str(Path(DATA_DIR) / "notes_data.json")
 NOTES_BACKUP_FILE = str(Path(BACKUP_DIR) / "notes_data.json.bak")
+
+# SQLite database file
+DATABASE_FILE = str(Path(DATA_DIR) / "papyrus.db")
