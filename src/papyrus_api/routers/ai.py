@@ -48,6 +48,7 @@ class FeaturesConfigModel(BaseModel):
     auto_hint: bool = False
     auto_explain: bool = False
     context_length: int = 10
+    agent_enabled: bool = False
 
 
 class AIConfigModel(BaseModel):
@@ -114,6 +115,7 @@ def get_ai_config_endpoint() -> AIConfigResponse:
                 auto_hint=config.config["features"]["auto_hint"],
                 auto_explain=config.config["features"]["auto_explain"],
                 context_length=config.config["features"]["context_length"],
+                agent_enabled=config.config["features"].get("agent_enabled", False),
             ),
         ),
     )
@@ -149,6 +151,7 @@ def save_ai_config_endpoint(payload: AIConfigModel) -> dict[str, Any]:
             "auto_hint": payload.features.auto_hint,
             "auto_explain": payload.features.auto_explain,
             "context_length": payload.features.context_length,
+            "agent_enabled": payload.features.agent_enabled,
         }
 
         config.save_config()

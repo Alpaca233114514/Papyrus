@@ -187,11 +187,40 @@ const saveUserProfile = (profile: UserProfile) => {
   }
 };
 
+// Agent 设置类型
+interface AgentSettings {
+  agentModeEnabled: boolean;
+}
+
+// 从 localStorage 加载 Agent 设置
+const loadAgentSettings = (): AgentSettings => {
+  try {
+    const saved = localStorage.getItem('papyrus_agent_settings');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch {
+    // ignore
+  }
+  return { agentModeEnabled: false };
+};
+
+// 保存 Agent 设置到 localStorage 并通知其他组件
+const saveAgentSettings = (settings: AgentSettings) => {
+  try {
+    localStorage.setItem('papyrus_agent_settings', JSON.stringify(settings));
+    // 触发自定义事件，通知同页面内的其他组件更新
+    window.dispatchEvent(new CustomEvent('papyrus_agent_settings_changed', { detail: settings }));
+  } catch {
+    // ignore
+  }
+};
+
 const ChatView = ({ onBack }: ChatViewProps) => {
   const [activeMenu, setActiveMenu] = useState('general');
   
   // 聊天设置状态
-  const [agentModeEnabled, setAgentModeEnabled] = useState(false);
+  const [agentModeEnabled, setAgentModeEnabledState] = useState(() => loadAgentSettings().agentModeEnabled);
   const [showTimestamp, setShowTimestamp] = useState(true);
   const [autoScroll, setAutoScroll] = useState(true);
   const [sendOnEnter, setSendOnEnter] = useState(true);
@@ -268,6 +297,21 @@ const ChatView = ({ onBack }: ChatViewProps) => {
           setCompletionRequireConfirm(data.config.require_confirm);
           setCompletionTriggerDelay(data.config.trigger_delay);
           setCompletionMaxTokens(data.config.max_tokens);
+        }
+      })
+      .catch(console.error);
+  }, []);
+
+  // 从后端加载 AI 配置（包含 agent_enabled）
+  useEffect(() => {
+    fetch('/api/config/ai')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.config && data.config.features) {
+          const agentEnabled = data.config.features.agent_enabled ?? false;
+          setAgentModeEnabledState(agentEnabled);
+          // 同步到 localStorage
+          saveAgentSettings({ agentModeEnabled: agentEnabled });
         }
       })
       .catch(console.error);
@@ -457,6 +501,34 @@ const ChatView = ({ onBack }: ChatViewProps) => {
     Message.success('已恢复默认头像');
   };
   
+  // 处理 Agent 开关变化
+  const setAgentModeEnabled = (enabled: boolean) => {
+    setAgentModeEnabledState(enabled);
+    // 保存到 localStorage 并通知其他组件
+    saveAgentSettings({ agentModeEnabled: enabled });
+    // 同步保存到后端
+    fetch('/api/config/ai')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.config) {
+          // 更新 features 中的 agent_enabled
+          const updatedConfig = {
+            ...data.config,
+            features: {
+              ...data.config.features,
+              agent_enabled: enabled,
+            },
+          };
+          return fetch('/api/config/ai', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatedConfig),
+          });
+        }
+      })
+      .catch(console.error);
+  };
+
   // 通用设置内容
   const ChatGeneralSettings = () => (
     <>

@@ -66,8 +66,13 @@ const App = () => {
 
   return (
     <div 
-      className="tw-relative tw-flex tw-flex-col tw-mx-auto tw-bg-arco-bg-1 tw-border tw-border-arco-border-2"
-      style={{ width: '1440px', height: '900px' }}
+      className="tw-relative tw-flex tw-flex-col tw-mx-auto tw-bg-arco-bg-1"
+      style={{ 
+        width: '1440px', 
+        height: '900px',
+        border: '1px solid #d9d9d9',
+        boxShadow: '0 0 0 1px #d9d9d9, 0 4px 20px rgba(0, 0, 0, 0.08)'
+      }}
     >
       {/* Skip Link - 无障碍导航 */}
       <a href="#main-content" className="skip-link">

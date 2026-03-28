@@ -21,6 +21,7 @@ class FeaturesConfig(TypedDict):
     auto_hint: bool
     auto_explain: bool
     context_length: int
+    agent_enabled: bool
 
 
 class LogConfig(TypedDict):
@@ -90,6 +91,7 @@ class AIConfig:
                 "auto_hint": False,
                 "auto_explain": False,
                 "context_length": 10,
+                "agent_enabled": False,
             },
             "log": {
                 "log_dir": default_log_dir,
@@ -171,11 +173,13 @@ class AIConfig:
 
         auto_hint: object = source.get("auto_hint", False)
         auto_explain: object = source.get("auto_explain", False)
+        agent_enabled: object = source.get("agent_enabled", False)
 
         return {
             "auto_hint": bool(auto_hint),
             "auto_explain": bool(auto_explain),
             "context_length": context_length,
+            "agent_enabled": bool(agent_enabled),
         }
 
     def _copy_log_config(self, source: LogConfig) -> LogConfig:
@@ -261,11 +265,13 @@ class AIConfig:
 
         auto_hint: object = raw_dict.get("auto_hint", fallback["auto_hint"])
         auto_explain: object = raw_dict.get("auto_explain", fallback["auto_explain"])
+        agent_enabled: object = raw_dict.get("agent_enabled", fallback.get("agent_enabled", False))
 
         return {
             "auto_hint": bool(auto_hint),
             "auto_explain": bool(auto_explain),
             "context_length": context_length,
+            "agent_enabled": bool(agent_enabled),
         }
 
     def _normalize_log_config(self, raw: object, fallback: LogConfig) -> LogConfig:

@@ -19,6 +19,20 @@ interface ChatPanelProps {
   onClose?: () => void;
 }
 
+// 从 localStorage 加载 Agent 模式设置
+const loadAgentModeEnabled = (): boolean => {
+  try {
+    const saved = localStorage.getItem('papyrus_agent_settings');
+    if (saved) {
+      const settings = JSON.parse(saved);
+      return settings.agentModeEnabled ?? false;
+    }
+  } catch {
+    // ignore
+  }
+  return false;
+};
+
 const modes = [
   { key: 'agent', icon: <IconAgentMode />, label: 'Agent 模式' },
   { key: 'chat', icon: <IconMessage />, label: 'Chat 模式' },
@@ -112,6 +126,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   const [userProfile, setUserProfile] = useState<UserProfile>(loadUserProfile());
   const [aiConfig, setAiConfig] = useState<AIConfig | null>(null);
   const [configChecked, setConfigChecked] = useState(false);
+  const [agentModeEnabled, setAgentModeEnabled] = useState<boolean>(loadAgentModeEnabled());
   const dragStartY = useRef<number>(0);
   const dragStartHeight = useRef<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -133,6 +148,36 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
       window.removeEventListener('papyrus_user_profile_changed', handleStorageChange);
     };
   }, []);
+
+
+
+  // 监听 Agent 模式设置变化
+  useEffect(() => {
+    const handleAgentModeChange = (e?: CustomEvent) => {
+      // 如果事件中有详细数据，直接使用；否则从 localStorage 重新加载
+      let enabled: boolean;
+      if (e?.detail && typeof e.detail.agentModeEnabled === 'boolean') {
+        enabled = e.detail.agentModeEnabled;
+      } else {
+        enabled = loadAgentModeEnabled();
+      }
+      setAgentModeEnabled(enabled);
+      // 如果 Agent 模式被禁用，且当前在 Agent 模式，则切换到 Chat 模式
+      if (!enabled && mode === 'agent') {
+        setMode('chat');
+      }
+    };
+
+    // 监听自定义事件（同页面内更新）
+    window.addEventListener('papyrus_agent_settings_changed', handleAgentModeChange as EventListener);
+    // 同时监听 storage 事件（跨标签页）
+    window.addEventListener('storage', () => handleAgentModeChange());
+
+    return () => {
+      window.removeEventListener('papyrus_agent_settings_changed', handleAgentModeChange as EventListener);
+      window.removeEventListener('storage', () => handleAgentModeChange());
+    };
+  }, [mode]);
 
   // 加载 AI 配置
   const loadAIConfig = useCallback(async () => {
@@ -679,6 +724,15 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   if (!open) return null;
 
   const currentMode = modes.find((m) => m.key === mode)!;
+  
+  // 处理模式切换，检查 Agent 是否被禁用
+  const handleModeChange = (newMode: string) => {
+    if (newMode === 'agent' && !agentModeEnabled) {
+      ArcoMessage.warning('请在设置中启用 Agent 模式');
+      return;
+    }
+    setMode(newMode);
+  };
 
   return (
     <div className="chat-panel" style={{ width }}>
@@ -837,20 +891,33 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
           <div className="chat-toolbar-left">
             <Dropdown
               trigger="click"
+              position="tl"
               droplist={
-                <Menu onClickMenuItem={(key) => setMode(key)}>
+                <Menu onClickMenuItem={(key) => handleModeChange(key)}>
                   {modes.map((m) => (
-                    <Menu.Item key={m.key}>
+                    <Menu.Item 
+                      key={m.key} 
+                      disabled={m.key === 'agent' && !agentModeEnabled}
+                    >
                       <span className="chat-mode-menu-item">
                         {m.icon}
                         <span>{m.label}</span>
+                        {m.key === 'agent' && !agentModeEnabled && (
+                          <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--color-text-3)' }}>
+                            (已禁用)
+                          </span>
+                        )}
                       </span>
                     </Menu.Item>
                   ))}
                 </Menu>
               }
             >
-              <button className="chat-mode-btn">
+              <button 
+                className="chat-mode-btn" 
+                disabled={!agentModeEnabled && mode === 'agent'}
+                title={!agentModeEnabled && mode === 'agent' ? 'Agent 模式已在设置中禁用' : ''}
+              >
                 {currentMode.icon}
                 <span>{currentMode.label}</span>
               </button>

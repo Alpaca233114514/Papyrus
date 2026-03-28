@@ -5,7 +5,7 @@
 .chat-panel {
   height: 100%;
   background: var(--color-bg-1);
-  border-left: 1px solid var(--color-border-2);
+  border-left: 1px solid var(--color-border-3);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -18,7 +18,7 @@
   padding: 0 8px;
   height: 40px;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--color-border-2);
+  border-bottom: 2px solid var(--color-border-2);
 }
 
 .chat-panel-header-actions {
@@ -281,7 +281,7 @@ body[arco-theme="dark"] .chat-message-user .chat-message-bubble {
   gap: 8px;
   height: 28px;
   padding: 0 8px;
-  border: 1px solid var(--color-border-2);
+  border: 2px solid var(--color-border-2);
   background: var(--color-fill-2);
   cursor: pointer;
   color: var(--color-text-1);
@@ -289,6 +289,13 @@ body[arco-theme="dark"] .chat-message-user .chat-message-bubble {
   font-size: 13px;
   white-space: nowrap;
   transition: background 0.2s, color 0.2s;
+}
+
+.chat-mode-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: var(--color-border-3);
+  color: var(--color-text-3);
 }
 
 .chat-mode-btn:hover {
@@ -375,7 +382,7 @@ body[arco-theme="dark"] .chat-message-user .chat-message-bubble {
 
 .chat-file-list {
   padding: 8px 16px 4px;
-  border-bottom: 1px solid var(--color-border-2);
+  border-bottom: 2px solid var(--color-border-2);
   background: var(--color-fill-2);
 }
 
@@ -486,7 +493,7 @@ body[arco-theme="dark"] .chat-file-tag .arco-tag-icon {
   text-align: center;
   background: var(--color-fill-2);
   border-radius: 16px;
-  border: 1px solid var(--color-border-2);
+  border: 2px solid var(--color-border-2);
   max-width: 320px;
 }
 
