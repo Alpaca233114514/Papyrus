@@ -8,6 +8,8 @@ from pydantic import BaseModel
 from papyrus.core import cards as card_core
 from papyrus.core.cards import CardDict
 from papyrus_api.deps import get_data_file, pick_card_text
+from papyrus.paths import DATABASE_FILE
+from papyrus.data.progress import record_card_created
 
 router = APIRouter(prefix="/cards", tags=["cards"])
 
@@ -62,6 +64,9 @@ def create_card(payload: CreateCardIn) -> CreateCardResponse:
         card = card_core.create_card(data_file, q=q, a=a)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    # 记录创建进度
+    record_card_created(DATABASE_FILE)
 
     return CreateCardResponse(success=True, card=card)
 

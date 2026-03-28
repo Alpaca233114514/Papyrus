@@ -26,6 +26,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from papyrus.data.relations import init_relations_table
+from papyrus.data.progress import init_progress_table
 from papyrus.paths import DATABASE_FILE
 from mcp.server import MCPServer
 from mcp.vault_tools import create_vault_tools
@@ -41,6 +42,7 @@ from papyrus_api.routers import (
     ai_router,
     data_router,
     relations_router,
+    progress_router,
 )
 
 # MCP Server 实例
@@ -57,6 +59,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # 初始化关联功能表
     init_relations_table(DATABASE_FILE)
+    
+    # 初始化进度表
+    init_progress_table(DATABASE_FILE)
 
     # 启动 MCP 服务器
     _mcp_server = MCPServer(
@@ -105,3 +110,4 @@ app.include_router(search_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")
 app.include_router(data_router, prefix="/api")
 app.include_router(relations_router, prefix="/api")
+app.include_router(progress_router, prefix="/api")

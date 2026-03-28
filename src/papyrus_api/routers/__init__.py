@@ -9,6 +9,7 @@
 - ai: AI配置和补全
 - data: 数据管理（导入导出备份）
 - relations: 笔记关联功能
+- progress: 学习进度（连续天数、每日目标）
 """
 
 from .cards import router as cards_router
@@ -19,6 +20,7 @@ from .search import router as search_router
 from .ai import router as ai_router
 from .data import router as data_router
 from .relations import router as relations_router
+from .progress import router as progress_router
 
 __all__ = [
     "cards_router",
@@ -29,4 +31,5 @@ __all__ = [
     "ai_router",
     "data_router",
     "relations_router",
+    "progress_router",
 ]

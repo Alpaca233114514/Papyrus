@@ -10,6 +10,8 @@ from pydantic import BaseModel, Field
 from papyrus.core import cards as card_core
 from papyrus.core.cards import CardDict, NextDueResult
 from papyrus_api.deps import get_data_file
+from papyrus.paths import DATABASE_FILE
+from papyrus.data.progress import record_card_reviewed
 
 router = APIRouter(prefix="/review", tags=["review"])
 
@@ -72,6 +74,9 @@ def rate_card(card_id: str, payload: RateCardIn) -> RateCardResponse:
     res = card_core.rate_card(data_file, card_id, int(payload.grade))
     if res is None:
         raise HTTPException(status_code=404, detail="card not found")
+
+    # 记录学习进度
+    record_card_reviewed(DATABASE_FILE)
 
     # also return the next due snapshot for convenience
     nxt = card_core.get_next_due(data_file)
