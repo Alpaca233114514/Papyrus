@@ -211,12 +211,12 @@ function buildPython() {
   log('Building Python executable with PyInstaller...');
   exec(`${pythonCmd} -m PyInstaller PapyrusAPI.spec --clean --distpath dist-python`);
   
-  // Verify build output
+  // Verify build output (one-dir mode)
   const executableName = process.platform === 'win32' ? 'Papyrus.exe' : 'Papyrus';
-  const executablePath = path.join(distPythonPath, executableName);
+  const executablePath = path.join(distPythonPath, 'Papyrus', executableName);
   
   if (!fs.existsSync(executablePath)) {
-    error(`Python build failed: ${executableName} not found in dist-python`);
+    error(`Python build failed: ${executableName} not found in dist-python/Papyrus`);
   }
   
   // Verify executable size (should be > 10MB)

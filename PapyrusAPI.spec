@@ -1,16 +1,17 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PyInstaller spec for Papyrus FastAPI Backend (Single File Mode)
+PyInstaller spec for Papyrus FastAPI Backend (One Directory Mode)
 
-This spec file is used to build the Python backend as a standalone executable
-for use with the Electron frontend.
+This spec file is used to build the Python backend as a standalone directory
+for use with the Electron frontend. One-dir mode is used to avoid antivirus
+false positives that often occur with single-file executables.
 
 Usage:
     pyinstaller PapyrusAPI.spec --clean
 
 Output:
-    dist-python/Papyrus.exe (Windows)
-    dist-python/Papyrus (macOS/Linux)
+    dist-python/Papyrus/Papyrus.exe (Windows)
+    dist-python/Papyrus/Papyrus (macOS/Linux)
 """
 import sys
 import os
@@ -149,20 +150,20 @@ a = Analysis(
     optimize=1,
 )
 
-# Create the executable (Single File Mode - no COLLECT)
+# Create the executable (One Directory Mode - with COLLECT)
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+
 exe = EXE(
+    pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='Papyrus',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     upx_exclude=[],
-    runtime_tmpdir=None,
     console=False,  # No console window in production
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -170,4 +171,16 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=['assets/icon.ico'] if sys.platform == 'win32' else 'assets/icon.icns' if sys.platform == 'darwin' else 'assets/icon.png',
+)
+
+# Collect all files into a directory
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='Papyrus',
 )

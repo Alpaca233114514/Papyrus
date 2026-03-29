@@ -58,14 +58,13 @@ function getIconName() {
   }
 }
 
-// Get platform-specific Python executable name
-function getPythonExecutableName() {
-  switch (process.platform) {
-    case 'win32': return 'Papyrus.exe';
-    case 'darwin': return 'Papyrus';
-    case 'linux': return 'Papyrus';
-    default: return 'Papyrus';
-  }
+// Get Python executable info (one-dir mode)
+function getPythonExecutableInfo(pythonDistPath) {
+  // In one-dir mode, the executable is inside the Papyrus folder
+  const executableName = process.platform === 'win32' ? 'Papyrus.exe' : 'Papyrus';
+  const executableDir = path.join(pythonDistPath, 'Papyrus');
+  const executablePath = path.join(executableDir, executableName);
+  return { executablePath, executableDir };
 }
 
 // Logging utility
@@ -147,14 +146,14 @@ async function startBackend() {
       shell: process.platform === 'win32',
     });
   } else {
-    // Production mode: use PyInstaller executable
-    const pythonExecutable = path.join(paths.pythonDistPath, getPythonExecutableName());
+    // Production mode: use PyInstaller executable (one-dir mode)
+    const { executablePath, executableDir } = getPythonExecutableInfo(paths.pythonDistPath);
     
-    if (!fs.existsSync(pythonExecutable)) {
-      throw new Error(`Python executable not found at: ${pythonExecutable}`);
+    if (!fs.existsSync(executablePath)) {
+      throw new Error(`Python executable not found at: ${executablePath}`);
     }
 
-    log(`Starting backend from: ${pythonExecutable}`);
+    log(`Starting backend from: ${executablePath}`);
     
     // Set data directory to Electron's userData (writable location)
     const env = {
@@ -162,8 +161,10 @@ async function startBackend() {
       PAPYRUS_DATA_DIR: app.getPath('userData'),
     };
     
-    backendProcess = spawn(pythonExecutable, [], {
-      cwd: paths.pythonDistPath,
+    // Note: In one-dir mode, cwd must be the directory containing the executable
+    // so it can find the _internal folder
+    backendProcess = spawn(executablePath, [], {
+      cwd: executableDir,
       stdio: 'pipe',
       detached: false,
       env: env,

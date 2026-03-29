@@ -69,13 +69,39 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
+          python-version: '3.12'
 
       - name: Build Python Backend
         run: |
           pip install pyinstaller
           pip install -r requirements.txt
           pyinstaller PapyrusAPI.spec --clean --distpath dist-python
+
+      - name: Verify Python Build
+        shell: bash
+        run: |
+          # One-dir mode: executable is in dist-python/Papyrus/
+          if [ "${{ matrix.platform }}" = "windows" ]; then
+            EXECUTABLE="dist-python/Papyrus/Papyrus.exe"
+          else
+            EXECUTABLE="dist-python/Papyrus/Papyrus"
+          fi
+          
+          if [ ! -f "$EXECUTABLE" ]; then
+            echo "❌ Error: Python executable not found at $EXECUTABLE"
+            ls -la dist-python/ || echo "dist-python directory does not exist"
+            ls -la dist-python/Papyrus/ || echo "dist-python/Papyrus directory does not exist"
+            exit 1
+          fi
+          
+          # Calculate total size of the Papyrus directory
+          SIZE_MB=$(du -sm dist-python/Papyrus/ | cut -f1)
+          echo "✅ Python executable built: $EXECUTABLE (total dir: ${SIZE_MB}MB)"
+          
+          if [ "$SIZE_MB" -lt 10 ]; then
+            echo "❌ Error: Directory size too small (${SIZE_MB}MB), build may be incomplete"
+            exit 1
+          fi
 
       - name: Build Electron App
         run: npx electron-builder --${{ matrix.platform }}
