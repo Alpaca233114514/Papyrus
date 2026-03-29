@@ -18,7 +18,8 @@ import os
 block_cipher = None
 
 # Get the project root directory
-project_root = os.path.dirname(os.path.abspath(SPECFILE))
+# PyInstaller 6.x: use __file__ instead of SPECFILE
+project_root = os.path.dirname(os.path.abspath(__file__))
 
 # Analysis configuration
 a = Analysis(
