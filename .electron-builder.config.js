@@ -53,6 +53,8 @@ module.exports = {
     icon: 'assets/icon.ico',
     publisherName: 'Papyrus Team',
     verifyUpdateCodeSignature: false,
+    certificateFile: 'build/code-signing.pfx',
+    certificatePassword: 'papyrus123',
   },
   
   nsis: {

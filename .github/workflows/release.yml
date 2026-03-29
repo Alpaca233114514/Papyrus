@@ -24,6 +24,8 @@ env:
   APP_NAME: "Papyrus"
   # 使用 Node.js 24，避免 Node.js 20 弃用警告
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # Electron Builder 二进制工具镜像（签名工具等）
+  ELECTRON_BUILDER_BINARIES_MIRROR: "https://npmmirror.com/mirrors/electron-builder-binaries/"
 
 jobs:
   build:

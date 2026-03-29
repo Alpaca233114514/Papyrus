@@ -45,7 +45,9 @@
     ],
     "icon": "assets/icon.ico",
     "publisherName": "Papyrus Team",
-    "verifyUpdateCodeSignature": false
+    "verifyUpdateCodeSignature": false,
+    "certificateFile": "build/code-signing.pfx",
+    "certificatePassword": "papyrus123"
   },
   "nsis": {
     "oneClick": false,
