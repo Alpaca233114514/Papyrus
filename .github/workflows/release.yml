@@ -2,6 +2,10 @@ name: Release with Changelog
 
 on:
   push:
+    branches:
+      - main
+      - develop
+      - release/**
     tags:
       - 'v*'
   workflow_dispatch:
