@@ -598,9 +598,9 @@ class VaultTools:
         md_files = []
         for directory in notes_dirs:
             for root, _, files in os.walk(directory):
-                for f in files:
-                    if f.endswith(".md"):
-                        md_files.append(os.path.join(root, f))
+                for filename in files:
+                    if filename.endswith(".md"):
+                        md_files.append(os.path.join(root, filename))
         
         if not md_files:
             return {

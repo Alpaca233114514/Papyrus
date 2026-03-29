@@ -35,31 +35,42 @@ class DatabaseChangeHandler(FileSystemEventHandler):  # type: ignore[misc]
         if event.is_directory:
             return
         
+        # 处理 src_path 可能是 bytes 的情况
+        src_path = event.src_path
+        if isinstance(src_path, bytes):
+            src_path = src_path.decode('utf-8')
+        
         # 只监听数据库文件
-        if not event.src_path.endswith(('.db', '.sqlite', '.sqlite3')):
+        if not src_path.endswith(('.db', '.sqlite', '.sqlite3')):
             return
             
         # 防抖处理
         now = time.time()
-        last = self._last_modified.get(event.src_path, 0)
+        last = self._last_modified.get(src_path, 0)
         if now - last < self._debounce_seconds:
             return
-        self._last_modified[event.src_path] = now
+        self._last_modified[src_path] = now
         
         if self.callback:
-            self.callback("modified", event.src_path)
+            self.callback("modified", src_path)
     
     def on_created(self, event: FileCreatedEvent) -> None:  # type: ignore[override]
         if event.is_directory:
             return
         if self.callback:
-            self.callback("created", event.src_path)
+            src_path = event.src_path
+            if isinstance(src_path, bytes):
+                src_path = src_path.decode('utf-8')
+            self.callback("created", src_path)
     
     def on_deleted(self, event: FileDeletedEvent) -> None:  # type: ignore[override]
         if event.is_directory:
             return
         if self.callback:
-            self.callback("deleted", event.src_path)
+            src_path = event.src_path
+            if isinstance(src_path, bytes):
+                src_path = src_path.decode('utf-8')
+            self.callback("deleted", src_path)
 
 
 class FileWatcher:
