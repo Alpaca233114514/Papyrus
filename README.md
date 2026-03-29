@@ -201,6 +201,28 @@ npm run typecheck # 类型检查
 python -m pytest tests/
 ```
 
+### 发布流程
+
+```bash
+# 1. 更新 CHANGELOG.md，将 [Unreleased] 的内容移动到新的版本号下
+
+# 2. 本地预览 changelog
+node scripts/extract-changelog.js v2.0.0
+
+# 3. 提交更改
+git add CHANGELOG.md
+git commit -m "chore: release v2.0.0"
+
+# 4. 打标签并推送（自动触发 Release）
+git tag v2.0.0
+git push origin main --tags
+
+# GitHub Actions 会自动：
+# - 构建所有平台的安装包
+# - 从 CHANGELOG.md 提取对应版本的发布说明
+# - 创建 GitHub Release 并上传安装包
+```
+
 ---
 
 ## 📁 配置文件
@@ -227,7 +249,7 @@ python -m pytest tests/
 - [快速启动指南](docs/guides/QUICKSTART.md) - 5分钟上手
 - [无障碍设置](docs/guides/A11Y_SETTINGS.md) - 辅助功能说明
 - [版本信息](docs/guides/VERSION.md) - 当前版本和更新内容
-- [更新日志](docs/guides/CHANGELOG.md) - 完整的版本历史
+- [更新日志](CHANGELOG.md) - 完整的版本历史（自动同步到 Release）
 
 ### 开发指南
 - [项目结构](docs/PROJECT_STRUCTURE.md) - 代码组织说明
