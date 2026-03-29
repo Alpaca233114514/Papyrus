@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Typography, Input, Tag, Button, Breadcrumb, Message, Modal, Dropdown } from '@arco-design/web-react';
 import SmartTextArea, { type SmartTextAreaRef } from '../../components/SmartTextArea';
 const BreadcrumbItem = Breadcrumb.Item;
@@ -6,6 +6,7 @@ import {
   IconLeft,
   IconDelete, 
   IconEdit,
+  IconEye,
   IconFolder,
   IconHistory,
   IconTags,
@@ -19,6 +20,7 @@ import {
 import { RelationsPanel, RelationGraph } from '../components/Relations';
 import type { Note, CreateNoteParams, UpdateNoteParams } from '../types';
 import { PRIMARY_COLOR } from '../constants';
+import MarkdownIt from 'markdown-it';
 
 interface NoteDetailViewProps {
   note: Note | null;
@@ -28,6 +30,13 @@ interface NoteDetailViewProps {
   onSave: (params: UpdateNoteParams | CreateNoteParams, isCreate: boolean) => void;
   onDelete?: (id: string) => void;
 }
+
+// 初始化 markdown-it 实例
+const md = new MarkdownIt({
+  html: true,
+  linkify: true,
+  typographer: true,
+});
 
 export const NoteDetailView = ({
   note,
@@ -44,6 +53,9 @@ export const NoteDetailView = ({
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   const [isEditing, setIsEditing] = useState(isCreateMode);
+  
+  // 预览模式状态 - 用于在非编辑模式下切换编辑/预览
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
   
   // 关联功能状态
   const [showRelationsPanel, setShowRelationsPanel] = useState(false);
@@ -75,6 +87,7 @@ export const NoteDetailView = ({
       if (e.detail.locked && isEditing && !isCreateMode) {
         handleSave(false);
         setIsEditing(false);
+        setIsPreviewMode(true);
       }
     };
     
@@ -90,12 +103,15 @@ export const NoteDetailView = ({
       setFolder(note.folder);
       setTags(note.tags);
       setIsEditing(isCreateMode);
+      // 非创建模式下，默认进入预览模式
+      setIsPreviewMode(!isCreateMode);
     } else if (isCreateMode) {
       setTitle('');
       setContent('');
       setFolder(allFolders[0] || '默认文件夹');
       setTags([]);
       setIsEditing(true);
+      setIsPreviewMode(false);
     }
   }, [note, isCreateMode, allFolders]);
 
@@ -125,6 +141,7 @@ export const NoteDetailView = ({
       Message.success('保存成功');
     }
     setIsEditing(false);
+    setIsPreviewMode(true);
     return true;
   };
   
@@ -221,6 +238,23 @@ export const NoteDetailView = ({
     };
   }, []);
 
+  // 渲染 Markdown 内容为 HTML
+  const renderedContent = useMemo(() => {
+    return md.render(content);
+  }, [content]);
+
+  // 切换编辑/预览模式
+  const toggleEditPreview = () => {
+    if (isPreviewMode) {
+      // 切换到编辑模式
+      setIsPreviewMode(false);
+      setIsEditing(true);
+    } else {
+      // 切换到预览模式
+      handleSave(false);
+    }
+  };
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* 顶部栏：面包屑居中 */}
@@ -306,15 +340,20 @@ export const NoteDetailView = ({
               )}
             </>
           )}
-          {!isCreateMode && !isEditing && (
+          
+          {/* 编辑/预览切换按钮 - 只在非创建模式下显示 */}
+          {!isCreateMode && (
             <Button
               type='primary'
-              icon={<IconEdit />}
-              onClick={() => setIsEditing(true)}
+              icon={isPreviewMode ? <IconEdit /> : <IconEye />}
+              onClick={toggleEditPreview}
               disabled={isGloballyLocked}
-              title={isGloballyLocked ? '编辑已被全局锁定' : ''}
-            />
+              title={isGloballyLocked ? '编辑已被全局锁定' : (isPreviewMode ? '编辑' : '预览')}
+            >
+              {isPreviewMode ? '编辑' : '预览'}
+            </Button>
           )}
+          
           {!isCreateMode && (
             <>
               <Button
@@ -492,7 +531,7 @@ export const NoteDetailView = ({
             </Typography.Title>
           )}
 
-          {/* 内容 */}
+          {/* 内容 - 编辑模式：显示 SmartTextArea，预览模式：显示渲染后的 Markdown */}
           {isEditable ? (
             <SmartTextArea
               ref={textAreaRef}
@@ -513,55 +552,14 @@ export const NoteDetailView = ({
             />
           ) : (
             <div
+              className="markdown-preview"
               style={{
                 fontSize: '15px',
                 lineHeight: '1.8',
                 color: 'var(--color-text-1)',
               }}
-            >
-              {content.split('\n').map((line, index) => {
-                if (line.startsWith('# ')) {
-                  return (
-                    <h1 key={index} style={{ fontSize: '24px', margin: '16px 0 8px' }}>
-                      {line.slice(2)}
-                    </h1>
-                  );
-                }
-                if (line.startsWith('## ')) {
-                  return (
-                    <h2 key={index} style={{ fontSize: '20px', margin: '16px 0 8px' }}>
-                      {line.slice(3)}
-                    </h2>
-                  );
-                }
-                if (line.startsWith('### ')) {
-                  return (
-                    <h3 key={index} style={{ fontSize: '16px', margin: '16px 0 8px' }}>
-                      {line.slice(4)}
-                    </h3>
-                  );
-                }
-                if (line.startsWith('- ')) {
-                  return (
-                    <li key={index} style={{ marginLeft: '16px' }}>
-                      {line.slice(2)}
-                    </li>
-                  );
-                }
-                if (line.startsWith('**') && line.endsWith('**')) {
-                  return (
-                    <strong key={index} style={{ display: 'block', margin: '8px 0' }}>
-                      {line.slice(2, -2)}
-                    </strong>
-                  );
-                }
-                return (
-                  <p key={index} style={{ margin: '8px 0' }}>
-                    {line || <br />}
-                  </p>
-                );
-              })}
-            </div>
+              dangerouslySetInnerHTML={{ __html: renderedContent }}
+            />
           )}
         </div>
 

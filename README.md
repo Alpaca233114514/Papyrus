@@ -235,6 +235,8 @@ python -m pytest tests/
 - [无障碍开发指南](docs/guides/ACCESSIBILITY_GUIDE.md) - a11y 开发规范
 - [UI 设计变量](docs/guides/UI_TOKENS.md) - 前端样式规范
 - [API 文档](docs/API.md) - REST API 参考
+- [扩展开发指南](docs/EXTENSIONS.md) - 开发浏览器扩展和第三方工具
+- [扩展示例](examples/extension-template/) - 完整的扩展模板项目
 
 ### AI 功能
 - [AI 功能说明](docs/AI_README.md) - AI 助手使用指南

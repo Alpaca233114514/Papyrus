@@ -1,59 +1,170 @@
+# ============================================================================
+# Papyrus Project - Git Ignore Configuration
+# ============================================================================
+
+# ----------------------------------------------------------------------------
 # Dependencies
+# ----------------------------------------------------------------------------
 node_modules/
 frontend/node_modules/
+package-lock.json
+frontend/package-lock.json
+yarn.lock
+frontend/yarn.lock
+pnpm-lock.yaml
+frontend/pnpm-lock.yaml
 
-# Build outputs
-dist/
-dist-electron/
+# ----------------------------------------------------------------------------
+# Build Outputs
+# ----------------------------------------------------------------------------
+# Python build
+dist-python/
 build/
+*.egg-info/
+.eggs/
+
+# Frontend build
+dist/
 frontend/dist/
 
+# Electron build
+dist-electron/
+electron-download/
+electron.zip
+
+# PyInstaller (保留配置文件)
+!Papyrus.spec
+!PapyrusAPI.spec
+*.spec
+
+# ----------------------------------------------------------------------------
 # Python
+# ----------------------------------------------------------------------------
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-*.egg-info/
-dist-python/
-# PyInstaller build files (保留配置文件)
-!Papyrus.spec
-!PapyrusAPI.spec
+*.manifest
 *.spec
+pip-log.txt
+pip-delete-this-directory.txt
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
 
-# Electron
-electron-download/
-electron.zip
+# ----------------------------------------------------------------------------
+# TypeScript/JavaScript
+# ----------------------------------------------------------------------------
+*.tsbuildinfo
+.eslintcache
+.stylelintcache
 
-# IDE
+# ----------------------------------------------------------------------------
+# IDE & Editors
+# ----------------------------------------------------------------------------
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+*.code-workspace
 
+# ----------------------------------------------------------------------------
 # Logs
+# ----------------------------------------------------------------------------
 logs/
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
 
-# Data
+# ----------------------------------------------------------------------------
+# Data & User Files (DO NOT COMMIT)
+# ----------------------------------------------------------------------------
+# 用户数据
 data/
 backup/
 *.bak
+*.tmp
+*.temp
+
+# 应用生成的数据文件
 Papyrusdata.json.bak
+notes_data.json
+scrolls.json
+*.db
+*.sqlite
+*.sqlite3
 
-# OS
+# ----------------------------------------------------------------------------
+# OS Generated
+# ----------------------------------------------------------------------------
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
 
+# ----------------------------------------------------------------------------
 # MyPy
+# ----------------------------------------------------------------------------
 .mypy_cache/
 .dmypy.json
+dmypy.json
 
+# ----------------------------------------------------------------------------
 # Tools
+# ----------------------------------------------------------------------------
 tools/code_backups/
 
-# Misc
+# ----------------------------------------------------------------------------
+# Environment & Secrets (DO NOT COMMIT)
+# ----------------------------------------------------------------------------
 .env
 .env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
+.secret
+secrets/
+*.pem
+*.key
+
+# ----------------------------------------------------------------------------
+# Test & Coverage
+# ----------------------------------------------------------------------------
+coverage/
+nyc_output/
+.nyc_output/
+
+# ----------------------------------------------------------------------------
+# Temporary Files
+# ----------------------------------------------------------------------------
+tmp/
+temp/
+*.tmp
+*.temp
+*.pid
+*.seed
+*.pid.lock

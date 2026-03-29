@@ -11,6 +11,7 @@
 - relations: 笔记关联功能
 - progress: 学习进度（连续天数、每日目标）
 - logs: 日志管理
+- mcp: MCP扩展接口
 """
 
 from .cards import router as cards_router
@@ -24,6 +25,8 @@ from .relations import router as relations_router
 from .progress import router as progress_router
 from .logs import router as logs_router
 from .update import router as update_router
+from .markdown import router as markdown_router
+from .mcp import router as mcp_router
 
 __all__ = [
     "cards_router",
@@ -37,4 +40,6 @@ __all__ = [
     "progress_router",
     "logs_router",
     "update_router",
+    "markdown_router",
+    "mcp_router",
 ]
