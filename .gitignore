@@ -7,8 +7,8 @@
 # ----------------------------------------------------------------------------
 node_modules/
 frontend/node_modules/
-package-lock.json
-frontend/package-lock.json
+# 注意：package-lock.json 需要提交到仓库，用于 CI/CD 构建
+# yarn.lock 和 pnpm-lock.yaml 如有使用也需提交
 yarn.lock
 frontend/yarn.lock
 pnpm-lock.yaml
