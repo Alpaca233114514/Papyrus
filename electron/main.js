@@ -151,6 +151,7 @@ async function startBackend() {
       env: {
         ...process.env,
         PYTHONIOENCODING: 'utf-8',
+        PYTHONPATH: path.join(cwd, 'src'),
       }
     });
   } else {
