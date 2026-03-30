@@ -76,6 +76,12 @@ jobs:
         with:
           python-version: '3.12'  
 
+      - name: Run Tests & Verify Accuracy
+        run: |
+          pip install pytest pytest-asyncio httpx
+          pip install -r requirements.txt
+          python scripts/verify-tests.py
+
       - name: Build Python Backend
         run: |
           pip install pyinstaller
@@ -85,33 +91,107 @@ jobs:
       - name: Verify Python Build
         shell: bash
         run: |
-          # One-dir mode: executable is in dist-python/Papyrus/
+          # PyInstaller one-file mode: executable is directly in dist-python/
           if [ "${{ matrix.platform }}" = "windows" ]; then
-            EXECUTABLE="dist-python/Papyrus/Papyrus.exe"
+            EXECUTABLE="dist-python/Papyrus.exe"
           else
-            EXECUTABLE="dist-python/Papyrus/Papyrus"
+            EXECUTABLE="dist-python/Papyrus"
           fi
           
           if [ ! -f "$EXECUTABLE" ]; then
             echo "❌ Error: Python executable not found at $EXECUTABLE"
+            echo "Contents of dist-python/:"
             ls -la dist-python/ || echo "dist-python directory does not exist"
-            ls -la dist-python/Papyrus/ || echo "dist-python/Papyrus directory does not exist"
             exit 1
           fi
           
-          # Calculate total size of the Papyrus directory
-          SIZE_MB=$(du -sm dist-python/Papyrus/ | cut -f1)
-          echo "✅ Python executable built: $EXECUTABLE (total dir: ${SIZE_MB}MB)"
+          # Check executable size (should be > 15MB)
+          SIZE_MB=$(du -m "$EXECUTABLE" | cut -f1)
+          echo "✅ Python executable built: $EXECUTABLE (${SIZE_MB}MB)"
           
-          if [ "$SIZE_MB" -lt 10 ]; then
-            echo "❌ Error: Directory size too small (${SIZE_MB}MB), build may be incomplete"
+          if [ "$SIZE_MB" -lt 15 ]; then
+            echo "❌ Error: Executable size too small (${SIZE_MB}MB), build may be incomplete"
             exit 1
+          fi
+          
+          # Test executable can start (check version/help)
+          echo "Testing executable..."
+          if ! "$EXECUTABLE" --version 2>/dev/null && ! "$EXECUTABLE" --help 2>/dev/null; then
+            echo "⚠️ Warning: Executable may not run correctly (no --version or --help support)"
           fi
 
       - name: Build Electron App
         run: npx electron-builder --${{ matrix.platform }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify Electron Build
+        shell: bash
+        run: |
+          RESOURCES_DIR=""
+          EXPECTED_FILES=(
+            "app.asar"
+            "assets/icon.ico"
+            "assets/icon.png"
+            "certs/root-ca.cer"
+            "python/Papyrus.exe"
+          )
+          
+          # Determine resources directory based on platform
+          if [ "${{ matrix.platform }}" = "windows" ]; then
+            RESOURCES_DIR="dist-electron/win-unpacked/resources"
+            EXPECTED_FILES+=(
+              "../Papyrus.exe"
+              "../chrome_100_percent.pak"
+              "../ffmpeg.dll"
+            )
+          elif [ "${{ matrix.platform }}" = "macos" ]; then
+            APP_NAME="dist-electron/mac/Papyrus.app"
+            RESOURCES_DIR="${APP_NAME}/Contents/Resources"
+            EXPECTED_FILES+=(
+              "../MacOS/Papyrus"
+            )
+          else
+            # Linux
+            RESOURCES_DIR="dist-electron/linux-unpacked/resources"
+            EXPECTED_FILES+=(
+              "../papyrus"
+            )
+          fi
+          
+          echo "Checking resources directory: $RESOURCES_DIR"
+          
+          # Check resources directory exists
+          if [ ! -d "$RESOURCES_DIR" ]; then
+            echo "❌ Error: Resources directory not found: $RESOURCES_DIR"
+            echo "Contents of dist-electron/:"
+            find dist-electron/ -type f -name "*" 2>/dev/null | head -30 || echo "dist-electron/ not found"
+            exit 1
+          fi
+          
+          # Verify each expected file
+          FAILED=0
+          for file in "${EXPECTED_FILES[@]}"; do
+            FULL_PATH="$RESOURCES_DIR/$file"
+            if [ -f "$FULL_PATH" ]; then
+              SIZE=$(du -h "$FULL_PATH" 2>/dev/null | cut -f1)
+              echo "✅ $file ($SIZE)"
+            else
+              echo "❌ MISSING: $file"
+              FAILED=$((FAILED + 1))
+            fi
+          done
+          
+          if [ $FAILED -gt 0 ]; then
+            echo ""
+            echo "❌ Error: $FAILED required files missing!"
+            echo "Actual contents of $RESOURCES_DIR:"
+            find "$RESOURCES_DIR" -type f 2>/dev/null | head -50
+            exit 1
+          fi
+          
+          echo ""
+          echo "✅ All required files present in Electron build"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
