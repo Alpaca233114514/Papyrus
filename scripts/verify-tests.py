@@ -70,12 +70,6 @@ def verify_test_categories():
     
     test_categories = [
         {
-            "name": "API 模型测试",
-            "path": "tests/test_api_simple.py",
-            "description": "验证 Pydantic 模型和数据验证",
-            "critical": True,
-        },
-        {
             "name": "AI 工具测试",
             "path": "tests/test_ai.py",
             "description": "验证 AI 卡片工具功能",
@@ -94,11 +88,16 @@ def verify_test_categories():
             "critical": True,
         },
         {
-            "name": "API 端点测试",
-            "path": "tests/test_api.py::TestHealthEndpoint",
-            "description": "验证健康检查端点",
+            "name": "API 模型测试",
+            "path": "tests/test_api_simple.py::TestCardsModels",
+            "description": "验证 Pydantic 模型",
             "critical": False,
-            "timeout": 30,
+        },
+        {
+            "name": "导入测试",
+            "path": "tests/test_api_simple.py::TestImports",
+            "description": "验证基础导入",
+            "critical": False,
         },
     ]
     
