@@ -148,6 +148,9 @@ jobs:
             "certs/root-ca.cer"
             "python/Papyrus/Papyrus.exe"
           )
+          EXPECTED_DIRS=(
+            "python/Papyrus/_internal"
+          )
           
           # Determine resources directory based on platform
           if [ "${{ matrix.platform }}" = "windows" ]; then
@@ -171,7 +174,10 @@ jobs:
             )
           fi
           
-          echo "Checking resources directory: $RESOURCES_DIR"
+          echo "=========================================="
+          echo "Electron Build Verification"
+          echo "=========================================="
+          echo "Resources directory: $RESOURCES_DIR"
           
           # Check resources directory exists
           if [ ! -d "$RESOURCES_DIR" ]; then
@@ -181,12 +187,37 @@ jobs:
             exit 1
           fi
           
+          echo ""
+          echo "📁 Checking required files..."
+          echo "------------------------------------------"
+          
           # Verify each expected file
           FAILED=0
           for file in "${EXPECTED_FILES[@]}"; do
             FULL_PATH="$RESOURCES_DIR/$file"
             if [ -f "$FULL_PATH" ]; then
               SIZE=$(du -h "$FULL_PATH" 2>/dev/null | cut -f1)
+              SIZE_BYTES=$(stat -f%z "$FULL_PATH" 2>/dev/null || stat -c%s "$FULL_PATH" 2>/dev/null || echo "0")
+              
+              # Check minimum size for critical files
+              MIN_SIZE=0
+              if [[ "$file" == *"Papyrus.exe" ]] && [[ "$file" != *"../"* ]]; then
+                MIN_SIZE=10000000  # 10MB for Python backend
+                if [ "$SIZE_BYTES" -lt "$MIN_SIZE" ]; then
+                  echo "❌ $file ($SIZE) - TOO SMALL! Expected >10MB"
+                  FAILED=$((FAILED + 1))
+                  continue
+                fi
+              fi
+              if [[ "$file" == "app.asar" ]]; then
+                MIN_SIZE=1000000  # 1MB for app.asar
+                if [ "$SIZE_BYTES" -lt "$MIN_SIZE" ]; then
+                  echo "❌ $file ($SIZE) - TOO SMALL! Expected >1MB"
+                  FAILED=$((FAILED + 1))
+                  continue
+                fi
+              fi
+              
               echo "✅ $file ($SIZE)"
             else
               echo "❌ MISSING: $file"
@@ -194,16 +225,61 @@ jobs:
             fi
           done
           
+          # Verify expected directories
+          echo ""
+          echo "📂 Checking required directories..."
+          echo "------------------------------------------"
+          for dir in "${EXPECTED_DIRS[@]}"; do
+            FULL_PATH="$RESOURCES_DIR/$dir"
+            if [ -d "$FULL_PATH" ]; then
+              FILE_COUNT=$(find "$FULL_PATH" -type f 2>/dev/null | wc -l)
+              DIR_SIZE=$(du -sh "$FULL_PATH" 2>/dev/null | cut -f1)
+              
+              # Check if directory has content
+              if [ "$FILE_COUNT" -eq 0 ]; then
+                echo "❌ $dir (EMPTY) - Expected files inside"
+                FAILED=$((FAILED + 1))
+              else
+                echo "✅ $dir ($FILE_COUNT files, $DIR_SIZE)"
+              fi
+            else
+              echo "❌ MISSING DIR: $dir"
+              FAILED=$((FAILED + 1))
+            fi
+          done
+          
+          # Summary
+          echo ""
+          echo "=========================================="
           if [ $FAILED -gt 0 ]; then
+            echo "❌ Error: $FAILED verification(s) failed!"
+            echo "=========================================="
             echo ""
-            echo "❌ Error: $FAILED required files missing!"
             echo "Actual contents of $RESOURCES_DIR:"
             find "$RESOURCES_DIR" -type f 2>/dev/null | head -50
             exit 1
           fi
           
+          echo "✅ All files and directories verified!"
+          echo "=========================================="
+          
+          # Print summary of key components
           echo ""
-          echo "✅ All required files present in Electron build"
+          echo "📊 Build Summary:"
+          echo "------------------------------------------"
+          PYTHON_EXE="$RESOURCES_DIR/python/Papyrus/Papyrus.exe"
+          APP_ASAR="$RESOURCES_DIR/app.asar"
+          INTERNAL_DIR="$RESOURCES_DIR/python/Papyrus/_internal"
+          
+          if [ -f "$PYTHON_EXE" ]; then
+            echo "Python Backend: $(du -h "$PYTHON_EXE" | cut -f1)"
+          fi
+          if [ -d "$INTERNAL_DIR" ]; then
+            echo "Python Dependencies: $(find "$INTERNAL_DIR" -name "*.pyd" -o -name "*.dll" | wc -l) native modules"
+          fi
+          if [ -f "$APP_ASAR" ]; then
+            echo "App Bundle: $(du -h "$APP_ASAR" | cut -f1)"
+          fi
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
