@@ -235,35 +235,8 @@ const ChatView = ({ onBack }: ChatViewProps) => {
   const [completionMaxTokens, setCompletionMaxTokens] = useState(50);
   
   // Provider 和模型状态
-  const [providers, setProviders] = useState<Provider[]>([
-    { 
-      id: '1', 
-      type: 'openai', 
-      name: 'OpenAI', 
-      apiKeys: [{id: '1', name: 'default', key: ''}], 
-      baseUrl: 'https://api.openai.com/v1', 
-      models: [
-        { id: 'm1', name: 'GPT-4o', modelId: 'gpt-4o', enabled: true, port: 'openai', capabilities: ['tools', 'vision'], apiKeyId: '1' },
-        { id: 'm2', name: 'GPT-4 Turbo', modelId: 'gpt-4-turbo', enabled: true, port: 'openai', capabilities: ['tools'], apiKeyId: '1' },
-        { id: 'm3', name: 'GPT-3.5 Turbo', modelId: 'gpt-3.5-turbo', enabled: true, port: 'openai', capabilities: ['tools'], apiKeyId: '1' },
-      ], 
-      enabled: true, 
-      isDefault: true 
-    },
-    { 
-      id: '2', 
-      type: 'gemini', 
-      name: 'Gemini', 
-      apiKeys: [{id: '1', name: 'default', key: ''}], 
-      baseUrl: 'https://generativelanguage.googleapis.com', 
-      models: [
-        { id: 'm4', name: 'Gemini 2.5 Flash', modelId: 'gemini-2.5-flash', enabled: true, port: 'gemini', capabilities: ['tools', 'vision'], apiKeyId: '1' },
-        { id: 'm5', name: 'Gemini 2.5 Pro', modelId: 'gemini-2.5-pro', enabled: true, port: 'gemini', capabilities: ['tools', 'vision', 'reasoning'], apiKeyId: '1' },
-      ], 
-      enabled: false, 
-      isDefault: false 
-    },
-  ]);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [providersLoading, setProvidersLoading] = useState(false);
   const [currentModelId, setCurrentModelId] = useState<string>('m1');
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [addForm] = Form.useForm();
@@ -317,44 +290,131 @@ const ChatView = ({ onBack }: ChatViewProps) => {
       .catch(console.error);
   }, []);
 
+  // 从后端加载 Providers
+  useEffect(() => {
+    loadProviders();
+  }, []);
+
+  const loadProviders = () => {
+    setProvidersLoading(true);
+    fetch('/api/providers')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.providers) {
+          setProviders(data.providers);
+        }
+      })
+      .catch(console.error)
+      .finally(() => setProvidersLoading(false));
+  };
+
   const updateProvider = (id: string, updates: Partial<Provider>) => {
     setProviders(providers.map(p => p.id === id ? { ...p, ...updates } : p));
   };
 
   const addProvider = () => {
-    addForm.validate().then((values: { name?: string; apiKey?: string; baseUrl?: string }) => {
+    addForm.validate().then((values: { name?: string; baseUrl?: string }) => {
       const preset = PROVIDER_PRESETS[newProviderType];
+      
+      // 转换 apiKeys state 为 Provider 的 apiKeys 格式
+      // 过滤掉 key 为空的条目，如果没有有效的 key 则使用空数组
+      const validApiKeys = apiKeys
+        .filter(k => k.key.trim() !== '')
+        .map((k, index) => ({
+          id: k.id || Date.now().toString() + index,
+          name: k.name.trim() || `key-${index + 1}`,
+          key: k.key.trim()
+        }));
+      
+      // 如果没有输入任何 API Key，添加一个空的 default key
+      const finalApiKeys = validApiKeys.length > 0 ? validApiKeys : [{id: '1', name: 'default', key: ''}];
+      
       const newProvider: Provider = {
         id: Date.now().toString(),
         type: newProviderType,
         name: values.name || preset.name,
-        apiKeys: [{id: '1', name: 'default', key: values.apiKey || ''}],
+        apiKeys: finalApiKeys,
         baseUrl: values.baseUrl || preset.baseUrl,
         models: [],
         enabled: false,
         isDefault: false,
       };
-      setProviders([...providers, newProvider]);
+
+      // 发送到后端
+      fetch('/api/providers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newProvider),
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            Message.success('供应商添加成功');
+            loadProviders();  // 重新加载 providers
+          } else {
+            Message.error(data.message || '添加失败');
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          Message.error('添加供应商失败');
+        });
+
       setAddModalVisible(false);
       addForm.resetFields();
+      setApiKeys([{ id: '1', key: '', name: '' }]);  // 重置 apiKeys state
     });
   };
 
   const deleteProvider = (id: string) => {
-    const newProviders = providers.filter(p => p.id !== id);
-    setProviders(newProviders);
+    fetch(`/api/providers/${id}`, { method: 'DELETE' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          Message.success('供应商已删除');
+          loadProviders();
+        } else {
+          Message.error(data.message || '删除失败');
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        Message.error('删除供应商失败');
+      });
   };
 
   const setDefault = (id: string) => {
-    setProviders(providers.map(p => ({ ...p, isDefault: p.id === id })));
+    fetch(`/api/providers/${id}/default`, { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          Message.success('默认供应商已设置');
+          loadProviders();
+        } else {
+          Message.error(data.message || '设置失败');
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        Message.error('设置默认供应商失败');
+      });
   };
 
   const deleteModel = (providerId: string, modelId: string) => {
-    const provider = providers.find(p => p.id === providerId);
-    if (!provider) return;
-    updateProvider(providerId, { 
-      models: provider.models.filter(m => m.id !== modelId) 
-    });
+    fetch(`/api/providers/${providerId}/models/${modelId}`, { method: 'DELETE' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          Message.success('模型已删除');
+          loadProviders();
+        } else {
+          Message.error(data.message || '删除失败');
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        Message.error('删除模型失败');
+      });
   };
 
   const toggleModel = (providerId: string, modelId: string, enabled: boolean) => {
@@ -419,35 +479,49 @@ const ChatView = ({ onBack }: ChatViewProps) => {
         port: values.port,
         capabilities,
         apiKeyId: values.apiKeyId,
+        enabled: true,
       };
       
       if (editingModel) {
-        setProviders(prevProviders => {
-          return prevProviders.map(p => {
-            if (p.id === targetProviderId) {
-              return {
-                ...p,
-                models: p.models.map(m => 
-                  m.id === editingModel.id ? { ...m, ...modelData } : m
-                )
-              };
+        // 更新现有模型
+        fetch(`/api/providers/${targetProviderId}/models/${editingModel.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(modelData),
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              Message.success('模型已更新');
+              loadProviders();
+            } else {
+              Message.error(data.message || '更新失败');
             }
-            return p;
+          })
+          .catch(err => {
+            console.error(err);
+            Message.error('更新模型失败');
           });
-        });
       } else {
-        const newModel: Model = {
-          id: Date.now().toString(),
-          ...modelData,
-          enabled: true,
-        };
-        setProviders(prevProviders => 
-          prevProviders.map(p => 
-            p.id === targetProviderId 
-              ? { ...p, models: [...p.models, newModel] }
-              : p
-          )
-        );
+        // 添加新模型
+        fetch(`/api/providers/${targetProviderId}/models`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(modelData),
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              Message.success('模型已添加');
+              loadProviders();
+            } else {
+              Message.error(data.message || '添加失败');
+            }
+          })
+          .catch(err => {
+            console.error(err);
+            Message.error('添加模型失败');
+          });
       }
       
       setModelModalVisible(false);
@@ -693,6 +767,36 @@ const ChatView = ({ onBack }: ChatViewProps) => {
       });
     };
     
+    const saveProviderChanges = (providerId: string) => {
+      const provider = editingProviders.find(p => p.id === providerId);
+      if (!provider) return;
+      
+      // 调用后端 API 保存
+      fetch(`/api/providers/${providerId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: provider.name,
+          baseUrl: provider.baseUrl,
+          enabled: provider.enabled,
+          apiKeys: provider.apiKeys,
+        }),
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            Message.success('供应商配置已保存');
+            loadProviders();  // 重新加载以获取最新数据
+          } else {
+            Message.error(data.message || '保存失败');
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          Message.error('保存供应商配置失败');
+        });
+    };
+    
     return (
       <>
         {editingProviders.map(provider => {
@@ -720,7 +824,31 @@ const ChatView = ({ onBack }: ChatViewProps) => {
                     icon={isExpanded ? <IconDown /> : <IconLeft />}
                     onClick={() => toggleExpand(provider.id)}
                   />
-                  <Switch size="small" checked={provider.enabled} onChange={(checked) => updateProvider(provider.id, { enabled: checked })} />
+                  <Switch size="small" checked={provider.enabled} onChange={(checked) => {
+                    // 先更新本地状态
+                    updateEditingProvider(provider.id, { enabled: checked });
+                    // 调用后端 API
+                    fetch(`/api/providers/${provider.id}/enabled`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ enabled: checked }),
+                    })
+                      .then(res => res.json())
+                      .then(data => {
+                        if (data.success) {
+                          loadProviders();
+                        } else {
+                          Message.error(data.message || '更新失败');
+                          // 恢复原状态
+                          loadProviders();
+                        }
+                      })
+                      .catch(err => {
+                        console.error(err);
+                        Message.error('更新供应商状态失败');
+                        loadProviders();
+                      });
+                  }} />
                   <Button type="text" size="mini" icon={<IconSafe />} onClick={() => setDefault(provider.id)} disabled={provider.isDefault} />
                   <Popconfirm title="删除供应商？" onOk={() => deleteProvider(provider.id)} disabled={provider.isDefault}>
                     <Button type="text" size="mini" icon={<IconDelete />} status="danger" disabled={provider.isDefault} />
@@ -779,6 +907,15 @@ const ChatView = ({ onBack }: ChatViewProps) => {
                         placeholder="https://api.example.com/v1" 
                         style={{ width: '100%' }} 
                       />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                      <Button 
+                        type="primary" 
+                        size="small"
+                        onClick={() => saveProviderChanges(provider.id)}
+                      >
+                        保存修改
+                      </Button>
                     </div>
                   </div>
                 </>

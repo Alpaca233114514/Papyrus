@@ -55,6 +55,7 @@ from papyrus_api.routers import (
     update_router,
     markdown_router,
     mcp_router,
+    providers_router,
 )
 
 # MCP Server 实例
@@ -134,6 +135,7 @@ app.include_router(logs_router, prefix="/api")
 app.include_router(update_router, prefix="/api")
 app.include_router(markdown_router, prefix="/api")
 app.include_router(mcp_router, prefix="/api")
+app.include_router(providers_router, prefix="/api")
 
 
 # Entry point for PyInstaller executable

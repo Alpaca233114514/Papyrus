@@ -12,6 +12,7 @@
 - progress: 学习进度（连续天数、每日目标）
 - logs: 日志管理
 - mcp: MCP扩展接口
+- providers: AI提供商管理
 """
 
 from .cards import router as cards_router
@@ -27,6 +28,7 @@ from .logs import router as logs_router
 from .update import router as update_router
 from .markdown import router as markdown_router
 from .mcp import router as mcp_router
+from .providers import router as providers_router
 
 __all__ = [
     "cards_router",
@@ -42,4 +44,5 @@ __all__ = [
     "update_router",
     "markdown_router",
     "mcp_router",
+    "providers_router",
 ]
