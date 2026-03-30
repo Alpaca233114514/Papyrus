@@ -80,6 +80,7 @@ jobs:
 
       - name: Run Tests & Verify Accuracy
         # 关键测试步骤：失败会阻止后续构建
+        shell: bash
         run: |
           pip install pytest pytest-asyncio httpx
           pip install -r requirements.txt
