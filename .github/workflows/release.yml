@@ -79,10 +79,17 @@ jobs:
           python-version: '3.12'  
 
       - name: Run Tests & Verify Accuracy
+        # 关键测试步骤：失败会阻止后续构建
         run: |
           pip install pytest pytest-asyncio httpx
           pip install -r requirements.txt
+          echo "Running tests with PYTHONPATH=$PYTHONPATH:src"
           PYTHONPATH=src python scripts/verify-tests.py
+          TEST_EXIT_CODE=$?
+          if [ $TEST_EXIT_CODE -ne 0 ]; then
+            echo "❌ Tests failed. Build aborted."
+            exit 1
+          fi
 
       - name: Build Python Backend
         run: |
