@@ -8,6 +8,8 @@ on:
       - release/**
       - v2
       - v2-develop
+      - v2.0.0beta*
+      - 'v2*'
     tags:
       - 'v*'
   workflow_dispatch:
