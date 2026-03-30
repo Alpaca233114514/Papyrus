@@ -160,7 +160,7 @@ Papyrus/
 ├── logs/                          # 日志文件
 │
 ├── run.pyw                        # 启动器
-├── Papyrus.spec                   # PyInstaller 配置
+├── PapyrusAPI.spec                # PyInstaller 配置
 ├── requirements.txt               # Python 依赖
 └── pyproject.toml                 # Python 项目配置
 ```
@@ -283,7 +283,7 @@ npm run build
 
 **打包完整应用**
 ```bash
-pyinstaller Papyrus.spec
+pyinstaller PapyrusAPI.spec
 ```
 
 ---

@@ -1,9 +1,7 @@
-"""Compatibility launcher.
+"""Compatibility launcher (windowed, no console).
 
 Historically the project used `src/Papyrus.pyw` as the GUI entrypoint.
 We keep this file so existing shortcuts/docs continue to work.
-
-It forwards to `src/Papyrus.py` (shim) -> `papyrus.app.run_app()`.
 """
 
 from __future__ import annotations
@@ -16,8 +14,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
-from Papyrus import run_app
-
+from papyrus.app import run_app
 
 if __name__ == "__main__":
     run_app()

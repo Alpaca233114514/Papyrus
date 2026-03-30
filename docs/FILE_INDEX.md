@@ -17,7 +17,6 @@
 | `package.json` | Node.js 项目配置，定义脚本和 Electron 构建设置 |
 | `pyproject.toml` | Python 项目配置，包含依赖和 mypy 配置 |
 | `requirements.txt` | Python 依赖列表 |
-| `Papyrus.spec` | PyInstaller 打包配置 |
 | `PapyrusAPI.spec` | PyInstaller API 服务打包配置 |
 | `.electron-builder.config.js` | Electron Builder 配置 |
 | `electron-builder.json` | Electron Builder 额外配置 |
@@ -125,7 +124,6 @@
 | 文件 | 说明 |
 |------|------|
 | `logger.py` | 日志模块 |
-| `log_viewer.py` | 日志查看器 |
 | `Papyrus.py` | 兼容入口 |
 | `Papyrus.pyw` | 兼容入口（无控制台） |
 
@@ -379,7 +377,7 @@
 |------|------|
 | `test_papyrus.py` | 核心功能测试 |
 | `test_api.py` | API 测试 |
-| `test_api_simple.py` | 简单 API 测试 |
+| `test_api_simple.py` | 简单 API 测试（待合并） |
 | `test_ai.py` | AI 功能测试 |
 | `test_sidebar_v3.py` | 侧边栏测试 |
 | `test_integration.py` | 集成测试 |

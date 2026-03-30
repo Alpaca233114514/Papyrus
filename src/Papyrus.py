@@ -5,7 +5,7 @@ The project is being modularized under `src/papyrus/`.
 This module keeps the old public import surface stable for:
 - tests
 - `run.pyw`
-- PyInstaller build (`Papyrus.spec`)
+- PyInstaller build (`PapyrusAPI.spec`)
 
 Python runtime target: 3.14+
 """
