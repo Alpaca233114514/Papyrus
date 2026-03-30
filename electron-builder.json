@@ -37,8 +37,10 @@
     "**/*.so",
     "**/*.dylib"
   ],
-  "electronDist": "electron-download/dist",
   "electronVersion": "41.1.0",
+  "electronDownload": {
+    "mirror": "https://npmmirror.com/mirrors/electron/"
+  },
   "win": {
     "target": [
       {

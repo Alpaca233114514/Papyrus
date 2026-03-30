@@ -26,6 +26,8 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   # Electron Builder 二进制工具镜像（签名工具等）
   ELECTRON_BUILDER_BINARIES_MIRROR: "https://npmmirror.com/mirrors/electron-builder-binaries/"
+  # Electron 镜像
+  ELECTRON_MIRROR: "https://npmmirror.com/mirrors/electron/"
 
 jobs:
   build:

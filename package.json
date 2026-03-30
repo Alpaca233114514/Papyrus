@@ -7,7 +7,9 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "dev:frontend": "cd frontend && npm run dev:frontend",
+    "dev": "concurrently -k -n BACKEND,FRONTEND -c cyan,magenta 'python -m uvicorn src.papyrus_api.main:app --reload --port 8000' 'cd frontend && npm run dev'",
+    "dev:electron": "node scripts/build-electron.js dev",
+    "dev:frontend": "cd frontend && npm run dev",
     "dev:backend": "python -m uvicorn src.papyrus_api.main:app --reload --port 8000",
     "electron:dev": "node scripts/build-electron.js dev",
     "electron:build": "node scripts/build-electron.js build",
