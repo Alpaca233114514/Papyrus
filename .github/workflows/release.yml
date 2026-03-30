@@ -93,33 +93,36 @@ jobs:
       - name: Verify Python Build
         shell: bash
         run: |
-          # PyInstaller one-file mode: executable is directly in dist-python/
+          # PyInstaller one-dir mode: executable is in dist-python/Papyrus/
           if [ "${{ matrix.platform }}" = "windows" ]; then
-            EXECUTABLE="dist-python/Papyrus.exe"
+            EXECUTABLE="dist-python/Papyrus/Papyrus.exe"
           else
-            EXECUTABLE="dist-python/Papyrus"
+            EXECUTABLE="dist-python/Papyrus/Papyrus"
           fi
           
           if [ ! -f "$EXECUTABLE" ]; then
             echo "❌ Error: Python executable not found at $EXECUTABLE"
             echo "Contents of dist-python/:"
             ls -la dist-python/ || echo "dist-python directory does not exist"
+            ls -la dist-python/Papyrus/ 2>/dev/null || echo "dist-python/Papyrus/ directory does not exist"
             exit 1
           fi
           
-          # Check executable size (should be > 15MB)
+          # Check executable size (should be > 10MB for one-dir mode)
           SIZE_MB=$(du -m "$EXECUTABLE" | cut -f1)
           echo "✅ Python executable built: $EXECUTABLE (${SIZE_MB}MB)"
           
-          if [ "$SIZE_MB" -lt 15 ]; then
+          if [ "$SIZE_MB" -lt 10 ]; then
             echo "❌ Error: Executable size too small (${SIZE_MB}MB), build may be incomplete"
             exit 1
           fi
           
-          # Test executable can start (check version/help)
-          echo "Testing executable..."
-          if ! "$EXECUTABLE" --version 2>/dev/null && ! "$EXECUTABLE" --help 2>/dev/null; then
-            echo "⚠️ Warning: Executable may not run correctly (no --version or --help support)"
+          # Check total directory size
+          TOTAL_SIZE=$(du -sm dist-python/Papyrus/ | cut -f1)
+          echo "✅ Total directory size: ${TOTAL_SIZE}MB"
+          
+          if [ "$TOTAL_SIZE" -lt 50 ]; then
+            echo "⚠️ Warning: Directory size seems small (${TOTAL_SIZE}MB)"
           fi
 
       - name: Build Electron App
@@ -136,7 +139,7 @@ jobs:
             "assets/icon.ico"
             "assets/icon.png"
             "certs/root-ca.cer"
-            "python/Papyrus.exe"
+            "python/Papyrus/Papyrus.exe"
           )
           
           # Determine resources directory based on platform

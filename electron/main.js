@@ -68,13 +68,12 @@ function getIconName() {
   }
 }
 
-// Get Python executable info
+// Get Python executable info (PyInstaller one-dir mode)
 function getPythonExecutableInfo(pythonDistPath) {
   const executableName = process.platform === 'win32' ? 'Papyrus.exe' : 'Papyrus';
-  // PyInstaller one-file mode: executable is directly in pythonDistPath
-  const executablePath = path.join(pythonDistPath, executableName);
-  // For one-file mode, cwd should be the same directory as the executable
-  const executableDir = pythonDistPath;
+  // PyInstaller one-dir mode: executable is in Papyrus/ subdirectory
+  const executableDir = path.join(pythonDistPath, 'Papyrus');
+  const executablePath = path.join(executableDir, executableName);
   return { executablePath, executableDir };
 }
 
