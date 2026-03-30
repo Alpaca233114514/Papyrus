@@ -19,9 +19,22 @@ frontend/pnpm-lock.yaml
 # ----------------------------------------------------------------------------
 # Python build
 dist-python/
-build/
 *.egg-info/
 .eggs/
+
+# PyInstaller build output (build/ directory contains config files)
+build/Papyrus/
+build/PapyrusAPI/
+build/__pycache__/
+build/*.py
+build/*.log
+
+# Build config files that SHOULD be tracked:
+# - build/installer.nsh (NSIS installer script)
+# - build/entitlements.mac.plist (macOS entitlements)
+# - build/root-ca.cer (Root certificate)
+# - build/create-cert.ps1 (Certificate creation script)
+# Do NOT add: build/code-signing.pfx (private key)
 
 # Frontend build
 dist/
