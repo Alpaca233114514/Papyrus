@@ -1,4 +1,4 @@
-# Papyrus Frontend (TS + React + Arco)
+# Papyrus (TS + React + Arco)
 
 ## Stack
 
