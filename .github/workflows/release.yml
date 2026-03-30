@@ -116,12 +116,14 @@ jobs:
             exit 1
           fi
           
-          # Check executable size (should be > 10MB for one-dir mode)
+          # Check executable size
+          # Windows: > 10MB (single executable)
+          # Linux/macOS one-dir: executable is just a launcher, can be smaller
           SIZE_MB=$(du -m "$EXECUTABLE" | cut -f1)
           echo "✅ Python executable built: $EXECUTABLE (${SIZE_MB}MB)"
           
-          if [ "$SIZE_MB" -lt 10 ]; then
-            echo "❌ Error: Executable size too small (${SIZE_MB}MB), build may be incomplete"
+          if [ "${{ matrix.platform }}" = "windows" ] && [ "$SIZE_MB" -lt 10 ]; then
+            echo "❌ Error: Windows executable too small (${SIZE_MB}MB), build may be incomplete"
             exit 1
           fi
           
