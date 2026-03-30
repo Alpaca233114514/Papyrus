@@ -32,10 +32,21 @@ const pythonCmd = platform() === 'win32' ? 'python' : 'python3';
 console.log(`${colors.yellow}📦 正在启动后端服务器...${colors.reset}`);
 
 const backendArgs = ['-m', 'uvicorn', 'src.papyrus_api.main:app', '--port', '8000', '--no-access-log'];
+
+// 设置 PYTHONPATH 以便 Python 能找到 papyrus 和 papyrus_api 模块
+const env = { ...process.env };
+const pythonPath = platform() === 'win32' 
+  ? `${projectRoot}\src`
+  : `${projectRoot}/src`;
+env.PYTHONPATH = env.PYTHONPATH 
+  ? `${pythonPath}${platform() === 'win32' ? ';' : ':'}${env.PYTHONPATH}`
+  : pythonPath;
+
 const backend = spawn(pythonCmd, backendArgs, {
   cwd: projectRoot,
   stdio: 'pipe',
-  shell: platform() === 'win32'
+  shell: platform() === 'win32',
+  env: env
 });
 
 let backendReady = false;

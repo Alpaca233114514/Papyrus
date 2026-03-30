@@ -7,10 +7,10 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "dev": "concurrently -k -n BACKEND,FRONTEND -c cyan,magenta \"python -m uvicorn src.papyrus_api.main:app --reload --port 8000\" \"cd frontend && npm run dev\"",
+    "dev": "concurrently -k -n BACKEND,FRONTEND -c cyan,magenta \"set PYTHONPATH=src && python -m uvicorn src.papyrus_api.main:app --reload --port 8000\" \"cd frontend && npm run dev\"",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:electron": "node scripts/build-electron.js dev",
-    "dev:backend": "python -m uvicorn src.papyrus_api.main:app --reload --port 8000",
+    "dev:backend": "set PYTHONPATH=src && python -m uvicorn src.papyrus_api.main:app --reload --port 8000",
     "electron:dev": "node scripts/build-electron.js dev",
     "electron:build": "node scripts/build-electron.js build",
     "electron:build:win": "node scripts/build-electron.js build:win",
