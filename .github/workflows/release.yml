@@ -118,23 +118,18 @@ jobs:
             exit 1
           fi
           
-          # Check executable size
-          # Windows: > 10MB (single executable)
-          # Linux/macOS one-dir: executable is just a launcher, can be smaller
+          # Check executable exists
           SIZE_MB=$(du -m "$EXECUTABLE" | cut -f1)
           echo "✅ Python executable built: $EXECUTABLE (${SIZE_MB}MB)"
           
-          if [ "${{ matrix.platform }}" = "windows" ] && [ "$SIZE_MB" -lt 10 ]; then
-            echo "❌ Error: Windows executable too small (${SIZE_MB}MB), build may be incomplete"
-            exit 1
-          fi
-          
-          # Check total directory size
+          # Check total directory size (one-dir mode: dependencies are in _internal/)
           TOTAL_SIZE=$(du -sm dist-python/Papyrus/ | cut -f1)
           echo "✅ Total directory size: ${TOTAL_SIZE}MB"
           
+          # All platforms use one-dir mode, check total size
           if [ "$TOTAL_SIZE" -lt 50 ]; then
-            echo "⚠️ Warning: Directory size seems small (${TOTAL_SIZE}MB)"
+            echo "❌ Error: Build directory too small (${TOTAL_SIZE}MB), may be incomplete"
+            exit 1
           fi
 
       - name: Build Electron App
