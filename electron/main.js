@@ -190,29 +190,53 @@ async function startBackend() {
     log(`  __dirname: ${__dirname}`);
     log(`  process.resourcesPath: ${process.resourcesPath}`);
     
-    // Check if executable exists
+    // Check if executable exists - try alternative paths if not found
+    let finalExecutablePath = executablePath;
+    let finalExecutableDir = executableDir;
+    
     if (!fs.existsSync(executablePath)) {
-      log(`ERROR: Python executable not found at: ${executablePath}`, 'error');
+      log(`Primary executable not found, trying alternative paths...`);
       
-      // Try to list what's in the directory for debugging
-      try {
-        const parentDir = path.dirname(paths.pythonDistPath);
-        log(`Contents of ${parentDir}:`, 'error');
-        if (fs.existsSync(parentDir)) {
-          fs.readdirSync(parentDir).forEach(file => {
-            log(`  - ${file}`, 'error');
-          });
-        } else {
-          log(`  Directory does not exist`, 'error');
+      // Try alternative paths
+      const alternativePaths = [
+        path.join(paths.pythonDistPath, 'Papyrus.exe'),
+        path.join(paths.pythonDistPath, 'Papyrus'),
+        path.join(process.resourcesPath, 'python', 'Papyrus', 'Papyrus.exe'),
+        path.join(process.resourcesPath, 'python', 'Papyrus.exe'),
+      ];
+      
+      for (const altPath of alternativePaths) {
+        log(`Checking: ${altPath}`);
+        if (fs.existsSync(altPath)) {
+          finalExecutablePath = altPath;
+          finalExecutableDir = path.dirname(altPath);
+          log(`Found executable at: ${altPath}`);
+          break;
         }
-      } catch (e) {
-        log(`Failed to list directory: ${e.message}`, 'error');
       }
       
-      throw new Error(`Python executable not found at: ${executablePath}`);
+      if (!fs.existsSync(finalExecutablePath)) {
+        log(`ERROR: Python executable not found at: ${executablePath}`, 'error');
+        
+        // Try to list what's in the directory for debugging
+        try {
+          log(`Contents of ${paths.pythonDistPath}:`, 'error');
+          if (fs.existsSync(paths.pythonDistPath)) {
+            fs.readdirSync(paths.pythonDistPath).forEach(file => {
+              log(`  - ${file}`, 'error');
+            });
+          } else {
+            log(`  Directory does not exist`, 'error');
+          }
+        } catch (e) {
+          log(`Failed to list directory: ${e.message}`, 'error');
+        }
+        
+        throw new Error(`后端程序未找到。请确保程序完整安装。路径: ${executablePath}`);
+      }
     }
 
-    log(`Starting backend from: ${executablePath}`);
+    log(`Starting backend from: ${finalExecutablePath}`);
     
     // Set data directory to Electron's userData (writable location)
     const env = {
@@ -224,8 +248,8 @@ async function startBackend() {
     
     // Note: In one-dir mode, cwd must be the directory containing the executable
     // so it can find the _internal folder
-    backendProcess = spawn(executablePath, [], {
-      cwd: executableDir,
+    backendProcess = spawn(finalExecutablePath, [], {
+      cwd: finalExecutableDir,
       stdio: 'pipe',
       detached: false,
       env: env,
@@ -243,20 +267,35 @@ async function startBackend() {
 
   backendProcess.on('error', (error) => {
     log(`Backend process error: ${error.message}`, 'error');
+    if (!isQuitting) {
+      dialog.showErrorBox('后端启动错误', `无法启动后端服务: ${error.message}\n\n请检查程序是否完整安装。`);
+    }
   });
 
   backendProcess.on('exit', (code, signal) => {
     log(`Backend process exited with code ${code}, signal ${signal}`);
     if (!isQuitting && code !== 0) {
       log('Backend crashed unexpectedly', 'error');
-      dialog.showErrorBox('Backend Error', 'The backend process crashed unexpectedly. The application will now close.');
-      app.quit();
+      // Don't quit immediately - let user see the error and try to restart
+      if (mainWindow) {
+        mainWindow.webContents.send('backend-crashed');
+      }
     }
   });
 
   // Wait for backend to be ready
-  await waitForBackend();
-  log('Backend started successfully');
+  try {
+    await waitForBackend();
+    log('Backend started successfully');
+  } catch (error) {
+    log(`Backend failed to start: ${error.message}`, 'error');
+    // Kill the process if it's still running
+    if (backendProcess) {
+      backendProcess.kill();
+      backendProcess = null;
+    }
+    throw new Error(`后端服务启动失败: ${error.message}`);
+  }
 }
 
 // Stop Python backend
@@ -491,6 +530,18 @@ function setupIPC() {
     await startBackend();
     return true;
   });
+  
+  // Select folder dialog
+  ipcMain.handle('dialog:selectFolder', async (event, defaultPath) => {
+    if (!mainWindow) return { canceled: true };
+    
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory'],
+      defaultPath: defaultPath || app.getPath('userData'),
+    });
+    
+    return result;
+  });
 }
 
 // Certificate installation messages
@@ -515,8 +566,11 @@ async function installRootCertificate() {
   // Check if certificate file exists
   if (!fs.existsSync(certPath)) {
     log('Root certificate not found in resources, skipping installation');
+    log(`Expected cert path: ${certPath}`);
     return;
   }
+  
+  log(`Found certificate at: ${certPath}`);
   
   // Check if already installed (by thumbprint)
   try {
@@ -527,6 +581,22 @@ async function installRootCertificate() {
     }
   } catch (e) {
     // Certificate not found, proceed with installation
+    log('Certificate not found in store, will attempt installation');
+  }
+  
+  // Check if running as administrator
+  let isAdmin = false;
+  try {
+    execSync('net session', { stdio: 'pipe' });
+    isAdmin = true;
+  } catch (e) {
+    isAdmin = false;
+  }
+  
+  if (!isAdmin) {
+    log('Running without administrator privileges, skipping certificate installation');
+    // Silently skip - certificate is optional for app functionality
+    return;
   }
   
   // Ask user for permission
@@ -556,10 +626,8 @@ async function installRootCertificate() {
     log('Root certificate installed successfully');
   } catch (error) {
     log(`Failed to install root certificate: ${error.message}`, 'error');
-    dialog.showErrorBox(
-      CERT_MESSAGES.errorTitle,
-      CERT_MESSAGES.errorMessage(error.message)
-    );
+    // Don't show error dialog - certificate is optional
+    log('Certificate installation failed but continuing app startup');
   }
 }
 

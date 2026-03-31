@@ -129,8 +129,11 @@ const AccessibilityView = ({ onBack }: AccessibilityViewProps) => {
           <Text type="secondary" style={{ fontSize: 12, padding: '8px 12px', display: 'block' }}>
             快速导航
           </Text>
-          <a 
-            href="#aa-section" 
+          <button 
+            onClick={() => {
+              const element = document.getElementById('aa-section');
+              if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
             style={{ 
               display: 'flex', 
               alignItems: 'center', 
@@ -139,13 +142,21 @@ const AccessibilityView = ({ onBack }: AccessibilityViewProps) => {
               color: 'var(--color-text-1)',
               textDecoration: 'none',
               borderRadius: 6,
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              width: '100%',
+              textAlign: 'left',
             }}
           >
             <IconEye style={{ fontSize: 16 }} />
             <Text style={{ fontSize: 13 }}>AA 级基础</Text>
-          </a>
-          <a 
-            href="#aaa-section" 
+          </button>
+          <button 
+            onClick={() => {
+              const element = document.getElementById('aaa-section');
+              if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
             style={{ 
               display: 'flex', 
               alignItems: 'center', 
@@ -154,13 +165,21 @@ const AccessibilityView = ({ onBack }: AccessibilityViewProps) => {
               color: 'var(--color-text-1)',
               textDecoration: 'none',
               borderRadius: 6,
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              width: '100%',
+              textAlign: 'left',
             }}
           >
             <IconSun style={{ fontSize: 16 }} />
             <Text style={{ fontSize: 13 }}>AAA 级增强</Text>
-          </a>
-          <a 
-            href="#motion-section" 
+          </button>
+          <button 
+            onClick={() => {
+              const element = document.getElementById('motion-section');
+              if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
             style={{ 
               display: 'flex', 
               alignItems: 'center', 
@@ -169,11 +188,16 @@ const AccessibilityView = ({ onBack }: AccessibilityViewProps) => {
               color: 'var(--color-text-1)',
               textDecoration: 'none',
               borderRadius: 6,
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              width: '100%',
+              textAlign: 'left',
             }}
           >
             <IconMoon style={{ fontSize: 16 }} />
             <Text style={{ fontSize: 13 }}>动画与效果</Text>
-          </a>
+          </button>
         </div>
       </div>
 

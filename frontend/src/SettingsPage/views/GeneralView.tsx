@@ -189,6 +189,28 @@ const GeneralView = ({ onBack }: GeneralViewProps) => {
     }
   };
 
+  // 选择日志文件夹
+  const selectLogsDir = async () => {
+    try {
+      // 检查是否在 Electron 环境中
+      if (window.electronAPI?.selectFolder) {
+        const result = await window.electronAPI.selectFolder(logsConfig.log_dir);
+        if (!result.canceled && result.filePaths.length > 0) {
+          const selectedPath = result.filePaths[0];
+          await saveLogsConfig({ log_dir: selectedPath });
+        }
+      } else {
+        // 浏览器环境 - 提示用户手动输入路径
+        const newPath = prompt('请输入日志文件夹路径:', logsConfig.log_dir);
+        if (newPath !== null) {
+          await saveLogsConfig({ log_dir: newPath });
+        }
+      }
+    } catch (err) {
+      Message.error('选择文件夹失败');
+    }
+  };
+
   // 日志设置内容
   const LogsSettings = () => (
     <>
@@ -203,10 +225,17 @@ const GeneralView = ({ onBack }: GeneralViewProps) => {
           <Button
             type="secondary"
             size="small"
+            onClick={selectLogsDir}
+          >
+            选择文件夹
+          </Button>
+          <Button
+            type="secondary"
+            size="small"
             onClick={openLogsDir}
             loading={logsLoading}
           >
-            打开文件夹
+            打开
           </Button>
         </div>
       </SettingItem>

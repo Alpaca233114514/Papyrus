@@ -148,7 +148,7 @@ const AboutView = ({ onBack }: AboutViewProps) => {
       
       <div className="settings-section" style={{ textAlign: 'center', padding: '40px 0' }}>
         <img 
-          src="/icon.ico" 
+          src="./icon.ico" 
           alt="Papyrus" 
           style={{ width: 80, height: 80, marginBottom: 16 }}
         />

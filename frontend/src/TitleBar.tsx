@@ -421,7 +421,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
     <>
       <div className="titlebar">
         <div className="titlebar-logo">
-          <img src="/icon.ico" alt="Papyrus" className="titlebar-logo-icon" />
+          <img src="./icon.ico" alt="Papyrus" className="titlebar-logo-icon" />
         </div>
 
         <Space className="titlebar-menus no-drag" size={0}>

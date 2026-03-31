@@ -29,6 +29,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Backend operations
   checkBackendHealth: () => ipcRenderer.invoke('backend:checkHealth'),
   restartBackend: () => ipcRenderer.invoke('backend:restart'),
+  
+  // Dialog operations
+  selectFolder: (defaultPath) => ipcRenderer.invoke('dialog:selectFolder', defaultPath),
 });
 
 // Expose environment info

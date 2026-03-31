@@ -41,6 +41,9 @@ export interface ElectronAPI {
   
   /** Restart the backend process */
   restartBackend(): Promise<boolean>;
+  
+  /** Select a folder using the native dialog */
+  selectFolder(defaultPath?: string): Promise<{ canceled: boolean; filePaths: string[] }>;
 }
 
 export interface ElectronEnv {

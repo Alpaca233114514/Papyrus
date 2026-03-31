@@ -16,7 +16,7 @@ export type SceneryContent = {
 // 本地静态数据（默认窗景）
 const defaultContent: SceneryContent = {
   id: 'default',
-  image: '/scenery/image.png',
+  image: './scenery/image.png',
   poem: '春未老，风细柳斜斜。试上超然台上望，半壕春水一城花，烟雨暗千家。寒食后，酒醒却咨嗟。休对故人思故国，且将新火试新茶，诗酒趁年华。',
   source: '[宋] 苏轼《望江南·超然台作》',
 };

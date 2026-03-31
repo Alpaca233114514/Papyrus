@@ -27,13 +27,6 @@ const FormItem = Form.Item;
 const { Title, Text, Paragraph } = Typography;
 const RadioGroup = Radio.Group;
 
-// 主题选项
-const THEME_OPTIONS = [
-  { label: '浅色', value: 'light' },
-  { label: '深色', value: 'dark' },
-  { label: '跟随系统', value: 'system' },
-];
-
 // 字体大小选项
 const FONT_SIZE_OPTIONS = [
   { label: '小', value: 'small' },
@@ -216,9 +209,7 @@ const AppearanceView = ({ onBack }: AppearanceViewProps) => {
   const [activeMenu, setActiveMenu] = useState('theme');
   
   // 外观设置状态
-  const [theme, setTheme] = useState('light');
   const [fontSize, setFontSize] = useState('medium');
-  const [accentColor, setAccentColor] = useState('var(--color-primary)');
   
   // 窗景设置状态
   const { allSceneries, addCustomScenery } = useSceneryManager();
@@ -251,40 +242,7 @@ const AppearanceView = ({ onBack }: AppearanceViewProps) => {
   // 外观设置内容
   const ThemeSettings = () => (
     <>
-      <SettingItem title="主题" desc="选择应用的整体配色方案">
-        <RadioGroup
-          type="button"
-          value={theme}
-          onChange={setTheme}
-          options={THEME_OPTIONS}
-        />
-      </SettingItem>
-
-      <SettingItem title="强调色" desc="选择应用的主色调">
-        <div className="settings-color-picker">
-          {[
-            { value: 'var(--color-primary)', label: '蓝色' },
-            { value: 'var(--color-success)', label: '绿色' },
-            { value: 'var(--color-danger)', label: '红色' },
-            { value: 'var(--color-warning)', label: '橙色' },
-            { value: 'var(--color-purple-6, #722ED1)', label: '紫色' },
-            { value: 'var(--color-cyan-6, #14C9C9)', label: '青色' },
-          ].map(({ value: color, label }) => (
-            <div
-              key={color}
-              className={`settings-color-option ${accentColor === color ? 'active' : ''}`}
-              style={{ background: color }}
-              onClick={() => setAccentColor(color)}
-              role="button"
-              tabIndex={0}
-              aria-label={`选择强调色 ${label}`}
-              onKeyDown={(e) => e.key === 'Enter' && setAccentColor(color)}
-            />
-          ))}
-        </div>
-      </SettingItem>
-
-      <SettingItem title="字体大小" desc="调整界面文字大小" divider={false}>
+      <SettingItem title="字体大小" desc="调整界面文字大小">
         <RadioGroup
           type="button"
           value={fontSize}
@@ -292,6 +250,26 @@ const AppearanceView = ({ onBack }: AppearanceViewProps) => {
           options={FONT_SIZE_OPTIONS}
         />
       </SettingItem>
+
+      <div style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 12,
+        padding: 16,
+        background: 'var(--color-fill-2)',
+        borderRadius: 8,
+        marginTop: 8,
+      }}>
+        <IconPalette style={{ color: 'var(--color-text-3)', fontSize: 20, marginTop: 2 }} />
+        <div>
+          <Text style={{ fontSize: 13, fontWeight: 500, marginBottom: 4, display: 'block' }}>
+            主题切换
+          </Text>
+          <Paragraph type="secondary" style={{ fontSize: 13, margin: 0 }}>
+            使用左下角的日间/夜间模式按钮切换主题。跟随系统设置功能即将推出。
+          </Paragraph>
+        </div>
+      </div>
     </>
   );
 
