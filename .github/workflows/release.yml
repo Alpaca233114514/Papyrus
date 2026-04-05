@@ -61,44 +61,54 @@ jobs:
           node-version: '24'
           cache: 'npm'
           cache-dependency-path: |
+            package-lock.json
             frontend/package-lock.json
 
-      - name: Install Dependencies
+      - name: Install Node Dependencies
         run: |
-          npm install
-          cd frontend && npm install
+          npm ci
+          cd frontend && npm ci
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: |
+            requirements.txt
+
+      - name: Install Python Dependencies
+        run: |
+          pip install --upgrade pip wheel
+          pip install pytest pytest-asyncio httpx pyinstaller
+          pip install -r requirements.txt
 
       - name: Build Frontend
         run: |
           cd frontend
           npm run build
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'  
-
       - name: Run Tests & Verify Accuracy
-        # 关键测试步骤：失败会阻止后续构建
         shell: bash
         env:
           PYTHONIOENCODING: utf-8
         run: |
-          pip install pytest pytest-asyncio httpx
-          pip install -r requirements.txt
           echo "Running tests with PYTHONPATH=$PYTHONPATH:src"
           PYTHONPATH=src python scripts/verify-tests.py
-          TEST_EXIT_CODE=$?
-          if [ $TEST_EXIT_CODE -ne 0 ]; then
-            echo "Tests failed. Build aborted."
-            exit 1
-          fi
+
+      - name: Cache PyInstaller
+        uses: actions/cache@v4
+        with:
+          path: |
+            build
+            *.pyc
+          key: pyinstaller-${{ matrix.platform }}-${{ hashFiles('requirements.txt', 'PapyrusAPI.spec') }}
+          restore-keys: |
+            pyinstaller-${{ matrix.platform }}-
 
       - name: Build Python Backend
         run: |
-          pip install pyinstaller
-          pip install -r requirements.txt
-          pyinstaller PapyrusAPI.spec --clean --distpath dist-python
+          pyinstaller PapyrusAPI.spec --distpath dist-python
 
       - name: Verify Python Build
         shell: bash
@@ -131,6 +141,18 @@ jobs:
             echo "❌ Error: Build directory too small (${TOTAL_SIZE}MB), may be incomplete"
             exit 1
           fi
+
+      - name: Cache Electron Builder
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: electron-${{ matrix.platform }}-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            electron-${{ matrix.platform }}-
 
       - name: Build Electron App
         run: npx electron-builder --${{ matrix.platform }}

@@ -44,6 +44,9 @@ frontend/dist/
 dist-electron/
 electron.zip
 
+# Local build script
+scripts/build-local.ps1
+
 # Electron download - 所有内容都不提交（自行下载）
 electron-download/
 
