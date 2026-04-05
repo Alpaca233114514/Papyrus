@@ -174,3 +174,50 @@ select:focus-visible {
   cursor: not-allowed;
   opacity: 0.6;
 }
+
+/* 页面切换动画 */
+.page-container {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.page-transition-up {
+  animation: pageSlideUp 0.25s ease-out forwards;
+}
+
+.page-transition-down {
+  animation: pageSlideDown 0.25s ease-out forwards;
+}
+
+@keyframes pageSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pageSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition-up,
+  .page-transition-down {
+    animation: none;
+  }
+}

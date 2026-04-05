@@ -33,17 +33,19 @@ export function useScrollNavigation<T extends NavItem>(
   const scrollToSection = (sectionId: string) => {
     if (contentRef.current) {
       const element = contentRef.current.querySelector(`#${sectionId}`);
-      if (element) {
-        isScrollingProgrammatically.current = true;
-        setActiveSection(sectionId);
-        contentRef.current.scrollTo({
-          top: (element as HTMLElement).offsetTop - scrollOffset,
-          behavior: 'smooth'
-        });
-        setTimeout(() => {
-          isScrollingProgrammatically.current = false;
-        }, 500);
+      if (!element) {
+        console.warn(`Section with id '${sectionId}' not found`);
+        return;
       }
+      isScrollingProgrammatically.current = true;
+      setActiveSection(sectionId);
+      contentRef.current.scrollTo({
+        top: (element as HTMLElement).offsetTop - scrollOffset,
+        behavior: 'smooth'
+      });
+      setTimeout(() => {
+        isScrollingProgrammatically.current = false;
+      }, 500);
     }
   };
 

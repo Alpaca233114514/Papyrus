@@ -1,6 +1,6 @@
 {
   "name": "papyrus",
-  "version": "v2.0.0-beta.1",
+  "version": "v2.0.0-beta.2",
   "description": "Papyrus - A modern note-taking and learning application",
   "main": "electron/main.js",
   "author": "Papyrus Team",
@@ -45,12 +45,16 @@
       {
         "from": "dist-python",
         "to": "python",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "assets",
         "to": "assets",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "build/root-ca.cer",

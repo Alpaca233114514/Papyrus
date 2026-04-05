@@ -23,6 +23,8 @@ import SettingsPage from './SettingsPage/SettingsPage';
 import SectionNavigation from './components/SectionNavigation';
 import type { SearchResult } from './api';
 
+const PAGE_ORDER = ['start', 'scroll', 'notes', 'charts', 'files', 'extensions', 'settings'];
+
 const App = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [todayDone, setTodayDone] = useState(false);
@@ -34,29 +36,53 @@ const App = () => {
   const dragStartWidth = useRef<number>(0);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const mainContentRef = useRef<HTMLDivElement>(null);
+  const prevPageIndexRef = useRef<number>(0);
+  const [animationDirection, setAnimationDirection] = useState<'up' | 'down' | null>(null);
+
+  // 处理页面切换动画
+  const handlePageChange = useCallback((newPage: string) => {
+    const newIndex = PAGE_ORDER.indexOf(newPage);
+    if (newIndex === -1) {
+      console.warn(`页面 '${newPage}' 不存在于页面顺序列表中`);
+      setActivePage(newPage);
+      return;
+    }
+    const prevIndex = prevPageIndexRef.current;
+    
+    if (newIndex > prevIndex) {
+      setAnimationDirection('up');
+    } else if (newIndex < prevIndex) {
+      setAnimationDirection('down');
+    } else {
+      setAnimationDirection(null);
+    }
+    
+    prevPageIndexRef.current = newIndex;
+    setActivePage(newPage);
+  }, []);
 
   // 处理搜索结果点击
   const handleSearchResult = useCallback((result: SearchResult) => {
     if (result.type === 'note') {
-      setActivePage('notes');
+      handlePageChange('notes');
       setSelectedNoteId(result.id);
       Message.success(`打开笔记: ${result.title}`);
     } else if (result.type === 'card') {
-      setActivePage('scroll');
+      handlePageChange('scroll');
       Message.success('跳转到复习页面');
     }
-  }, []);
+  }, [handlePageChange]);
 
   // 监听来自 ChatPanel 的设置页面跳转事件
   useEffect(() => {
     const handleOpenSettings = (e: Event) => {
       const detail = (e as CustomEvent).detail;
-      setActivePage('settings');
+      handlePageChange('settings');
       console.log('Opening settings section:', detail?.section);
     };
     window.addEventListener('papyrus_open_settings', handleOpenSettings);
     return () => window.removeEventListener('papyrus_open_settings', handleOpenSettings);
-  }, []);
+  }, [handlePageChange]);
 
   const onChatDragStart = useCallback((e: React.MouseEvent) => {
     dragStartX.current = e.clientX;
@@ -88,6 +114,30 @@ const App = () => {
   useEffect(() => {
     document.title = `Papyrus - ${pageTitles[activePage] || '莎草纸'}`;
   }, [activePage]);
+
+  // 渲染当前页面
+  const renderPage = () => {
+    const animationClass = animationDirection ? `page-transition-${animationDirection}` : '';
+    
+    const pages: Record<string, React.ReactNode> = {
+      start: <StartPage onDoneChange={setTodayDone} />,
+      scroll: <ScrollPage />,
+      notes: <NotesPage />,
+      charts: <ChartsPage />,
+      files: <FilesPage />,
+      extensions: <ExtensionsPage />,
+      settings: <SettingsPage />,
+    };
+
+    return (
+      <div 
+        key={activePage}
+        className={`page-container ${animationClass}`}
+      >
+        {pages[activePage]}
+      </div>
+    );
+  };
 
   return (
     <div 
@@ -124,7 +174,7 @@ const App = () => {
 
       {/* 标题栏 */}
       <TitleBar 
-        onPageChange={setActivePage} 
+        onPageChange={handlePageChange} 
         onSearchResult={handleSearchResult} 
       />
       
@@ -137,7 +187,7 @@ const App = () => {
           chatOpen={chatOpen} 
           onChatToggle={() => setChatOpen(!chatOpen)} 
           activePage={activePage} 
-          onPageChange={setActivePage} 
+          onPageChange={handlePageChange} 
         />
         
         {/* 主内容区域 */}
@@ -163,13 +213,7 @@ const App = () => {
           )}
 
           {/* 页面内容 */}
-          {activePage === 'start' && <StartPage onDoneChange={setTodayDone} />}
-          {activePage === 'scroll' && <ScrollPage />}
-          {activePage === 'notes' && <NotesPage />}
-          {activePage === 'charts' && <ChartsPage />}
-          {activePage === 'files' && <FilesPage />}
-          {activePage === 'extensions' && <ExtensionsPage />}
-          {activePage === 'settings' && <SettingsPage />}
+          {renderPage()}
         </main>
         
         {/* 节标题导航（AAA 级） */}
