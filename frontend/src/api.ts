@@ -1,4 +1,7 @@
-const BASE = '/api';
+const BACKEND_URL = 'http://127.0.0.1:8000';
+const BASE = window.location.protocol === 'file:' 
+  ? `${BACKEND_URL}/api` 
+  : '/api';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {

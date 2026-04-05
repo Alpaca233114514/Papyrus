@@ -101,13 +101,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(title="Papyrus API", version="v2.0.0-beta.1", lifespan=lifespan)
 
-# Frontend dev server (vite) defaults to 5173
+# 注意：这是本地应用，仅绑定到 127.0.0.1，不暴露到公网
+# 使用正则表达式仅允许安全来源：
+# - null origin (file:// 协议)
+# - http://localhost:*
+# - http://127.0.0.1:*
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origin_regex="^null$|^http://localhost(:\\d+)?$|^http://127\\.0\\.0\\.1(:\\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

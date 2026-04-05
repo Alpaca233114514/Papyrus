@@ -334,7 +334,8 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
-      webSecurity: !isDevMode, // Disable in dev for local development
+      webSecurity: true,
+      allowFileAccessFromFiles: true,
     },
     // Frameless window - hide native title bar on all platforms
     frame: false,
@@ -347,7 +348,8 @@ function createWindow() {
         nodeIntegration: false,
         contextIsolation: true,
         preload: path.join(__dirname, 'preload.js'),
-        webSecurity: !isDevMode,
+        webSecurity: true,
+        allowFileAccessFromFiles: true,
         devTools: true 
       }
     } : {}),
