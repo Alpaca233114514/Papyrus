@@ -230,12 +230,60 @@ function buildPython() {
   return true;
 }
 
+// Kill process on port (cross-platform)
+function killPort(port) {
+  try {
+    if (process.platform === 'win32') {
+      // Windows: find PID using netstat and kill with taskkill
+      const output = execSync(`netstat -ano | findstr :${port} | findstr LISTENING`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+      const lines = output.trim().split('\n');
+      for (const line of lines) {
+        const match = line.trim().match(/\s+(\d+)\s*$/);
+        if (match) {
+          const pid = match[1];
+          try {
+            execSync(`taskkill /PID ${pid} /F`, { stdio: 'ignore' });
+            log(`Released port ${port} (PID: ${pid})`, 'green');
+          } catch (e) {
+            log(`Failed to kill process ${pid}`, 'yellow');
+          }
+        }
+      }
+    } else {
+      // macOS/Linux: use lsof to find and kill processes
+      try {
+        const output = execSync(`lsof -ti:${port}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+        const pids = output.trim().split('\n');
+        for (const pid of pids) {
+          if (pid) {
+            execSync(`kill -9 ${pid}`, { stdio: 'ignore' });
+            log(`Released port ${port} (PID: ${pid})`, 'green');
+          }
+        }
+      } catch (e) {
+        // Port not in use, ignore
+      }
+    }
+  } catch (e) {
+    // Port not in use or error, ignore
+  }
+}
+
 // Development mode
 function devMode() {
   logSection('Starting Development Mode');
   
   const waitOn = require('wait-on');
   const { spawn } = require('child_process');
+  
+  // Release ports before starting
+  log('Checking port usage...');
+  killPort(8000);
+  killPort(5173);
+  
+  // Wait a moment for ports to be fully released
+  log('Waiting for ports to be released...', 'dim');
+  execSync('sleep 1 || timeout 1 >nul', { stdio: 'ignore' });
   
   // Start frontend
   log('Starting frontend...');

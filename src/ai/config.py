@@ -133,7 +133,7 @@ class AIConfig:
             return []
         result: list[str] = []
         for item in value:
-            if item is not None:
+            if item is not None:        
                 item_obj: object = item
                 result.append(str(item_obj))
         return result

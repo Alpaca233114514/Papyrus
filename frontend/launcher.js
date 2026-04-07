@@ -3,10 +3,13 @@
  * 同时启动 Python 后端和 Vite 前端开发服务器
  */
 
-import { spawn } from 'child_process';
+import { spawn, exec } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { platform } from 'os';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -24,6 +27,55 @@ const colors = {
 };
 
 console.log(`${colors.cyan}🚀 Papyrus 启动器${colors.reset}\n`);
+
+// 释放端口函数
+async function killPort(port) {
+  try {
+    if (platform() === 'win32') {
+      // Windows: 使用 netstat 找到占用端口的 PID，然后 taskkill
+      const { stdout } = await execAsync(`netstat -ano | findstr :${port} | findstr LISTENING`);
+      const lines = stdout.trim().split('\n');
+      
+      for (const line of lines) {
+        const match = line.trim().match(/\s+(\d+)\s*$/);
+        if (match) {
+          const pid = match[1];
+          try {
+            await execAsync(`taskkill /PID ${pid} /F`);
+            console.log(`${colors.green}✅ 端口 ${port} 已释放 (PID: ${pid})${colors.reset}`);
+          } catch (e) {
+            console.log(`${colors.yellow}⚠️  无法终止进程 ${pid}${colors.reset}`);
+          }
+        }
+      }
+    } else {
+      // macOS/Linux: 使用 lsof
+      try {
+        const { stdout } = await execAsync(`lsof -ti:${port}`);
+        const pids = stdout.trim().split('\n');
+        for (const pid of pids) {
+          if (pid) {
+            await execAsync(`kill -9 ${pid}`);
+            console.log(`${colors.green}✅ 端口 ${port} 已释放 (PID: ${pid})${colors.reset}`);
+          }
+        }
+      } catch (e) {
+        // 没有进程占用，忽略错误
+      }
+    }
+  } catch (e) {
+    // 端口未被占用，忽略错误
+  }
+}
+
+// 启动前释放端口
+console.log(`${colors.yellow}🔍 检查端口占用...${colors.reset}`);
+await killPort(8000);
+await killPort(5173);
+
+// 等待端口完全释放
+await new Promise(resolve => setTimeout(resolve, 1000));
+console.log();
 
 // 检测 Python 命令
 const pythonCmd = platform() === 'win32' ? 'python' : 'python3';
