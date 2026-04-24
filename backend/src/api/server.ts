@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import { pathToFileURL } from 'node:url';
 import { paths } from '../utils/paths.js';
 import { PapyrusLogger } from '../utils/logger.js';
 import { MCPServer } from '../mcp/server.js';
@@ -95,6 +96,6 @@ export async function start(): Promise<void> {
 export { app, logger };
 
 // Start if run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   await start();
 }

@@ -24,9 +24,10 @@
     "build:all": "npm run build:backend && npm run build:frontend && electron-builder --win portable --win nsis --x64 --publish=never"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "concurrently": "^8.2.2",
     "electron": "^41.1.0",
-    "electron-builder": "^24.13.0",
-    "concurrently": "^8.2.2"
+    "electron-builder": "^24.13.0"
   },
   "build": {
     "appId": "com.papyrus.app",
