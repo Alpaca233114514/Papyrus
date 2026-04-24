@@ -42,19 +42,11 @@ const getPaths = () => {
     ? path.join(__dirname, '..') 
     : process.resourcesPath;
   
-  // In production, extraResources are placed directly in resources directory
-  // In development, python is in dist-python
-  const pythonDistPath = isDevMode
-    ? path.join(__dirname, '..', 'dist-python')
-    : path.join(process.resourcesPath, 'python');
-
   return {
     resourcesPath,
-    pythonDistPath,
     assetsPath: path.join(resourcesPath, 'assets'),
-    frontendDistPath: isDevMode 
+    frontendDistPath: isDevMode
       ? path.join(__dirname, '..', 'frontend', 'dist')
-      // In production, frontend files are in app.asar or unpacked next to main.js
       : path.join(__dirname, '..', 'frontend', 'dist'),
     iconPath: path.join(resourcesPath, 'assets', getIconName()),
   };
@@ -69,13 +61,21 @@ function getIconName() {
   }
 }
 
-// Get Python executable info (PyInstaller one-dir mode)
-function getPythonExecutableInfo(pythonDistPath) {
-  const executableName = process.platform === 'win32' ? 'Papyrus.exe' : 'Papyrus';
-  // PyInstaller one-dir mode: executable is in Papyrus/ subdirectory
-  const executableDir = path.join(pythonDistPath, 'Papyrus');
-  const executablePath = path.join(executableDir, executableName);
-  return { executablePath, executableDir };
+// Get Node backend executable info
+function getBackendExecutableInfo() {
+  const isDev = isDevMode;
+  if (isDev) {
+    return {
+      command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
+      args: ['tsx', 'watch', 'src/api/server.ts'],
+      cwd: path.join(__dirname, '..', 'backend'),
+    };
+  }
+  return {
+    command: process.execPath, // Node.js executable bundled with Electron
+    args: [path.join(__dirname, '..', 'backend', 'dist', 'api', 'server.js')],
+    cwd: path.join(__dirname, '..', 'backend'),
+  };
 }
 
 // Logging utility
@@ -145,116 +145,32 @@ async function waitForBackend(timeout = CONFIG.backendStartupTimeout) {
   throw new Error('Backend failed to start within timeout');
 }
 
-// Start Python backend
+// Start Node.js backend
 async function startBackend() {
   const paths = getPaths();
-  
-  // Log environment info for debugging
+
   log(`Environment Info:`);
   log(`  isDevMode: ${isDevMode}`);
   log(`  resourcesPath: ${paths.resourcesPath}`);
-  log(`  pythonDistPath: ${paths.pythonDistPath}`);
   log(`  userData: ${app.getPath('userData')}`);
-  
-  if (isDevMode) {
-    // Development mode: use Python directly
-    log('Starting backend in development mode...');
-    
-    // Try python first, then python3
-    const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-    const cwd = path.join(__dirname, '..');
-    log(`Python command: ${pythonCmd}, cwd: ${cwd}`);
-    
-    backendProcess = spawn(pythonCmd, [
-      '-m', 'uvicorn',
-      'src.papyrus_api.main:app',
-      '--host', CONFIG.backendHost,
-      '--port', CONFIG.backendPort.toString()
-    ], {
-      cwd: cwd,
-      stdio: 'pipe',
-      shell: false,
-      env: {
-        ...process.env,
-        PYTHONIOENCODING: 'utf-8',
-        PYTHONPATH: path.join(cwd, 'src'),
-      }
-    });
-  } else {
-    // Production mode: use PyInstaller executable (one-dir mode)
-    const { executablePath, executableDir } = getPythonExecutableInfo(paths.pythonDistPath);
-    
-    log(`Production mode paths:`);
-    log(`  executablePath: ${executablePath}`);
-    log(`  executableDir: ${executableDir}`);
-    log(`  __dirname: ${__dirname}`);
-    log(`  process.resourcesPath: ${process.resourcesPath}`);
-    
-    // Check if executable exists - try alternative paths if not found
-    let finalExecutablePath = executablePath;
-    let finalExecutableDir = executableDir;
-    
-    if (!fs.existsSync(executablePath)) {
-      log(`Primary executable not found, trying alternative paths...`);
-      
-      // Try alternative paths
-      const alternativePaths = [
-        path.join(paths.pythonDistPath, 'Papyrus.exe'),
-        path.join(paths.pythonDistPath, 'Papyrus'),
-        path.join(process.resourcesPath, 'python', 'Papyrus', 'Papyrus.exe'),
-        path.join(process.resourcesPath, 'python', 'Papyrus.exe'),
-      ];
-      
-      for (const altPath of alternativePaths) {
-        log(`Checking: ${altPath}`);
-        if (fs.existsSync(altPath)) {
-          finalExecutablePath = altPath;
-          finalExecutableDir = path.dirname(altPath);
-          log(`Found executable at: ${altPath}`);
-          break;
-        }
-      }
-      
-      if (!fs.existsSync(finalExecutablePath)) {
-        log(`ERROR: Python executable not found at: ${executablePath}`, 'error');
-        
-        // Try to list what's in the directory for debugging
-        try {
-          log(`Contents of ${paths.pythonDistPath}:`, 'error');
-          if (fs.existsSync(paths.pythonDistPath)) {
-            fs.readdirSync(paths.pythonDistPath).forEach(file => {
-              log(`  - ${file}`, 'error');
-            });
-          } else {
-            log(`  Directory does not exist`, 'error');
-          }
-        } catch (e) {
-          log(`Failed to list directory: ${e.message}`, 'error');
-        }
-        
-        throw new Error(`后端程序未找到。请确保程序完整安装。路径: ${executablePath}`);
-      }
-    }
 
-    log(`Starting backend from: ${finalExecutablePath}`);
-    
-    // Set data directory to Electron's userData (writable location)
-    const env = {
-      ...process.env,
-      PAPYRUS_DATA_DIR: app.getPath('userData'),
-    };
-    
-    log(`Backend env PAPYRUS_DATA_DIR: ${env.PAPYRUS_DATA_DIR}`);
-    
-    // Note: In one-dir mode, cwd must be the directory containing the executable
-    // so it can find the _internal folder
-    backendProcess = spawn(finalExecutablePath, [], {
-      cwd: finalExecutableDir,
-      stdio: 'pipe',
-      detached: false,
-      env: env,
-    });
-  }
+  const { command, args, cwd } = getBackendExecutableInfo();
+
+  log(`Starting backend: ${command} ${args.join(' ')}`);
+  log(`Backend cwd: ${cwd}`);
+
+  const env = {
+    ...process.env,
+    PAPYRUS_DATA_DIR: app.getPath('userData'),
+    PAPYRUS_PORT: CONFIG.backendPort.toString(),
+  };
+
+  backendProcess = spawn(command, args, {
+    cwd,
+    stdio: 'pipe',
+    shell: false,
+    env,
+  });
 
   // Handle backend output
   backendProcess.stdout?.on('data', (data) => {
@@ -276,7 +192,6 @@ async function startBackend() {
     log(`Backend process exited with code ${code}, signal ${signal}`);
     if (!isQuitting && code !== 0) {
       log('Backend crashed unexpectedly', 'error');
-      // Don't quit immediately - let user see the error and try to restart
       if (mainWindow) {
         mainWindow.webContents.send('backend-crashed');
       }
@@ -289,7 +204,6 @@ async function startBackend() {
     log('Backend started successfully');
   } catch (error) {
     log(`Backend failed to start: ${error.message}`, 'error');
-    // Kill the process if it's still running
     if (backendProcess) {
       backendProcess.kill();
       backendProcess = null;
@@ -594,13 +508,13 @@ app.whenReady().then(async () => {
     
     // Gather diagnostic information
     const paths = getPaths();
-    const { executablePath, executableDir } = getPythonExecutableInfo(paths.pythonDistPath);
-    
+    const { command, args, cwd } = getBackendExecutableInfo();
+
     const diagnosticPaths = {
       resourcesPath: paths.resourcesPath,
-      pythonDistPath: paths.pythonDistPath,
-      pythonExecutable: executablePath,
-      pythonExecutableDir: executableDir,
+      backendCommand: command,
+      backendArgs: args,
+      backendCwd: cwd,
       userData: app.getPath('userData'),
       __dirname: __dirname,
       processResourcesPath: process.resourcesPath,

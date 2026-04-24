@@ -7,21 +7,21 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "dev": "concurrently -k -n BACKEND,FRONTEND -c cyan,magenta \"set PYTHONPATH=src && python -m uvicorn src.papyrus_api.main:app --reload --port 8000\" \"cd frontend && npm run dev\"",
+    "dev": "concurrently -k -n BACKEND,FRONTEND -c cyan,magenta \"cd backend && npm run dev\" \"cd frontend && npm run dev\"",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:electron": "node scripts/build-electron.js dev",
-    "dev:backend": "set PYTHONPATH=src && python -m uvicorn src.papyrus_api.main:app --reload --port 8000",
+    "dev:backend": "cd backend && npm run dev",
     "electron:dev": "node scripts/build-electron.js dev",
     "electron:build": "node scripts/build-electron.js build",
     "electron:build:win": "node scripts/build-electron.js build:win",
     "electron:build:mac": "node scripts/build-electron.js build:mac",
     "electron:build:linux": "node scripts/build-electron.js build:linux",
     "build:frontend": "cd frontend && npm run build",
-    "build:python": "pyinstaller PapyrusAPI.spec --clean --distpath dist-python",
-    "postinstall": "cd frontend && npm install",
-    "build:portable": "electron-builder --win portable --x64 --publish=never",
-    "build:installer": "electron-builder --win nsis --x64 --publish=never",
-    "build:all": "electron-builder --win portable --win nsis --x64 --publish=never"
+    "build:backend": "cd backend && npm run build",
+    "postinstall": "cd frontend && npm install && cd ../backend && npm install",
+    "build:portable": "npm run build:backend && npm run build:frontend && electron-builder --win portable --x64 --publish=never",
+    "build:installer": "npm run build:backend && npm run build:frontend && electron-builder --win nsis --x64 --publish=never",
+    "build:all": "npm run build:backend && npm run build:frontend && electron-builder --win portable --win nsis --x64 --publish=never"
   },
   "devDependencies": {
     "electron": "^41.1.0",
@@ -38,17 +38,13 @@
     "files": [
       "electron/**/*",
       "frontend/dist/**/*",
+      "backend/dist/**/*",
+      "backend/package.json",
       "!frontend/node_modules/**/*",
+      "!backend/node_modules/**/*",
       "!**/*.map"
     ],
     "extraResources": [
-      {
-        "from": "dist-python",
-        "to": "python",
-        "filter": [
-          "**/*"
-        ]
-      },
       {
         "from": "assets",
         "to": "assets",
@@ -62,9 +58,7 @@
       }
     ],
     "asar": true,
-    "asarUnpack": [
-      "**/python/**/*"
-    ],
+    "asarUnpack": [],
     "win": {
       "target": [
         {

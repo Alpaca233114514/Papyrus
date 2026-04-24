@@ -9,16 +9,14 @@
   "files": [
     "electron/**/*",
     "frontend/dist/**/*",
+    "backend/dist/**/*",
+    "backend/package.json",
     "!frontend/node_modules/**/*",
+    "!backend/node_modules/**/*",
     "!**/*.map",
     "!**/.*"
   ],
   "extraResources": [
-    {
-      "from": "dist-python",
-      "to": "python",
-      "filter": ["**/*"]
-    },
     {
       "from": "assets",
       "to": "assets",
@@ -30,13 +28,7 @@
     }
   ],
   "asar": true,
-  "asarUnpack": [
-    "**/python/**/*",
-    "**/*.exe",
-    "**/*.dll",
-    "**/*.so",
-    "**/*.dylib"
-  ],
+  "asarUnpack": [],
   "electronVersion": "41.1.0",
   "electronDownload": {
     "mirror": "https://npmmirror.com/mirrors/electron/"

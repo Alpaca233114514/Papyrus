@@ -145,88 +145,40 @@ function buildFrontend() {
   success('Frontend built successfully');
 }
 
-// Check Python dependencies
-function checkPythonDependencies() {
-  const pythonCmd = commandExists('python') ? 'python' : (commandExists('python3') ? 'python3' : null);
-  if (!pythonCmd) {
-    return false;
-  }
-  
-  const requiredModules = ['fastapi', 'uvicorn', 'watchdog', 'requests', 'pydantic'];
-  const missing = [];
-  
-  for (const mod of requiredModules) {
-    try {
-      execSync(`${pythonCmd} -c "import ${mod}"`, { stdio: 'ignore' });
-    } catch {
-      missing.push(mod);
-    }
-  }
-  
-  if (missing.length > 0) {
-    log(`Missing Python modules: ${missing.join(', ')}`, 'yellow');
-    log('Installing requirements...', 'dim');
-    exec(`${pythonCmd} -m pip install -r requirements.txt`);
-  }
-  
-  return true;
-}
+// Build Node.js backend
+function buildBackend() {
+  logSection('Building Node.js Backend');
 
-// Build Python backend (optional)
-function buildPython() {
-  logSection('Building Python Backend');
-  
-  // Check if PyInstaller is available
-  const hasPyInstaller = commandExists('pyinstaller');
-  
-  if (!hasPyInstaller) {
-    log('PyInstaller not found. Skipping Python build.', 'yellow');
-    log('The app will use Python source directly in development.', 'dim');
-    return false;
+  const backendPath = path.join('backend');
+  if (!fs.existsSync(backendPath)) {
+    error('Backend directory not found. Please ensure backend/ exists.');
   }
-  
-  // Check if Python is available
-  const pythonCmd = commandExists('python') ? 'python' : (commandExists('python3') ? 'python3' : null);
-  if (!pythonCmd) {
-    log('Python not found. Skipping Python build.', 'yellow');
-    return false;
+
+  // Check if backend dependencies are installed
+  const backendNodeModules = path.join('backend', 'node_modules');
+  if (!fs.existsSync(backendNodeModules)) {
+    log('Backend dependencies not found. Installing...', 'yellow');
+    exec('cd backend && npm install');
   }
-  
-  // Check Python dependencies
-  checkPythonDependencies();
-  
+
   // Clean previous build
-  const distPythonPath = path.join('dist-python');
-  if (fs.existsSync(distPythonPath)) {
-    log('Cleaning previous Python build...', 'dim');
-    fs.rmSync(distPythonPath, { recursive: true, force: true });
+  const distBackendPath = path.join('backend', 'dist');
+  if (fs.existsSync(distBackendPath)) {
+    log('Cleaning previous backend build...', 'dim');
+    fs.rmSync(distBackendPath, { recursive: true, force: true });
   }
-  
-  const buildPath = path.join('build');
-  if (fs.existsSync(buildPath)) {
-    fs.rmSync(buildPath, { recursive: true, force: true });
+
+  // Build TypeScript
+  log('Compiling TypeScript backend...');
+  exec('cd backend && npm run build');
+
+  // Verify build output
+  const serverJsPath = path.join(distBackendPath, 'api', 'server.js');
+  if (!fs.existsSync(serverJsPath)) {
+    error(`Backend build failed: server.js not found in ${distBackendPath}`);
   }
-  
-  // Build with PyInstaller
-  log('Building Python executable with PyInstaller...');
-  exec(`${pythonCmd} -m PyInstaller PapyrusAPI.spec --clean --distpath dist-python`);
-  
-  // Verify build output (one-dir mode)
-  const executableName = process.platform === 'win32' ? 'Papyrus.exe' : 'Papyrus';
-  const executablePath = path.join(distPythonPath, 'Papyrus', executableName);
-  
-  if (!fs.existsSync(executablePath)) {
-    error(`Python build failed: ${executableName} not found in dist-python/Papyrus`);
-  }
-  
-  // Verify executable size (should be > 10MB)
-  const stats = fs.statSync(executablePath);
-  const sizeMB = stats.size / 1024 / 1024;
-  if (sizeMB < 10) {
-    error(`Python build seems incomplete: ${executableName} is only ${sizeMB.toFixed(2)} MB (expected > 10 MB)`);
-  }
-  
-  success(`Python backend built successfully (${sizeMB.toFixed(2)} MB)`);
+
+  success('Node.js backend built successfully');
   return true;
 }
 
@@ -293,13 +245,13 @@ function devMode() {
     shell: true
   });
   
-  // Start backend with proper PYTHONPATH
+  // Start Node.js backend
   log('Starting backend...');
-  const backendEnv = { ...process.env, PYTHONPATH: 'src' };
-  const backend = spawn('python', ['-m', 'uvicorn', 'src.papyrus_api.main:app', '--reload', '--port', '8000'], {
+  const backend = spawn('npm', ['run', 'dev'], {
+    cwd: path.join(process.cwd(), 'backend'),
     stdio: 'inherit',
     shell: true,
-    env: backendEnv
+    env: process.env
   });
   
   // Wait for both services to be ready
@@ -377,38 +329,38 @@ function main() {
     case 'build':
       checkPrerequisites();
       buildFrontend();
-      buildPython();
+      buildBackend();
       buildElectron();
       break;
-      
+
     case 'build:win':
     case 'build:windows':
       checkPrerequisites();
       buildFrontend();
-      buildPython();
+      buildBackend();
       buildElectron('win');
       break;
-      
+
     case 'build:mac':
     case 'build:macos':
     case 'build:darwin':
       checkPrerequisites();
       buildFrontend();
-      buildPython();
+      buildBackend();
       buildElectron('mac');
       break;
-      
+
     case 'build:linux':
       checkPrerequisites();
       buildFrontend();
-      buildPython();
+      buildBackend();
       buildElectron('linux');
       break;
-      
+
     case 'build:all':
       checkPrerequisites();
       buildFrontend();
-      buildPython();
+      buildBackend();
       buildElectron('all');
       break;
       
