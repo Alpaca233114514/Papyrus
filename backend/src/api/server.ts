@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { paths } from '../utils/paths.js';
 import { PapyrusLogger } from '../utils/logger.js';
+import { MCPServer } from '../mcp/server.js';
 
 const logger = new PapyrusLogger(paths.logDir, 'INFO');
 
@@ -54,6 +55,7 @@ export async function initApp(): Promise<void> {
   const { default: markdownRoutes } = await import('./routes/markdown.js');
   const { default: providersRoutes } = await import('./routes/providers.js');
   const { default: updateRoutes } = await import('./routes/update.js');
+  const { default: mcpRoutes } = await import('./routes/mcp.js');
 
   app.register(cardsRoutes, { prefix: '/api/cards' });
   app.register(reviewRoutes, { prefix: '/api/review' });
@@ -66,13 +68,19 @@ export async function initApp(): Promise<void> {
   app.register(markdownRoutes, { prefix: '/api/markdown' });
   app.register(providersRoutes, { prefix: '/api/providers' });
   app.register(updateRoutes, { prefix: '/api/update' });
+  app.register(mcpRoutes, { prefix: '/api/mcp' });
 }
+
+let mcpServer: MCPServer | null = null;
 
 export async function start(): Promise<void> {
   await initApp();
   try {
     await app.listen({ port: PORT, host: '127.0.0.1' });
     logger.info(`Papyrus backend started on http://127.0.0.1:${PORT}`);
+
+    mcpServer = new MCPServer({ logger });
+    await mcpServer.start();
   } catch (err) {
     logger.error(`Failed to start server: ${err}`);
     throw err;

@@ -83,4 +83,106 @@ describe('API Integration Tests', () => {
     expect(body.success).toBe(true);
     expect(body.html).toContain('<h1>');
   });
+
+  it('GET /api/config/ai should return masked config', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/config/ai',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.config.current_provider).toBeDefined();
+    expect(body.config.providers).toBeDefined();
+  });
+
+  it('POST /api/tools/config should update tool config', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/tools/config',
+      payload: { mode: 'auto', auto_execute_tools: [] },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.config.mode).toBe('auto');
+  });
+
+  it('POST /api/tools/submit should auto-execute readonly tools', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/tools/submit',
+      payload: { tool_name: 'get_card_stats', params: {} },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.result).toBeDefined();
+  });
+
+  it('POST /api/tools/parse should parse AI response', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/tools/parse',
+      payload: { response: 'Hello\n```json\n{"tool": "search_cards", "params": {"keyword": "test"}}\n```' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.data.tool_call).not.toBeNull();
+    expect(body.data.tool_call.tool).toBe('search_cards');
+  });
+
+  it('GET /api/sessions should list sessions', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/sessions',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.sessions)).toBe(true);
+  });
+
+  it('GET /api/mcp/health should return ok', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/mcp/health',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.status).toBe('ok');
+    expect(body.service).toBe('mcp');
+  });
+
+  it('GET /api/mcp/notes should list notes', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/mcp/notes',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.notes)).toBe(true);
+  });
+
+  it('POST /api/mcp/notes/search should search notes', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/mcp/notes/search',
+      payload: { query: 'Test', limit: 10 },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.notes)).toBe(true);
+  });
 });
