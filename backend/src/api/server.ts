@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import { paths } from '../utils/paths.js';
 import { PapyrusLogger } from '../utils/logger.js';
 import { MCPServer } from '../mcp/server.js';
+import { startFileWatching } from '../integrations/file-watcher.js';
 
 const logger = new PapyrusLogger(paths.logDir, 'INFO');
 
@@ -81,6 +82,10 @@ export async function start(): Promise<void> {
 
     mcpServer = new MCPServer({ logger });
     await mcpServer.start();
+
+    startFileWatching((eventType, filePath) => {
+      logger.info(`文件${eventType}: ${filePath}`);
+    });
   } catch (err) {
     logger.error(`Failed to start server: ${err}`);
     throw err;
