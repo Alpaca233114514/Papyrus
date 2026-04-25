@@ -1425,6 +1425,17 @@ describe('API Integration Tests', () => {
     expect(response.statusCode).toBe(400);
   });
 
+  it('POST /api/review/:cardId/rate should 404 for non-existent card with valid grade', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/review/non-existent/rate',
+      payload: { grade: 3 },
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
   it('POST /api/providers/:providerId/models should add a model', async () => {
     const providers = await app.inject({ method: 'GET', url: '/api/providers' });
     const providerId = JSON.parse(providers.body).providers[0].id;
@@ -1679,6 +1690,19 @@ describe('API Integration Tests', () => {
     expect(body.note.title).toBe('MCPCreate');
   });
 
+  it('POST /api/mcp/notes should create a note without content', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/mcp/notes',
+      payload: { title: 'NoContent' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.note.content).toBe('');
+  });
+
   it('PATCH /api/mcp/notes/:noteId should update a note', async () => {
     const create = await app.inject({
       method: 'POST',
@@ -1844,6 +1868,25 @@ describe('API Integration Tests', () => {
     const body = JSON.parse(response.body);
     expect(body.success).toBe(true);
     expect(Array.isArray(body.notes)).toBe(true);
+  });
+
+  it('POST /api/mcp/vault/read should filter null for broken wiki links', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { title: 'BrokenLink', content: 'link to [[non-existent-id]]' },
+    });
+    const noteId = JSON.parse(create.body).note.id;
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/mcp/vault/read',
+      payload: { ids: [noteId], format: 'detail', include_links: true },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.notes[0]?.linked_notes).toEqual([]);
   });
 
   it('POST /api/config/ai should update AI config', async () => {
@@ -2223,5 +2266,275 @@ describe('API Integration Tests', () => {
     const body = JSON.parse(response.body);
     expect(body.success).toBe(false);
     expect(body.message).toContain('auto crash');
+  });
+
+  it('GET /api/notes/:noteId/history should return versions', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { title: 'Versioned', content: 'v1' },
+    });
+    const noteId = JSON.parse(create.body).note.id;
+
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/notes/${noteId}`,
+      payload: { content: 'v2' },
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/notes/${noteId}/history`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.count).toBe(1);
+    expect(body.history[0].content).toBe('v1');
+  });
+
+  it('GET /api/notes/:noteId/history should 404 for non-existent note', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/notes/non-existent-id/history',
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('GET /api/notes/:noteId/history/:versionId should return a version', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { title: 'Versioned', content: 'v1' },
+    });
+    const noteId = JSON.parse(create.body).note.id;
+
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/notes/${noteId}`,
+      payload: { content: 'v2' },
+    });
+
+    const historyRes = await app.inject({
+      method: 'GET',
+      url: `/api/notes/${noteId}/history`,
+    });
+    const versionId = JSON.parse(historyRes.body).history[0].version_id;
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/notes/${noteId}/history/${versionId}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.version.content).toBe('v1');
+  });
+
+  it('GET /api/notes/:noteId/history/:versionId should 404 for non-existent version', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { title: 'Versioned', content: 'v1' },
+    });
+    const noteId = JSON.parse(create.body).note.id;
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/notes/${noteId}/history/non-existent-version`,
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('POST /api/notes/:noteId/rollback/:versionId should roll back note', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { title: 'Versioned', content: 'v1' },
+    });
+    const noteId = JSON.parse(create.body).note.id;
+
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/notes/${noteId}`,
+      payload: { content: 'v2' },
+    });
+
+    const historyRes = await app.inject({
+      method: 'GET',
+      url: `/api/notes/${noteId}/history`,
+    });
+    const versionId = JSON.parse(historyRes.body).history[0].version_id;
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/notes/${noteId}/rollback/${versionId}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.note.content).toBe('v1');
+  });
+
+  it('POST /api/notes/:noteId/rollback/:versionId should 404 for non-existent note', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/notes/non-existent-id/rollback/some-version',
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('GET /api/notes/:noteId/history/:versionId should 404 for non-existent note', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/notes/non-existent-id/history/some-version',
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('GET /api/cards/:cardId/history should return versions', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/cards',
+      payload: { q: 'Q1', a: 'A1' },
+    });
+    const cardId = JSON.parse(create.body).card.id;
+
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/cards/${cardId}`,
+      payload: { q: 'Q2' },
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/cards/${cardId}/history`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.count).toBe(1);
+    expect(body.history[0].q).toBe('Q1');
+  });
+
+  it('GET /api/cards/:cardId/history should 404 for non-existent card', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/cards/non-existent-id/history',
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('GET /api/cards/:cardId/history/:versionId should return a version', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/cards',
+      payload: { q: 'Q1', a: 'A1' },
+    });
+    const cardId = JSON.parse(create.body).card.id;
+
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/cards/${cardId}`,
+      payload: { q: 'Q2' },
+    });
+
+    const historyRes = await app.inject({
+      method: 'GET',
+      url: `/api/cards/${cardId}/history`,
+    });
+    const versionId = JSON.parse(historyRes.body).history[0].version_id;
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/cards/${cardId}/history/${versionId}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.version.q).toBe('Q1');
+  });
+
+  it('GET /api/cards/:cardId/history/:versionId should 404 for non-existent version', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/cards',
+      payload: { q: 'Q1', a: 'A1' },
+    });
+    const cardId = JSON.parse(create.body).card.id;
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/cards/${cardId}/history/non-existent-version`,
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('POST /api/cards/:cardId/rollback/:versionId should roll back card', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/cards',
+      payload: { q: 'Q1', a: 'A1' },
+    });
+    const cardId = JSON.parse(create.body).card.id;
+
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/cards/${cardId}`,
+      payload: { q: 'Q2' },
+    });
+
+    const historyRes = await app.inject({
+      method: 'GET',
+      url: `/api/cards/${cardId}/history`,
+    });
+    const versionId = JSON.parse(historyRes.body).history[0].version_id;
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/cards/${cardId}/rollback/${versionId}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.card.q).toBe('Q1');
+  });
+
+  it('POST /api/cards/:cardId/rollback/:versionId should 404 for non-existent card', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/cards/non-existent-id/rollback/some-version',
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('GET /api/cards/:cardId/history/:versionId should 404 for non-existent card', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/cards/non-existent-id/history/some-version',
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(JSON.parse(response.body).success).toBe(false);
   });
 });

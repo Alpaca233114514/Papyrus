@@ -32,6 +32,13 @@ app.setNotFoundHandler((_request, reply) => {
   reply.status(404).send({ success: false, error: 'Not found' });
 });
 
+// Security headers
+app.addHook('onSend', async (_request, reply) => {
+  reply.header('X-Content-Type-Options', 'nosniff');
+  reply.header('X-Frame-Options', 'DENY');
+  reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+});
+
 const PORT = process.env.PAPYRUS_PORT ? parseInt(process.env.PAPYRUS_PORT, 10) : 8000;
 
 export async function initApp(): Promise<void> {
@@ -105,6 +112,8 @@ export async function initApp(): Promise<void> {
   const { default: providersRoutes } = await import('./routes/providers.js');
   const { default: updateRoutes } = await import('./routes/update.js');
   const { default: mcpRoutes } = await import('./routes/mcp.js');
+  const { default: noteVersionRoutes } = await import('./routes/note-versions.js');
+  const { default: cardVersionRoutes } = await import('./routes/card-versions.js');
 
   app.register(cardsRoutes, { prefix: '/api/cards' });
   app.register(reviewRoutes, { prefix: '/api/review' });
@@ -118,6 +127,8 @@ export async function initApp(): Promise<void> {
   app.register(providersRoutes, { prefix: '/api/providers' });
   app.register(updateRoutes, { prefix: '/api/update' });
   app.register(mcpRoutes, { prefix: '/api/mcp' });
+  app.register(noteVersionRoutes, { prefix: '/api/notes/:noteId' });
+  app.register(cardVersionRoutes, { prefix: '/api/cards/:cardId' });
 }
 
 let mcpServer: MCPServer | null = null;

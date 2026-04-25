@@ -10,6 +10,7 @@ import {
   getCardsDueBefore,
   getCardCount,
 } from '../db/database.js';
+import { saveCardVersion } from './versioning.js';
 import { applySm2 } from './sm2.js';
 import type { CardRecord } from './types.js';
 import type { PapyrusLogger } from '../utils/logger.js';
@@ -50,6 +51,8 @@ export async function updateCard(
   return cardMutex.runExclusive(() => {
     const card = getCardById(cardId);
     if (!card) return null;
+
+    saveCardVersion(card, logger);
 
     if (updates.q !== undefined) card.q = updates.q;
     if (updates.a !== undefined) card.a = updates.a;

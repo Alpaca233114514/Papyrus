@@ -22,6 +22,8 @@ describe('Rate Limit', () => {
     const body = JSON.parse(res.body);
     expect(body.statusCode).toBe(429);
     expect(body.message).toBeTruthy();
+
+    await testApp.close();
   });
 
   it('should include rate limit headers', async () => {
@@ -37,5 +39,7 @@ describe('Rate Limit', () => {
     expect(res.headers['x-ratelimit-limit']).toBe('100');
     expect(res.headers['x-ratelimit-remaining']).toBeDefined();
     expect(res.headers['x-ratelimit-reset']).toBeDefined();
+
+    await testApp.close();
   });
 });

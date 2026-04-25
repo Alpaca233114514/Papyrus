@@ -1,21 +1,21 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import type { Note } from '../../src/core/types.js';
 
 describe('Notes', () => {
   const testDir = path.join(os.tmpdir(), `papyrus-notes-test-${Date.now()}`);
 
-  let computeWordCount: (content: string) => number;
-  let computeHash: (content: string) => string;
-  let createNote: (title: string, content: string, folder?: string, tags?: string[], logger?: unknown) => unknown;
-  let updateNote: (noteId: string, updates: unknown, logger?: unknown) => unknown | null;
-  let deleteNote: (noteId: string, logger?: unknown) => boolean;
-  let searchNotes: (query: string) => unknown[];
-  let getAllNotes: (logger?: unknown) => unknown[];
-  let getFolders: () => string[];
-  let getStats: () => { total: number };
-  let getNotesInFolder: (folder: string) => unknown[];
-  let importObsidianVault: (vaultPath: string, logger?: unknown) => { imported: number; errors: number };
+  let computeWordCount: typeof import('../../src/core/notes.js').computeWordCount;
+  let computeHash: typeof import('../../src/core/notes.js').computeHash;
+  let createNote: typeof import('../../src/core/notes.js').createNote;
+  let updateNote: typeof import('../../src/core/notes.js').updateNote;
+  let deleteNote: typeof import('../../src/core/notes.js').deleteNote;
+  let searchNotes: typeof import('../../src/core/notes.js').searchNotes;
+  let getAllNotes: typeof import('../../src/core/notes.js').getAllNotes;
+  let getFolders: typeof import('../../src/core/notes.js').getFolders;
+  let getStats: typeof import('../../src/core/notes.js').getStats;
+  let importObsidianVault: typeof import('../../src/core/notes.js').importObsidianVault;
 
   beforeAll(async () => {
     fs.mkdirSync(testDir, { recursive: true });
@@ -31,7 +31,6 @@ describe('Notes', () => {
     getAllNotes = notes.getAllNotes;
     getFolders = notes.getFolders;
     getStats = notes.getStats;
-    getNotesInFolder = notes.getNotesInFolder;
     importObsidianVault = notes.importObsidianVault;
   });
 
@@ -82,7 +81,7 @@ describe('Notes', () => {
 
   describe('createNote', () => {
     it('should create a note with default values', () => {
-      const note = createNote('Test Title', 'Test content') as Record<string, unknown>;
+      const note = createNote('Test Title', 'Test content');
 
       expect(note.title).toBe('Test Title');
       expect(note.content).toBe('Test content');
@@ -94,23 +93,23 @@ describe('Notes', () => {
     });
 
     it('should trim title and use custom folder', () => {
-      const note = createNote('  Title  ', 'content', 'Custom Folder') as Record<string, unknown>;
+      const note = createNote('  Title  ', 'content', 'Custom Folder');
       expect(note.title).toBe('Title');
       expect(note.folder).toBe('Custom Folder');
     });
 
     it('should fallback to default folder for empty string', () => {
-      const note = createNote('Title', 'content', '  ') as Record<string, unknown>;
+      const note = createNote('Title', 'content', '  ');
       expect(note.folder).toBe('默认');
     });
 
     it('should trim and filter empty tags', () => {
-      const note = createNote('Title', 'content', '默认', ['a', '  b  ', '', 'c']) as Record<string, unknown>;
+      const note = createNote('Title', 'content', '默认', ['a', '  b  ', '', 'c']);
       expect(note.tags).toEqual(['a', 'b', 'c']);
     });
 
     it('should extract headings from content', () => {
-      const note = createNote('Title', '# H1\n## H2\n### H3\n#### H4') as Record<string, unknown>;
+      const note = createNote('Title', '# H1\n## H2\n### H3\n#### H4');
       expect(note.headings).toEqual([
         { level: 1, text: 'H1' },
         { level: 2, text: 'H2' },
@@ -119,14 +118,14 @@ describe('Notes', () => {
     });
 
     it('should extract wiki links', () => {
-      const note = createNote('Title', 'See [[Note A]] and [[Note B]] and [[Note A]]') as Record<string, unknown>;
+      const note = createNote('Title', 'See [[Note A]] and [[Note B]] and [[Note A]]');
       expect(note.outgoing_links).toEqual(['Note A', 'Note B']);
     });
 
     it('should generate preview', () => {
-      const note = createNote('Title', 'This is a long content that should be previewed properly') as Record<string, unknown>;
+      const note = createNote('Title', 'This is a long content that should be previewed properly');
       expect(typeof note.preview).toBe('string');
-      expect((note.preview as string).length).toBeGreaterThan(0);
+      expect(note.preview.length).toBeGreaterThan(0);
     });
   });
 
@@ -137,14 +136,16 @@ describe('Notes', () => {
     });
 
     it('should update note title', () => {
-      const note = createNote('Old Title', 'content') as Record<string, unknown>;
-      const updated = updateNote(note.id as string, { title: 'New Title' }) as Record<string, unknown>;
+      const note = createNote('Old Title', 'content');
+      const updated = updateNote(note.id, { title: 'New Title' });
+      if (updated === null) throw new Error('expected updated note');
       expect(updated.title).toBe('New Title');
     });
 
     it('should update note content and derived fields', () => {
-      const note = createNote('Title', 'old') as Record<string, unknown>;
-      const updated = updateNote(note.id as string, { content: '# New\n[[Link]]' }) as Record<string, unknown>;
+      const note = createNote('Title', 'old');
+      const updated = updateNote(note.id, { content: '# New\n[[Link]]' });
+      if (updated === null) throw new Error('expected updated note');
 
       expect(updated.content).toBe('# New\n[[Link]]');
       expect(updated.headings).toEqual([{ level: 1, text: 'New' }]);
@@ -153,21 +154,23 @@ describe('Notes', () => {
     });
 
     it('should trim updated title', () => {
-      const note = createNote('Title', 'content') as Record<string, unknown>;
-      const updated = updateNote(note.id as string, { title: '  New  ' }) as Record<string, unknown>;
+      const note = createNote('Title', 'content');
+      const updated = updateNote(note.id, { title: '  New  ' });
+      if (updated === null) throw new Error('expected updated note');
       expect(updated.title).toBe('New');
     });
 
     it('should fallback to default folder for empty string', () => {
-      const note = createNote('Title', 'content', 'Custom') as Record<string, unknown>;
-      const updated = updateNote(note.id as string, { folder: '  ' }) as Record<string, unknown>;
+      const note = createNote('Title', 'content', 'Custom');
+      const updated = updateNote(note.id, { folder: '  ' });
+      if (updated === null) throw new Error('expected updated note');
       expect(updated.folder).toBe('默认');
     });
   });
 
   describe('searchNotes', () => {
     beforeEach(() => {
-      getAllNotes().forEach((n: Record<string, unknown>) => deleteNote(n.id as string));
+      getAllNotes().forEach((n) => deleteNote(n.id));
     });
 
     it('should find notes by title', () => {
@@ -176,7 +179,7 @@ describe('Notes', () => {
 
       const results = searchNotes('javascript');
       expect(results.length).toBe(1);
-      expect((results[0] as Record<string, unknown>).title).toBe('JavaScript Basics');
+      expect(results[0]?.title).toBe('JavaScript Basics');
     });
 
     it('should find notes by content', () => {
@@ -199,7 +202,7 @@ describe('Notes', () => {
 
   describe('getFolders', () => {
     beforeEach(() => {
-      getAllNotes().forEach((n: Record<string, unknown>) => deleteNote(n.id as string));
+      getAllNotes().forEach((n) => deleteNote(n.id));
     });
 
     it('should return unique folders', () => {
@@ -239,7 +242,7 @@ describe('Notes', () => {
       expect(result.errors).toBe(0);
 
       const notes = getAllNotes();
-      const titles = notes.map((n: Record<string, unknown>) => n.title);
+      const titles = notes.map((n) => n.title);
       expect(titles).toContain('note1');
       expect(titles).toContain('Custom Title');
     });
@@ -254,7 +257,8 @@ describe('Notes', () => {
       expect(result.imported).toBe(1);
 
       const notes = getAllNotes();
-      const note = notes.find((n: Record<string, unknown>) => n.title === 'deep') as Record<string, unknown>;
+      const note = notes.find((n) => n.title === 'deep');
+      if (note === undefined) throw new Error('expected note to be found');
       expect(note.folder).toBe('sub');
     });
   });

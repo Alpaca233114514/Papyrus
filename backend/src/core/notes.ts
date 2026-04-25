@@ -13,6 +13,7 @@ import {
   getNoteCount,
   getAllFolders,
 } from '../db/database.js';
+import { saveNoteVersion } from './versioning.js';
 
 import type { Note } from './types.js';
 import type { PapyrusLogger } from '../utils/logger.js';
@@ -107,6 +108,8 @@ export function updateNote(
   const note = getNoteById(noteId);
   if (!note) return null;
 
+  saveNoteVersion(note, logger);
+
   if (updates.title !== undefined) note.title = updates.title.trim();
   if (updates.content !== undefined) {
     note.content = updates.content;
@@ -161,8 +164,8 @@ export function importObsidianVault(vaultPath: string, logger?: PapyrusLogger): 
     return { imported: 0, errors: 0 };
   }
 
-  const resolvedVaultPath = path.resolve(vaultPath);
-  const homeDir = path.resolve(os.homedir());
+  const resolvedVaultPath = fs.realpathSync(path.resolve(vaultPath));
+  const homeDir = fs.realpathSync(path.resolve(os.homedir()));
   const isUnderHomeDir = resolvedVaultPath === homeDir || resolvedVaultPath.startsWith(homeDir + path.sep);
   if (!isUnderHomeDir) {
     logger?.error(`Obsidian 导入被拒绝: 路径必须在用户主目录内 (${vaultPath})`);

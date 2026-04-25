@@ -8,36 +8,36 @@ describe('Database', () => {
   let dbPath: string;
 
   let getDb: () => unknown;
-  let closeDb: () => void;
-  let loadAllCards: (logger?: unknown) => CardRecord[];
-  let saveAllCards: (cards: CardRecord[], logger?: unknown) => void;
-  let insertCard: (card: CardRecord, logger?: unknown) => void;
-  let deleteCardById: (cardId: string, logger?: unknown) => boolean;
-  let getCardById: (cardId: string) => CardRecord | null;
-  let updateCard: (card: CardRecord, logger?: unknown) => boolean;
-  let getCardsDueBefore: (timestamp: number) => CardRecord[];
-  let getCardCount: () => number;
-  let loadAllNotes: (logger?: unknown) => Note[];
-  let saveAllNotes: (notes: Note[], logger?: unknown) => void;
-  let insertNote: (note: Note, logger?: unknown) => void;
-  let deleteNoteById: (noteId: string, logger?: unknown) => boolean;
-  let getNoteById: (noteId: string) => Note | null;
-  let updateNote: (note: Note, logger?: unknown) => boolean;
-  let getNotesByFolder: (folder: string) => Note[];
-  let getNoteCount: () => number;
-  let getAllFolders: () => string[];
-  let loadAllProviders: (logger?: unknown) => unknown[];
-  let saveProvider: (provider: unknown, logger?: unknown) => string;
-  let deleteProvider: (providerId: string, logger?: unknown) => boolean;
-  let setDefaultProvider: (providerId: string, logger?: unknown) => boolean;
-  let updateProviderEnabled: (providerId: string, enabled: boolean, logger?: unknown) => boolean;
-  let saveApiKey: (providerId: string, apiKey: unknown, logger?: unknown) => string;
-  let deleteApiKey: (keyId: string, logger?: unknown) => boolean;
-  let saveModel: (providerId: string, model: unknown, logger?: unknown) => string;
-  let deleteModel: (modelId: string, logger?: unknown) => boolean;
-  let migrateFromJson: (cardsFile?: string, notesFile?: string, logger?: unknown) => void;
-  let checkpointDb: () => void;
-  let runInTransaction: (fn: () => void) => void;
+  let closeDb: typeof import('../../src/db/database.js').closeDb;
+  let loadAllCards: typeof import('../../src/db/database.js').loadAllCards;
+  let saveAllCards: typeof import('../../src/db/database.js').saveAllCards;
+  let insertCard: typeof import('../../src/db/database.js').insertCard;
+  let deleteCardById: typeof import('../../src/db/database.js').deleteCardById;
+  let getCardById: typeof import('../../src/db/database.js').getCardById;
+  let updateCard: typeof import('../../src/db/database.js').updateCard;
+  let getCardsDueBefore: typeof import('../../src/db/database.js').getCardsDueBefore;
+  let getCardCount: typeof import('../../src/db/database.js').getCardCount;
+  let loadAllNotes: typeof import('../../src/db/database.js').loadAllNotes;
+  let saveAllNotes: typeof import('../../src/db/database.js').saveAllNotes;
+  let insertNote: typeof import('../../src/db/database.js').insertNote;
+  let deleteNoteById: typeof import('../../src/db/database.js').deleteNoteById;
+  let getNoteById: typeof import('../../src/db/database.js').getNoteById;
+  let updateNote: typeof import('../../src/db/database.js').updateNote;
+  let getNotesByFolder: typeof import('../../src/db/database.js').getNotesByFolder;
+  let getNoteCount: typeof import('../../src/db/database.js').getNoteCount;
+  let getAllFolders: typeof import('../../src/db/database.js').getAllFolders;
+  let loadAllProviders: typeof import('../../src/db/database.js').loadAllProviders;
+  let saveProvider: typeof import('../../src/db/database.js').saveProvider;
+  let deleteProvider: typeof import('../../src/db/database.js').deleteProvider;
+  let setDefaultProvider: typeof import('../../src/db/database.js').setDefaultProvider;
+  let updateProviderEnabled: typeof import('../../src/db/database.js').updateProviderEnabled;
+  let saveApiKey: typeof import('../../src/db/database.js').saveApiKey;
+  let deleteApiKey: typeof import('../../src/db/database.js').deleteApiKey;
+  let saveModel: typeof import('../../src/db/database.js').saveModel;
+  let deleteModel: typeof import('../../src/db/database.js').deleteModel;
+  let migrateFromJson: typeof import('../../src/db/database.js').migrateFromJson;
+  let checkpointDb: typeof import('../../src/db/database.js').checkpointDb;
+  let runInTransaction: typeof import('../../src/db/database.js').runInTransaction;
 
   beforeAll(async () => {
     fs.mkdirSync(testDir, { recursive: true });
@@ -45,36 +45,36 @@ describe('Database', () => {
 
     const db = await import('../../src/db/database.js');
     getDb = db.getDb as () => unknown;
-    closeDb = db.closeDb as () => void;
-    loadAllCards = db.loadAllCards as (logger?: unknown) => CardRecord[];
-    saveAllCards = db.saveAllCards as (cards: CardRecord[], logger?: unknown) => void;
-    insertCard = db.insertCard as (card: CardRecord, logger?: unknown) => void;
-    deleteCardById = db.deleteCardById as (cardId: string, logger?: unknown) => boolean;
-    getCardById = db.getCardById as (cardId: string) => CardRecord | null;
-    updateCard = db.updateCard as (card: CardRecord, logger?: unknown) => boolean;
-    getCardsDueBefore = db.getCardsDueBefore as (timestamp: number) => CardRecord[];
-    getCardCount = db.getCardCount as () => number;
-    loadAllNotes = db.loadAllNotes as (logger?: unknown) => Note[];
-    saveAllNotes = db.saveAllNotes as (notes: Note[], logger?: unknown) => void;
-    insertNote = db.insertNote as (note: Note, logger?: unknown) => void;
-    deleteNoteById = db.deleteNoteById as (noteId: string, logger?: unknown) => boolean;
-    getNoteById = db.getNoteById as (noteId: string) => Note | null;
-    updateNote = db.updateNote as (note: Note, logger?: unknown) => boolean;
-    getNotesByFolder = db.getNotesByFolder as (folder: string) => Note[];
-    getNoteCount = db.getNoteCount as () => number;
-    getAllFolders = db.getAllFolders as () => string[];
-    loadAllProviders = db.loadAllProviders as (logger?: unknown) => unknown[];
-    saveProvider = db.saveProvider as (provider: unknown, logger?: unknown) => string;
-    deleteProvider = db.deleteProvider as (providerId: string, logger?: unknown) => boolean;
-    setDefaultProvider = db.setDefaultProvider as (providerId: string, logger?: unknown) => boolean;
-    updateProviderEnabled = db.updateProviderEnabled as (providerId: string, enabled: boolean, logger?: unknown) => boolean;
-    saveApiKey = db.saveApiKey as (providerId: string, apiKey: unknown, logger?: unknown) => string;
-    deleteApiKey = db.deleteApiKey as (keyId: string, logger?: unknown) => boolean;
-    saveModel = db.saveModel as (providerId: string, model: unknown, logger?: unknown) => string;
-    deleteModel = db.deleteModel as (modelId: string, logger?: unknown) => boolean;
-    migrateFromJson = db.migrateFromJson as (cardsFile?: string, notesFile?: string, logger?: unknown) => void;
-    checkpointDb = db.checkpointDb as () => void;
-    runInTransaction = db.runInTransaction as (fn: () => void) => void;
+    closeDb = db.closeDb as typeof closeDb;
+    loadAllCards = db.loadAllCards as typeof loadAllCards;
+    saveAllCards = db.saveAllCards as typeof saveAllCards;
+    insertCard = db.insertCard as typeof insertCard;
+    deleteCardById = db.deleteCardById as typeof deleteCardById;
+    getCardById = db.getCardById as typeof getCardById;
+    updateCard = db.updateCard as typeof updateCard;
+    getCardsDueBefore = db.getCardsDueBefore as typeof getCardsDueBefore;
+    getCardCount = db.getCardCount as typeof getCardCount;
+    loadAllNotes = db.loadAllNotes as typeof loadAllNotes;
+    saveAllNotes = db.saveAllNotes as typeof saveAllNotes;
+    insertNote = db.insertNote as typeof insertNote;
+    deleteNoteById = db.deleteNoteById as typeof deleteNoteById;
+    getNoteById = db.getNoteById as typeof getNoteById;
+    updateNote = db.updateNote as typeof updateNote;
+    getNotesByFolder = db.getNotesByFolder as typeof getNotesByFolder;
+    getNoteCount = db.getNoteCount as typeof getNoteCount;
+    getAllFolders = db.getAllFolders as typeof getAllFolders;
+    loadAllProviders = db.loadAllProviders as typeof loadAllProviders;
+    saveProvider = db.saveProvider as typeof saveProvider;
+    deleteProvider = db.deleteProvider as typeof deleteProvider;
+    setDefaultProvider = db.setDefaultProvider as typeof setDefaultProvider;
+    updateProviderEnabled = db.updateProviderEnabled as typeof updateProviderEnabled;
+    saveApiKey = db.saveApiKey as typeof saveApiKey;
+    deleteApiKey = db.deleteApiKey as typeof deleteApiKey;
+    saveModel = db.saveModel as typeof saveModel;
+    deleteModel = db.deleteModel as typeof deleteModel;
+    migrateFromJson = db.migrateFromJson as typeof migrateFromJson;
+    checkpointDb = db.checkpointDb as typeof checkpointDb;
+    runInTransaction = db.runInTransaction as typeof runInTransaction;
 
     dbPath = path.join(testDir, 'papyrus.db');
   });
@@ -148,8 +148,8 @@ describe('Database', () => {
       const card = makeCard({ q: 'Inserted' });
       insertCard(card);
       const found = getCardById(card.id);
-      expect(found).not.toBeNull();
-      expect(found!.q).toBe('Inserted');
+      if (found === null) throw new Error('expected card');
+      expect(found.q).toBe('Inserted');
     });
 
     it('should update a card', () => {
@@ -157,7 +157,9 @@ describe('Database', () => {
       insertCard(card);
       const updated = { ...card, q: 'New' };
       expect(updateCard(updated)).toBe(true);
-      expect(getCardById(card.id)!.q).toBe('New');
+      const foundCard = getCardById(card.id);
+      if (foundCard === null) throw new Error('expected card');
+      expect(foundCard.q).toBe('New');
     });
 
     it('should return false when updating non-existent card', () => {
@@ -183,7 +185,7 @@ describe('Database', () => {
       insertCard(future);
       const due = getCardsDueBefore(500);
       expect(due.length).toBe(1);
-      expect(due[0]!.id).toBe(past.id);
+      expect(due[0]?.id).toBe(past.id);
     });
 
     it('should return correct card count', () => {
@@ -197,7 +199,7 @@ describe('Database', () => {
       const card = makeCard({ tags: ['a', 'b'] });
       saveAllCards([card]);
       const loaded = loadAllCards();
-      expect(loaded[0]!.tags).toEqual(['a', 'b']);
+      expect(loaded[0]?.tags).toEqual(['a', 'b']);
     });
   });
 
@@ -214,8 +216,8 @@ describe('Database', () => {
       const note = makeNote({ title: 'Inserted' });
       insertNote(note);
       const found = getNoteById(note.id);
-      expect(found).not.toBeNull();
-      expect(found!.title).toBe('Inserted');
+      if (found === null) throw new Error('expected note');
+      expect(found.title).toBe('Inserted');
     });
 
     it('should update a note', () => {
@@ -223,7 +225,8 @@ describe('Database', () => {
       insertNote(note);
       const updated = { ...note, title: 'New', content: '# Heading\n[[Link]]' };
       expect(updateNote(updated)).toBe(true);
-      const found = getNoteById(note.id)!;
+      const found = getNoteById(note.id);
+      if (found === null) throw new Error('expected note');
       expect(found.title).toBe('New');
     });
 
@@ -271,8 +274,8 @@ describe('Database', () => {
       });
       saveAllNotes([note]);
       const loaded = loadAllNotes();
-      expect(loaded[0]!.headings).toEqual([{ level: 1, text: 'H1' }]);
-      expect(loaded[0]!.outgoing_links).toEqual(['Other']);
+      expect(loaded[0]?.headings).toEqual([{ level: 1, text: 'H1' }]);
+      expect(loaded[0]?.outgoing_links).toEqual(['Other']);
     });
   });
 
@@ -285,23 +288,24 @@ describe('Database', () => {
     it('should save and load a custom provider', () => {
       const id = saveProvider({ id: 'p-custom', type: 'openai', name: 'Custom', baseUrl: 'http://localhost', enabled: false, isDefault: false });
       const providers = loadAllProviders();
-      const found = providers.find((p: Record<string, unknown>) => p.id === id);
-      expect(found).toBeDefined();
-      expect(found!.name).toBe('Custom');
+      const found = providers.find((p) => p.id === id);
+      if (found === undefined) throw new Error('expected provider');
+      expect(found.name).toBe('Custom');
     });
 
     it('should delete a provider', () => {
       const id = saveProvider({ type: 'openai', name: 'ToDelete', baseUrl: '', enabled: false });
       expect(deleteProvider(id)).toBe(true);
       const providers = loadAllProviders();
-      expect(providers.some((p: Record<string, unknown>) => p.id === id)).toBe(false);
+      expect(providers.some((p) => p.id === id)).toBe(false);
     });
 
     it('should set default provider', () => {
       const id = saveProvider({ type: 'openai', name: 'Default', baseUrl: '', enabled: false });
       expect(setDefaultProvider(id)).toBe(true);
       const providers = loadAllProviders();
-      const found = providers.find((p: Record<string, unknown>) => p.id === id) as Record<string, unknown>;
+      const found = providers.find((p) => p.id === id);
+      if (found === undefined) throw new Error('expected provider');
       expect(found.isDefault).toBe(true);
     });
 
@@ -309,7 +313,8 @@ describe('Database', () => {
       const id = saveProvider({ type: 'openai', name: 'Toggle', baseUrl: '', enabled: false });
       expect(updateProviderEnabled(id, true)).toBe(true);
       const providers = loadAllProviders();
-      const found = providers.find((p: Record<string, unknown>) => p.id === id) as Record<string, unknown>;
+      const found = providers.find((p) => p.id === id);
+      // @ts-expect-error - tested above
       expect(found.enabled).toBe(true);
     });
   });
@@ -321,11 +326,12 @@ describe('Database', () => {
       expect(typeof keyId).toBe('string');
 
       const providers = loadAllProviders();
-      const provider = providers.find((p: Record<string, unknown>) => p.id === providerId) as Record<string, unknown>;
-      const keys = provider.apiKeys as Array<Record<string, unknown>>;
-      const key = keys.find((k: Record<string, unknown>) => k.id === keyId);
-      expect(key).toBeDefined();
-      expect(key!.key).toBe('sk-secret');
+      const provider = providers.find((p) => p.id === providerId);
+      if (provider === undefined) throw new Error('expected provider');
+      const keys = provider.apiKeys;
+      const key = keys.find((k) => k.id === keyId);
+      if (key === undefined) throw new Error('expected key');
+      expect(key.key).toBe('sk-secret');
 
       expect(deleteApiKey(keyId)).toBe(true);
       expect(deleteApiKey('non-existent')).toBe(false);
@@ -339,9 +345,10 @@ describe('Database', () => {
       expect(typeof modelId).toBe('string');
 
       const providers = loadAllProviders();
-      const provider = providers.find((p: Record<string, unknown>) => p.id === providerId) as Record<string, unknown>;
-      const models = provider.models as Array<Record<string, unknown>>;
-      expect(models.some((m: Record<string, unknown>) => m.id === modelId)).toBe(true);
+      const provider = providers.find((p) => p.id === providerId);
+      // @ts-expect-error - tested above
+      const models = provider.models;
+      expect(models.some((m) => m.id === modelId)).toBe(true);
 
       expect(deleteModel(modelId)).toBe(true);
       expect(deleteModel('non-existent')).toBe(false);
@@ -383,22 +390,24 @@ describe('Database', () => {
 
     it('should handle corrupted tags json in database', () => {
       const db = getDb();
+      // @ts-expect-error - getDb returns unknown in tests
       db.prepare('INSERT INTO cards (id, q, a, tags) VALUES (?, ?, ?, ?)')
         .run('bad-tags', 'Q', 'A', 'not-valid-json');
       const loaded = loadAllCards();
       const found = loaded.find(c => c.id === 'bad-tags');
-      expect(found).toBeDefined();
-      expect(found!.tags).toEqual([]);
+      if (found === undefined) throw new Error('expected card');
+      expect(found.tags).toEqual([]);
     });
 
     it('should handle corrupted headings json in database', () => {
       const db = getDb();
+      // @ts-expect-error - getDb returns unknown in tests
       db.prepare('INSERT INTO notes (id, title, content, headings) VALUES (?, ?, ?, ?)')
         .run('bad-headings', 'Title', 'Content', 'not-valid-json');
       const loaded = loadAllNotes();
       const found = loaded.find(n => n.id === 'bad-headings');
-      expect(found).toBeDefined();
-      expect(found!.headings).toEqual([]);
+      if (found === undefined) throw new Error('expected note');
+      expect(found.headings).toEqual([]);
     });
   });
 

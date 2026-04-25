@@ -94,12 +94,42 @@ function initSchema(database: DatabaseSync): void {
       FOREIGN KEY (api_key_id) REFERENCES api_keys(id) ON DELETE SET NULL
     );
 
+    CREATE TABLE IF NOT EXISTS note_versions (
+      id TEXT PRIMARY KEY,
+      note_id TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      title TEXT NOT NULL DEFAULT '',
+      folder TEXT NOT NULL DEFAULT '',
+      content TEXT NOT NULL DEFAULT '',
+      preview TEXT NOT NULL DEFAULT '',
+      tags TEXT DEFAULT '[]',
+      word_count INTEGER DEFAULT 0,
+      hash TEXT DEFAULT '',
+      headings TEXT DEFAULT '[]',
+      outgoing_links TEXT DEFAULT '[]',
+      incoming_count INTEGER DEFAULT 0,
+      created_at REAL DEFAULT 0.0
+    );
+
+    CREATE TABLE IF NOT EXISTS card_versions (
+      id TEXT PRIMARY KEY,
+      card_id TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      q TEXT NOT NULL,
+      a TEXT NOT NULL,
+      tags TEXT DEFAULT '[]',
+      content_hash TEXT DEFAULT '',
+      created_at REAL DEFAULT 0.0
+    );
+
     CREATE INDEX IF NOT EXISTS idx_cards_next_review ON cards(next_review);
     CREATE INDEX IF NOT EXISTS idx_notes_folder ON notes(folder);
     CREATE INDEX IF NOT EXISTS idx_notes_updated ON notes(updated_at DESC);
     CREATE INDEX IF NOT EXISTS idx_notes_hash ON notes(hash);
     CREATE INDEX IF NOT EXISTS idx_api_keys_provider ON api_keys(provider_id);
     CREATE INDEX IF NOT EXISTS idx_models_provider ON provider_models(provider_id);
+    CREATE INDEX IF NOT EXISTS idx_note_versions_note ON note_versions(note_id, version DESC);
+    CREATE INDEX IF NOT EXISTS idx_card_versions_card ON card_versions(card_id, version DESC);
   `);
 
   if (isNewDb) {
@@ -665,6 +695,214 @@ export function deleteModel(modelId: string, logger?: PapyrusLogger): boolean {
   const result = stmt.run(modelId);
   logger?.info(`Model deleted: ${modelId}`);
   return result.changes > 0;
+}
+
+// ==================== Note Versions ====================
+
+export function saveNoteVersion(note: Note, logger?: PapyrusLogger): string {
+  const database = getDb();
+  const versionStmt = database.prepare(
+    'SELECT COALESCE(MAX(version), 0) as max_version FROM note_versions WHERE note_id = ?'
+  );
+  const versionRow = versionStmt.get(note.id) as { max_version: number } | undefined;
+  const version = (versionRow?.max_version ?? 0) + 1;
+  const versionId = `${note.id}_v${version}`;
+  const now = Date.now() / 1000;
+
+  const stmt = database.prepare(
+    `INSERT INTO note_versions (id, note_id, version, title, folder, content, preview, tags, word_count, hash, headings, outgoing_links, incoming_count, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  stmt.run(
+    versionId, note.id, version, note.title, note.folder, note.content, note.preview,
+    tagsToJson(note.tags), note.word_count, note.hash, JSON.stringify(note.headings),
+    JSON.stringify(note.outgoing_links), note.incoming_count, now
+  );
+  logger?.info(`保存笔记版本: ${note.id} v${version}`);
+  return versionId;
+}
+
+export function getNoteVersions(noteId: string): Array<Note & { version: number; version_id: string; version_created_at: number }> {
+  const database = getDb();
+  const stmt = database.prepare(
+    'SELECT * FROM note_versions WHERE note_id = ? ORDER BY version DESC'
+  );
+  const rows = stmt.all(noteId) as Array<{
+    id: string;
+    note_id: string;
+    version: number;
+    title: string;
+    folder: string;
+    content: string;
+    preview: string;
+    tags: string;
+    word_count: number;
+    hash: string;
+    headings: string;
+    outgoing_links: string;
+    incoming_count: number;
+    created_at: number;
+  }>;
+
+  return rows.map(row => ({
+    id: row.note_id,
+    title: row.title,
+    folder: row.folder,
+    content: row.content,
+    preview: row.preview,
+    tags: tagsFromJson(row.tags),
+    created_at: 0,
+    updated_at: 0,
+    word_count: row.word_count,
+    hash: row.hash,
+    headings: jsonFromStr(row.headings) as Array<{ level: number; text: string }>,
+    outgoing_links: jsonFromStr(row.outgoing_links) as string[],
+    incoming_count: row.incoming_count,
+    version: row.version,
+    version_id: row.id,
+    version_created_at: row.created_at,
+  }));
+}
+
+export function getNoteVersionById(versionId: string): (Note & { version: number; version_id: string; version_created_at: number }) | null {
+  const database = getDb();
+  const stmt = database.prepare('SELECT * FROM note_versions WHERE id = ?');
+  const row = stmt.get(versionId) as {
+    id: string;
+    note_id: string;
+    version: number;
+    title: string;
+    folder: string;
+    content: string;
+    preview: string;
+    tags: string;
+    word_count: number;
+    hash: string;
+    headings: string;
+    outgoing_links: string;
+    incoming_count: number;
+    created_at: number;
+  } | undefined;
+
+  if (!row) return null;
+  return {
+    id: row.note_id,
+    title: row.title,
+    folder: row.folder,
+    content: row.content,
+    preview: row.preview,
+    tags: tagsFromJson(row.tags),
+    created_at: 0,
+    updated_at: 0,
+    word_count: row.word_count,
+    hash: row.hash,
+    headings: jsonFromStr(row.headings) as Array<{ level: number; text: string }>,
+    outgoing_links: jsonFromStr(row.outgoing_links) as string[],
+    incoming_count: row.incoming_count,
+    version: row.version,
+    version_id: row.id,
+    version_created_at: row.created_at,
+  };
+}
+
+export function getLatestNoteVersionHash(noteId: string): string | null {
+  const database = getDb();
+  const stmt = database.prepare(
+    'SELECT hash FROM note_versions WHERE note_id = ? ORDER BY version DESC LIMIT 1'
+  );
+  const row = stmt.get(noteId) as { hash: string } | undefined;
+  return row?.hash ?? null;
+}
+
+// ==================== Card Versions ====================
+
+export function saveCardVersion(card: CardRecord, contentHash: string, logger?: PapyrusLogger): string {
+  const database = getDb();
+  const versionStmt = database.prepare(
+    'SELECT COALESCE(MAX(version), 0) as max_version FROM card_versions WHERE card_id = ?'
+  );
+  const versionRow = versionStmt.get(card.id) as { max_version: number } | undefined;
+  const version = (versionRow?.max_version ?? 0) + 1;
+  const versionId = `${card.id}_v${version}`;
+  const now = Date.now() / 1000;
+
+  const stmt = database.prepare(
+    `INSERT INTO card_versions (id, card_id, version, q, a, tags, content_hash, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  stmt.run(versionId, card.id, version, card.q, card.a, tagsToJson(card.tags), contentHash, now);
+  logger?.info(`保存卡片版本: ${card.id} v${version}`);
+  return versionId;
+}
+
+export function getCardVersions(cardId: string): Array<CardRecord & { version: number; version_id: string; version_created_at: number }> {
+  const database = getDb();
+  const stmt = database.prepare(
+    'SELECT * FROM card_versions WHERE card_id = ? ORDER BY version DESC'
+  );
+  const rows = stmt.all(cardId) as Array<{
+    id: string;
+    card_id: string;
+    version: number;
+    q: string;
+    a: string;
+    tags: string;
+    content_hash: string;
+    created_at: number;
+  }>;
+
+  return rows.map(row => ({
+    id: row.card_id,
+    q: row.q,
+    a: row.a,
+    next_review: 0,
+    interval: 0,
+    ef: 2.5,
+    repetitions: 0,
+    tags: tagsFromJson(row.tags),
+    version: row.version,
+    version_id: row.id,
+    version_created_at: row.created_at,
+  }));
+}
+
+export function getCardVersionById(versionId: string): (CardRecord & { version: number; version_id: string; version_created_at: number }) | null {
+  const database = getDb();
+  const stmt = database.prepare('SELECT * FROM card_versions WHERE id = ?');
+  const row = stmt.get(versionId) as {
+    id: string;
+    card_id: string;
+    version: number;
+    q: string;
+    a: string;
+    tags: string;
+    content_hash: string;
+    created_at: number;
+  } | undefined;
+
+  if (!row) return null;
+  return {
+    id: row.card_id,
+    q: row.q,
+    a: row.a,
+    next_review: 0,
+    interval: 0,
+    ef: 2.5,
+    repetitions: 0,
+    tags: tagsFromJson(row.tags),
+    version: row.version,
+    version_id: row.id,
+    version_created_at: row.created_at,
+  };
+}
+
+export function getLatestCardVersionHash(cardId: string): string | null {
+  const database = getDb();
+  const stmt = database.prepare(
+    'SELECT content_hash FROM card_versions WHERE card_id = ? ORDER BY version DESC LIMIT 1'
+  );
+  const row = stmt.get(cardId) as { content_hash: string } | undefined;
+  return row?.content_hash ?? null;
 }
 
 // ==================== Migration ====================

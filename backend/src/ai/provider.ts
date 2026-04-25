@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Mutex } from 'async-mutex';
 import OpenAI from 'openai';
 import type { AIConfig } from './config.js';
+import { isPrivateUrl } from './config.js';
 
 export type StreamEventType = 'content' | 'reasoning' | 'tool_start' | 'tool_result' | 'done' | 'error';
 
@@ -459,6 +460,10 @@ export class AIManager {
   ): AsyncGenerator<StreamChunk> {
     const baseUrl = providerConfig.base_url.replace(/\/$/, '');
     const apiKey = providerConfig.api_key;
+
+    if (isPrivateUrl(baseUrl)) {
+      throw new Error('SSRF: 禁止通过非本地 provider 访问私有地址');
+    }
 
     const client = new OpenAI({ apiKey, baseURL: baseUrl });
 

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { paths } from './paths.js';
 
 const TOKEN_FILE = path.join(paths.dataDir, '.api_token');
@@ -60,5 +60,10 @@ export function validateRequestToken(headerToken?: string): boolean {
   if (!expected) {
     return true;
   }
-  return !!headerToken && headerToken === expected;
+  if (!headerToken || headerToken.length !== expected.length) {
+    return false;
+  }
+  const bufA = Buffer.from(headerToken, 'utf8');
+  const bufB = Buffer.from(expected, 'utf8');
+  return timingSafeEqual(bufA, bufB);
 }

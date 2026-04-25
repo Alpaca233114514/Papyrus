@@ -264,6 +264,12 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
         }
       } else {
         const baseUrl = providerConfig.base_url || 'https://api.openai.com/v1';
+        if (isPrivateUrl(baseUrl)) {
+          reply.raw.write(`data: {"error":"SSRF: 禁止通过非本地 provider 访问私有地址"}\n\n`);
+          reply.raw.write(`data: {"done":true}\n\n`);
+          reply.raw.end();
+          return;
+        }
         const apiKey = providerConfig.api_key;
         const model = aiConfig.config.current_model || 'gpt-3.5-turbo';
 

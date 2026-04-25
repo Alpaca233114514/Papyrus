@@ -2,11 +2,26 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
+interface AIResponseParserClass {
+  parseReasoning(text: string): { cleaned: string; reasoning: string | null };
+  parseToolCall(text: string): { tool: string; params: Record<string, unknown> } | null;
+  parseResponse(text: string, reasoningContent?: string | null): { content: string; reasoning: string | null; tool_call: { tool: string; params: Record<string, unknown> } | null };
+  removeToolCallMarkers(text: string): string;
+}
+
+interface CardToolsInstance {
+  createCard(q: string, a: string, tags?: string[]): { success: boolean; card?: { q: string } };
+  searchCards(keyword: string): { success: boolean; results?: Array<{ question: string }> };
+  getCardStats(): { success: boolean; stats?: { total_cards: number } };
+  executeTool(tool: string, params: Record<string, unknown>): { success: boolean; error?: string; new?: { q: string } };
+  updateCard(index: number, q?: string, a?: string): { success: boolean; new?: { q: string } };
+  deleteCard(index: number): { success: boolean };
+  parseToolCall(text: string): { tool: string } | null;
+}
+
 const testDir = path.join(os.tmpdir(), `papyrus-ai-tools-test-${Date.now()}`);
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let CardToolsCtor: any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let AIResponseParserCtor: any;
+let CardToolsCtor: new () => CardToolsInstance;
+let AIResponseParserCtor: AIResponseParserClass;
 let closeDb: () => void;
 
 describe('AIResponseParser', () => {
@@ -53,8 +68,7 @@ describe('AIResponseParser', () => {
 });
 
 describe('CardTools', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let tools: any;
+  let tools: CardToolsInstance;
 
   beforeEach(() => {
     closeDb();

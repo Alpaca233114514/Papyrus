@@ -6,14 +6,14 @@ import { jest } from '@jest/globals';
 describe('Cards', () => {
   const testDir = path.join(os.tmpdir(), `papyrus-cards-test-${Date.now()}`);
 
-  let createCard: (q: string, a: string, tags?: string[], logger?: unknown) => Record<string, unknown>;
-  let updateCard: (cardId: string, updates: unknown, logger?: unknown) => Promise<Record<string, unknown> | null>;
-  let deleteCard: (cardId: string, logger?: unknown) => boolean;
-  let getAllCards: (logger?: unknown) => Record<string, unknown>[];
-  let getNextDueCard: (logger?: unknown) => Record<string, unknown> | null;
-  let rateCard: (cardId: string, grade: number, logger?: unknown) => Promise<{ card: Record<string, unknown>; intervalDays: number; ef: number } | null>;
-  let importCardsFromTxt: (content: string, logger?: unknown) => Record<string, unknown>[];
-  let getCardStats: () => { total: number; due: number };
+  let createCard: typeof import('../../src/core/cards.js').createCard;
+  let updateCard: typeof import('../../src/core/cards.js').updateCard;
+  let deleteCard: typeof import('../../src/core/cards.js').deleteCard;
+  let getAllCards: typeof import('../../src/core/cards.js').getAllCards;
+  let getNextDueCard: typeof import('../../src/core/cards.js').getNextDueCard;
+  let rateCard: typeof import('../../src/core/cards.js').rateCard;
+  let importCardsFromTxt: typeof import('../../src/core/cards.js').importCardsFromTxt;
+  let getCardStats: typeof import('../../src/core/cards.js').getCardStats;
 
   beforeAll(async () => {
     fs.mkdirSync(testDir, { recursive: true });
@@ -38,7 +38,7 @@ describe('Cards', () => {
   });
 
   beforeEach(() => {
-    getAllCards().forEach((c: Record<string, unknown>) => deleteCard(c.id as string));
+    getAllCards().forEach((c) => deleteCard(c.id));
   });
 
   describe('createCard', () => {
@@ -61,7 +61,8 @@ describe('Cards', () => {
 
     it('should log when logger is provided', () => {
       const logger = { info: jest.fn(), error: jest.fn(), logEvent: jest.fn() };
-      createCard('Q', 'A', [], logger as unknown as Parameters<typeof createCard>[3]);
+      // @ts-expect-error - mock logger for test coverage
+      createCard('Q', 'A', [], logger);
       expect(logger.info).toHaveBeenCalled();
     });
   });
@@ -69,12 +70,12 @@ describe('Cards', () => {
   describe('updateCard', () => {
     it('should update card fields', async () => {
       const card = createCard('Old Q', 'Old A');
-      const updated = await updateCard(card.id as string, { q: 'New Q', a: 'New A', tags: ['updated'] });
+      const updated = await updateCard(card.id, { q: 'New Q', a: 'New A', tags: ['updated'] });
 
-      expect(updated).not.toBeNull();
-      expect(updated!.q).toBe('New Q');
-      expect(updated!.a).toBe('New A');
-      expect(updated!.tags).toEqual(['updated']);
+      if (updated === null) throw new Error('expected updated card');
+      expect(updated.q).toBe('New Q');
+      expect(updated.a).toBe('New A');
+      expect(updated.tags).toEqual(['updated']);
     });
 
     it('should return null for non-existent card', async () => {
@@ -84,19 +85,20 @@ describe('Cards', () => {
 
     it('should handle partial updates', async () => {
       const card = createCard('Q', 'A', ['tag']);
-      const updated = await updateCard(card.id as string, { q: 'New Q' });
+      const updated = await updateCard(card.id, { q: 'New Q' });
+      if (updated === null) throw new Error('expected updated card');
 
-      expect(updated!.q).toBe('New Q');
-      expect(updated!.a).toBe('A');
-      expect(updated!.tags).toEqual(['tag']);
+      expect(updated.q).toBe('New Q');
+      expect(updated.a).toBe('A');
+      expect(updated.tags).toEqual(['tag']);
     });
   });
 
   describe('deleteCard', () => {
     it('should delete an existing card', () => {
       const card = createCard('Q', 'A');
-      expect(deleteCard(card.id as string)).toBe(true);
-      expect(getAllCards().find((c: Record<string, unknown>) => c.id === card.id)).toBeUndefined();
+      expect(deleteCard(card.id)).toBe(true);
+      expect(getAllCards().find((c) => c.id === card.id)).toBeUndefined();
     });
 
     it('should return false for non-existent card', () => {
@@ -112,13 +114,13 @@ describe('Cards', () => {
     it('should return a due card', () => {
       createCard('Q', 'A');
       const due = getNextDueCard();
-      expect(due).not.toBeNull();
-      expect(due!.q).toBe('Q');
+      if (due === null) throw new Error('expected due card');
+      expect(due.q).toBe('Q');
     });
 
     it('should not return future cards', async () => {
       const card = createCard('Q', 'A');
-      await rateCard(card.id as string, 3);
+      await rateCard(card.id, 3);
 
       const due = getNextDueCard();
       expect(due).toBeNull();
@@ -128,21 +130,21 @@ describe('Cards', () => {
   describe('rateCard', () => {
     it('should update card with grade 3 (good)', async () => {
       const card = createCard('Q', 'A');
-      const result = await rateCard(card.id as string, 3);
+      const result = await rateCard(card.id, 3);
 
-      expect(result).not.toBeNull();
-      expect(result!.intervalDays).toBe(1.0);
-      expect(result!.card.repetitions).toBe(1);
+      if (result === null) throw new Error('expected rating result');
+      expect(result.intervalDays).toBe(1.0);
+      expect(result.card.repetitions).toBe(1);
     });
 
     it('should reset card with grade 1 (again)', async () => {
       const card = createCard('Q', 'A');
-      await rateCard(card.id as string, 3);
-      const result = await rateCard(card.id as string, 1);
+      await rateCard(card.id, 3);
+      const result = await rateCard(card.id, 1);
 
-      expect(result).not.toBeNull();
-      expect(result!.intervalDays).toBe(1.0);
-      expect(result!.card.repetitions).toBe(0);
+      if (result === null) throw new Error('expected rating result');
+      expect(result.intervalDays).toBe(1.0);
+      expect(result.card.repetitions).toBe(0);
     });
 
     it('should return null for non-existent card', async () => {
@@ -152,16 +154,18 @@ describe('Cards', () => {
 
     it('should increase interval on successive good reviews', async () => {
       const card = createCard('Q', 'A');
-      const r1 = await rateCard(card.id as string, 3);
-      const r2 = await rateCard(card.id as string, 3);
+      const r1 = await rateCard(card.id, 3);
+      const r2 = await rateCard(card.id, 3);
+      if (r1 === null || r2 === null) throw new Error('expected rating results');
 
-      expect(r2!.intervalDays).toBeGreaterThan(r1!.intervalDays);
+      expect(r2.intervalDays).toBeGreaterThan(r1.intervalDays);
     });
 
     it('should log when logger is provided', async () => {
       const card = createCard('Q', 'A');
       const logger = { info: jest.fn(), error: jest.fn(), logEvent: jest.fn() };
-      await rateCard(card.id as string, 3, logger as unknown as Parameters<typeof rateCard>[2]);
+      // @ts-expect-error - mock logger for test coverage
+      await rateCard(card.id, 3, logger);
       expect(logger.info).toHaveBeenCalled();
     });
   });
@@ -172,6 +176,7 @@ describe('Cards', () => {
       const cards = importCardsFromTxt(content);
 
       expect(cards.length).toBe(2);
+      if (cards[0] === undefined || cards[1] === undefined) throw new Error('expected cards');
       expect(cards[0].q).toBe('Q1');
       expect(cards[0].a).toBe('A1');
       expect(cards[0].tags).toEqual(['tag1', 'tag2']);
@@ -192,7 +197,8 @@ describe('Cards', () => {
 
     it('should log when logger is provided', () => {
       const logger = { info: jest.fn(), error: jest.fn(), logEvent: jest.fn() };
-      importCardsFromTxt('Q\tA', logger as unknown as Parameters<typeof importCardsFromTxt>[1]);
+      // @ts-expect-error - mock logger for test coverage
+      importCardsFromTxt('Q\tA', logger);
       expect(logger.info).toHaveBeenCalled();
     });
   });
