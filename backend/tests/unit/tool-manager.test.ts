@@ -70,4 +70,45 @@ describe('ToolManager', () => {
     const tm2 = getToolManager();
     expect(tm1).toBe(tm2);
   });
+
+  it('should update config partially', () => {
+    manager.updateConfig({ mode: 'auto' });
+    expect(manager.getConfig().mode).toBe('auto');
+    manager.updateConfig({ auto_execute_tools: ['x'] });
+    expect(manager.getConfig().auto_execute_tools).toEqual(['x']);
+  });
+
+  it('should return null for approving non-existent call', () => {
+    expect(manager.approveCall('no-such-id')).toBeNull();
+  });
+
+  it('should return null for rejecting non-pending call', () => {
+    const callId = manager.createPendingCall('search_cards', {});
+    manager.approveCall(callId);
+    expect(manager.rejectCall(callId)).toBeNull();
+  });
+
+  it('should return null for markExecuting non-approved call', () => {
+    const callId = manager.createPendingCall('search_cards', {});
+    expect(manager.markExecuting(callId)).toBeNull();
+  });
+
+  it('should return null for complete/fail non-executing call', () => {
+    const callId = manager.createPendingCall('search_cards', {});
+    expect(manager.completeCall(callId, {})).toBeNull();
+    expect(manager.failCall(callId, 'err')).toBeNull();
+  });
+
+  it('should clear all history including pending', () => {
+    manager.createPendingCall('search_cards', { keyword: 'a' });
+    const cleared = manager.clearHistory(false);
+    expect(cleared).toBeGreaterThan(0);
+    expect(manager.getAllCalls().length).toBe(0);
+  });
+
+  it('should get call by id', () => {
+    const callId = manager.createPendingCall('search_cards', { keyword: 'a' });
+    expect(manager.getCall(callId)).not.toBeNull();
+    expect(manager.getCall('no-such-id')).toBeNull();
+  });
 });

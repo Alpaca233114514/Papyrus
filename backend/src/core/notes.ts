@@ -1,8 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
-import MarkdownIt from 'markdown-it';
 import matter from 'gray-matter';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import {
   loadAllNotes,
   insertNote,
@@ -14,13 +14,12 @@ import {
   getAllFolders,
 } from '../db/database.js';
 
-export function getNoteById(noteId: string): Note | null {
-  return dbGetNoteById(noteId);
-}
 import type { Note } from './types.js';
 import type { PapyrusLogger } from '../utils/logger.js';
 
-const md = new MarkdownIt();
+export function getNoteById(noteId: string): Note | null {
+  return dbGetNoteById(noteId);
+}
 
 function extractHeadings(content: string): Array<{ level: number; text: string }> {
   const headings: Array<{ level: number; text: string }> = [];
@@ -28,7 +27,7 @@ function extractHeadings(content: string): Array<{ level: number; text: string }
   for (const line of lines) {
     const match = line.match(/^(#{1,3})\s+(.+)$/);
     if (match && headings.length < 10) {
-      headings.push({ level: match[1]?.length ?? 1, text: match[2]?.trim() ?? '' });
+      headings.push({ level: match[1]!.length, text: match[2]!.trim() });
     }
   }
   return headings;
@@ -157,6 +156,18 @@ export function getStats(): { total: number } {
 export function importObsidianVault(vaultPath: string, logger?: PapyrusLogger): { imported: number; errors: number } {
   let imported = 0;
   let errors = 0;
+
+  if (!fs.existsSync(vaultPath)) {
+    return { imported: 0, errors: 0 };
+  }
+
+  const resolvedVaultPath = path.resolve(vaultPath);
+  const homeDir = path.resolve(os.homedir());
+  const isUnderHomeDir = resolvedVaultPath === homeDir || resolvedVaultPath.startsWith(homeDir + path.sep);
+  if (!isUnderHomeDir) {
+    logger?.error(`Obsidian 导入被拒绝: 路径必须在用户主目录内 (${vaultPath})`);
+    return { imported: 0, errors: 1 };
+  }
 
   function scanDir(dir: string, relPath = ''): void {
     const entries = fs.readdirSync(dir, { withFileTypes: true });

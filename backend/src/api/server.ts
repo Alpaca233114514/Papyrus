@@ -1,11 +1,13 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
 import { pathToFileURL } from 'node:url';
 import { paths } from '../utils/paths.js';
 import { PapyrusLogger } from '../utils/logger.js';
 import { MCPServer } from '../mcp/server.js';
 import { startFileWatching } from '../integrations/file-watcher.js';
 import { setGlobalLogger } from './routes/logs.js';
+import { isAuthEnabled, validateRequestToken } from '../utils/auth.js';
 
 const logger = new PapyrusLogger(paths.logDir, 'INFO');
 
@@ -15,12 +17,13 @@ const app = Fastify({
   },
 });
 
-// Error handler
+// Error handler — sanitize error messages in production to avoid info leakage
+const isDebugMode = process.env.PAPYRUS_DEBUG === '1' || process.env.NODE_ENV === 'development';
 app.setErrorHandler((error: Error & { statusCode?: number }, _request, reply) => {
   logger.error(`API Error: ${error.message}`);
   reply.status(error.statusCode ?? 500).send({
     success: false,
-    error: error.message,
+    error: isDebugMode ? error.message : 'Internal server error',
   });
 });
 
@@ -33,16 +36,58 @@ const PORT = process.env.PAPYRUS_PORT ? parseInt(process.env.PAPYRUS_PORT, 10) :
 
 export async function initApp(): Promise<void> {
   setGlobalLogger(logger);
+  const allowedPorts = new Set([5173, 4173, 8000, 3000, 9100]);
   await app.register(cors, {
     origin: (origin, cb) => {
-      if (!origin || /^http:\/\/localhost(:\d+)?$/.test(origin) || /^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) {
+      if (!origin) {
         cb(null, true);
         return;
+      }
+      try {
+        const parsed = new URL(origin);
+        const hostname = parsed.hostname;
+        const port = parsed.port ? parseInt(parsed.port, 10) : (parsed.protocol === 'https:' ? 443 : 80);
+        if (
+          parsed.protocol === 'http:' &&
+          (hostname === 'localhost' || hostname === '127.0.0.1') &&
+          allowedPorts.has(port)
+        ) {
+          cb(null, true);
+          return;
+        }
+      } catch {
+        // ignore invalid origins
       }
       cb(new Error('Not allowed'), false);
     },
     credentials: true,
   });
+
+  // Rate limiting — 100 requests per minute per IP (localhost-only backend)
+  // Disabled in test to avoid flakiness across shared test instances
+  const isTestEnv = process.env.NODE_ENV === 'test';
+  await app.register(rateLimit, {
+    max: isTestEnv ? Number.MAX_SAFE_INTEGER : 100,
+    timeWindow: '1 minute',
+  });
+
+  // Optional lightweight auth for local API protection
+  // When PAPYRUS_AUTH_TOKEN is set (Electron mode), require it for mutating operations
+  if (isAuthEnabled()) {
+    app.addHook('onRequest', async (request, reply) => {
+      if (request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS') {
+        return;
+      }
+      if (request.url === '/api/health') {
+        return;
+      }
+      const token = request.headers['x-papyrus-token'];
+      if (!validateRequestToken(typeof token === 'string' ? token : undefined)) {
+        reply.status(401).send({ success: false, error: 'Unauthorized' });
+        return;
+      }
+    });
+  }
 
   // Health check
   app.get('/api/health', async () => ({ status: 'ok' }));
@@ -52,7 +97,7 @@ export async function initApp(): Promise<void> {
   const { default: reviewRoutes } = await import('./routes/review.js');
   const { default: notesRoutes } = await import('./routes/notes.js');
   const { default: searchRoutes } = await import('./routes/search.js');
-  const aiRoutes = (await import('./routes/ai.js')).default ?? (async () => {});
+  const { default: aiRoutes } = await import('./routes/ai.js');
   const { default: dataRoutes } = await import('./routes/data.js');
   const { default: progressRoutes } = await import('./routes/progress.js');
   const { default: logsRoutes } = await import('./routes/logs.js');

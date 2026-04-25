@@ -271,9 +271,11 @@ function devMode() {
     log('Services ready, starting Electron...');
     
     // Get electron executable path
-    // Note: require('electron') may have encoding issues, construct path manually
-    const electronPath = require('path').join(__dirname, '..', 'node_modules', 'electron', 'dist', 'electron.exe');
-    
+    const electronModulePath = require.resolve('electron');
+    const electronPath = process.platform === 'win32'
+      ? require('path').join(require('path').dirname(electronModulePath), 'dist', 'electron.exe')
+      : require('path').join(require('path').dirname(electronModulePath), 'dist', 'electron');
+
     const electron = spawn(electronPath, ['.'], {
       stdio: 'inherit',
       shell: false,

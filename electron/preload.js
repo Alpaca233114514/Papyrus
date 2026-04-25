@@ -14,7 +14,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getVersion: () => ipcRenderer.invoke('app:getVersion'),
   getPlatform: () => ipcRenderer.invoke('app:getPlatform'),
   isDev: () => ipcRenderer.invoke('app:isDev'),
-  
+  getAuthToken: () => ipcRenderer.invoke('app:getAuthToken'),
+
   // Shell operations
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
   openDataFolder: () => ipcRenderer.invoke('shell:openDataFolder'),

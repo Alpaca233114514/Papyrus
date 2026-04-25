@@ -56,7 +56,7 @@ interface UseWebSocketReturn {
  */
 export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketReturn {
   const {
-    url = `ws://${window.location.host}/ws`,
+    url = `ws://127.0.0.1:8000/ws`,
     onConnect,
     onDisconnect,
     onMessage,

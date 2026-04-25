@@ -15,10 +15,21 @@ function generateToken(): string {
   return randomBytes(24).toString('base64url');
 }
 
+function isAllowedOrigin(origin: string): boolean {
+  const allowedPorts = new Set([5173, 4173, 8000, 3000, 9100]);
+  try {
+    const parsed = new URL(origin);
+    const port = parsed.port ? parseInt(parsed.port, 10) : (parsed.protocol === 'https:' ? 443 : 80);
+    return parsed.protocol === 'http:' && (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') && allowedPorts.has(port);
+  } catch {
+    return false;
+  }
+}
+
 function sendJson(res: http.ServerResponse, data: unknown, status = 200, origin?: string): void {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
-    ...(origin?.startsWith('http://localhost:') || origin?.startsWith('http://127.0.0.1:')
+    ...(origin && isAllowedOrigin(origin)
       ? { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Credentials': 'true' }
       : {}),
   });
@@ -53,7 +64,7 @@ export class MCPServer {
 
         if (req.method === 'OPTIONS') {
           res.writeHead(204, {
-            ...(origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')
+            ...(isAllowedOrigin(origin)
               ? { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Credentials': 'true' }
               : {}),
             'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',

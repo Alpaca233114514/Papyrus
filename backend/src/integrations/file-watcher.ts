@@ -4,7 +4,7 @@ import { paths } from '../utils/paths.js';
 export type ChangeCallback = (eventType: string, filePath: string) => void;
 
 export class FileWatcher {
-  private watchPath: string;
+  readonly watchPath: string;
   private watcher: FSWatcher | null = null;
   private callback: ChangeCallback | null = null;
   private running = false;
@@ -72,7 +72,11 @@ export class FileWatcher {
 let globalWatcher: FileWatcher | null = null;
 
 export function getFileWatcher(watchPath?: string): FileWatcher {
-  if (!globalWatcher) {
+  const targetPath = watchPath ?? paths.dataDir;
+  if (!globalWatcher || globalWatcher.watchPath !== targetPath) {
+    if (globalWatcher) {
+      globalWatcher.stop();
+    }
     globalWatcher = new FileWatcher(watchPath);
   }
   return globalWatcher;

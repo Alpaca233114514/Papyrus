@@ -17,24 +17,16 @@ frontend/pnpm-lock.yaml
 # ----------------------------------------------------------------------------
 # Build Outputs
 # ----------------------------------------------------------------------------
-# Python build
-dist-python/
-*.egg-info/
-.eggs/
-
-# PyInstaller build output (build/ directory contains config files)
-build/Papyrus/
-build/PapyrusAPI/
-build/__pycache__/
-build/*.py
-build/*.log
-
 # Build config files that SHOULD be tracked:
 # - build/installer.nsh (NSIS installer script)
 # - build/entitlements.mac.plist (macOS entitlements)
-# - build/root-ca.cer (Root certificate)
 # - build/create-cert.ps1 (Certificate creation script)
-# Do NOT add: build/code-signing.pfx (private key)
+# Note: signing certificates moved to ~/.papyrus-certs/ (outside project)
+build/*.log
+build/*.pfx
+build/*.p12
+build/*.pem
+build/*.key
 
 # Frontend build
 dist/
@@ -56,35 +48,6 @@ test-*.mjs
 test-*.html
 test-*.ps1
 test-*.bat
-
-# PyInstaller (保留配置文件)
-!Papyrus.spec
-!PapyrusAPI.spec
-*.spec
-
-# ----------------------------------------------------------------------------
-# Python
-# ----------------------------------------------------------------------------
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-*.manifest
-*.spec
-pip-log.txt
-pip-delete-this-directory.txt
-htmlcov/
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
 
 # ----------------------------------------------------------------------------
 # TypeScript/JavaScript
@@ -151,13 +114,6 @@ Desktop.ini
 $RECYCLE.BIN/
 
 # ----------------------------------------------------------------------------
-# MyPy
-# ----------------------------------------------------------------------------
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# ----------------------------------------------------------------------------
 # Tools
 # ----------------------------------------------------------------------------
 tools/code_backups/
@@ -178,7 +134,6 @@ secrets/
 
 # Security audit files
 SECURITY_AUDIT_REPORT*.md
-security_poc.py
 
 # ----------------------------------------------------------------------------
 # Test & Coverage

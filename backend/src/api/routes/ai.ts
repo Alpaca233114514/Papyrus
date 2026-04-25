@@ -217,6 +217,7 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
         const resp = await fetch(`${baseUrl}/api/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(60000),
           body: JSON.stringify({
             model,
             messages: [
@@ -289,6 +290,7 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
             Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
           },
+          signal: AbortSignal.timeout(60000),
           body: JSON.stringify(reqBody),
         });
 
@@ -409,6 +411,7 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
       );
 
       let assistantContent = '';
+      let reasoningContent = '';
       for await (const chunk of stream) {
         if (chunk.type === 'content') {
           const text = typeof chunk.data === 'string' ? chunk.data : '';
@@ -416,6 +419,7 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
           reply.raw.write(`data: ${JSON.stringify({ text, done: false })}\n\n`);
         } else if (chunk.type === 'reasoning') {
           const text = typeof chunk.data === 'string' ? chunk.data : '';
+          reasoningContent += text;
           reply.raw.write(`data: ${JSON.stringify({ reasoning: text, done: false })}\n\n`);
         } else if (chunk.type === 'tool_start') {
           reply.raw.write(`data: ${JSON.stringify({ tool_call: chunk.data, done: false })}\n\n`);
@@ -427,9 +431,10 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
         }
       }
 
-      // Save assistant response to session
-      if (assistantContent) {
-        await aiManager.appendAssistantMessage(assistantContent);
+      // Save assistant response to session (include reasoning if no regular content)
+      const finalContent = assistantContent || reasoningContent;
+      if (finalContent) {
+        await aiManager.appendAssistantMessage(finalContent);
       }
 
       reply.raw.end();

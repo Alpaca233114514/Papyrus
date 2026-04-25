@@ -1,0 +1,136 @@
+  console.log
+    2026-04-24 18:34:49 - INFO - test info
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:49 - ERROR - test error
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:49 - WARNING - warning msg
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:49 - INFO - 日志目录已更改为: C:\Users\HP\AppData\Local\Temp\papyrus-logger-test-1777055689306\sub
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:49 - INFO - in new dir
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:49 - ERROR - 无效的日志级别: INVALID
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:49 - INFO - 日志级别已设置为: INFO
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:49 - INFO - 日志轮转已启用
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:49 - INFO - 日志轮转已禁用
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:49 - INFO - 最大日志文件数已设置为: 5
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:49 - INFO - before clear
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:49 - INFO - 日志已清空
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:49 - INFO - export me
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:49 - INFO - 日志目录: C:\Users\HP\AppData\Local\Temp\papyrus-logger-test-1777055689306
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:49 - INFO - fallback
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:49 - INFO - 日志已清空
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:49 - ERROR - 解密 API Key 失败: TypeError: Invalid authentication tag length: 0
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:49 - ERROR - 解密 API Key 失败: Error: Unsupported state or unable to authenticate data
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:49 - ERROR - 解密 API Key 失败: TypeError: Invalid authentication tag length: 0
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:49 - ERROR - 解密 API Key 失败: Error: Unsupported state or unable to authenticate data
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.error
+    [SECURITY WARNING] Failed to write master key with restricted permissions. Falling back to default permissions for: C:\Users\HP\AppData\Local\Temp\papyrus-crypto-test-1777055689262\.master_key
+
+    [0m [90m 36 |[39m       fs[33m.[39mwriteFileSync(keyPath[33m,[39m key[33m,[39m { mode[33m:[39m [35m0o400[39m })[33m;[39m
+     [90m 37 |[39m     } [36mcatch[39m {
+    [31m[1m>[22m[39m[90m 38 |[39m       console[33m.[39merror([32m`[SECURITY WARNING] Failed to write master key with restricted permissions. Falling back to default permissions for: ${keyPath}`[39m)[33m;[39m
+     [90m    |[39m               [31m[1m^[22m[39m
+     [90m 39 |[39m       fs[33m.[39mwriteFileSync(keyPath[33m,[39m key)[33m;[39m
+     [90m 40 |[39m     }
+     [90m 41 |[39m[0m
+
+      at getOrCreateMasterKey (src/core/crypto.ts:38:15)
+      at getCipherKey (src/core/crypto.ts:76:21)
+      at encryptApiKey (src/core/crypto.ts:87:15)
+      at Object.<anonymous> (tests/unit/crypto.test.ts:151:23)
+
+  console.log
+    2026-04-24 18:34:50 - ERROR - API Error: Not allowed
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:50 - INFO - 从数据库加载 1042 张卡片
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:50 - INFO - 从数据库加载 707 条笔记
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+
+  console.log
+    2026-04-24 18:34:50 - INFO - 从数据库加载 707 条笔记
+
+      at PapyrusLogger.log (src/utils/logger.ts:144:15)
+

@@ -1,5 +1,12 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { app, initApp } from '../../src/api/server.js';
 import { closeDb } from '../../src/db/database.js';
+import { CardTools } from '../../src/ai/tools.js';
+
+// Access the aiManager singleton inside the route module for monkey-patching
+let aiManagerSingleton: Record<string, unknown> | null = null;
 
 describe('API Integration Tests', () => {
   beforeAll(async () => {
@@ -18,6 +25,82 @@ describe('API Integration Tests', () => {
 
     expect(response.statusCode).toBe(200);
     expect(JSON.parse(response.body)).toEqual({ status: 'ok' });
+  });
+
+  it('should reject non-localhost CORS', async () => {
+    const response = await app.inject({
+      method: 'OPTIONS',
+      url: '/api/health',
+      headers: { Origin: 'http://example.com' },
+    });
+
+    expect(response.statusCode).toBe(500);
+  });
+
+  it('should accept localhost CORS', async () => {
+    const response = await app.inject({
+      method: 'OPTIONS',
+      url: '/api/health',
+      headers: {
+        Origin: 'http://localhost:5173',
+        'Access-Control-Request-Method': 'POST',
+      },
+    });
+
+    expect(response.statusCode).toBe(204);
+  });
+
+  it('should accept 127.0.0.1 CORS', async () => {
+    const response = await app.inject({
+      method: 'OPTIONS',
+      url: '/api/health',
+      headers: {
+        Origin: 'http://127.0.0.1:5173',
+        'Access-Control-Request-Method': 'POST',
+      },
+    });
+
+    expect(response.statusCode).toBe(204);
+  });
+
+  it('should reject https CORS', async () => {
+    const response = await app.inject({
+      method: 'OPTIONS',
+      url: '/api/health',
+      headers: { Origin: 'https://localhost:5173' },
+    });
+
+    expect(response.statusCode).toBe(500);
+  });
+
+  it('should reject wrong port CORS', async () => {
+    const response = await app.inject({
+      method: 'OPTIONS',
+      url: '/api/health',
+      headers: { Origin: 'http://localhost:9999' },
+    });
+
+    expect(response.statusCode).toBe(500);
+  });
+
+  it('should reject invalid origin URL CORS', async () => {
+    const response = await app.inject({
+      method: 'OPTIONS',
+      url: '/api/health',
+      headers: { Origin: 'not-a-valid-url' },
+    });
+
+    expect(response.statusCode).toBe(500);
+  });
+
+  it('should return 404 for unmatched route', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/nonexistent-route',
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(JSON.parse(response.body).error).toBe('Not found');
   });
 
   it('POST /api/cards should create a card', async () => {
@@ -75,7 +158,7 @@ describe('API Integration Tests', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/markdown/render',
-      payload: { content: '# Hello\n\nWorld' },
+      payload: { content: '# Hello\n\nWorld [link](https://example.com)' },
     });
 
     expect(response.statusCode).toBe(200);
@@ -108,6 +191,19 @@ describe('API Integration Tests', () => {
     const body = JSON.parse(response.body);
     expect(body.success).toBe(true);
     expect(body.config.mode).toBe('auto');
+  });
+
+  it('GET /api/tools/config should return tool config', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/tools/config',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.config.mode).toBeDefined();
+    expect(Array.isArray(body.config.auto_execute_tools)).toBe(true);
   });
 
   it('POST /api/tools/submit should auto-execute readonly tools', async () => {
@@ -184,5 +280,1948 @@ describe('API Integration Tests', () => {
     const body = JSON.parse(response.body);
     expect(body.success).toBe(true);
     expect(Array.isArray(body.notes)).toBe(true);
+  });
+
+  it('POST /api/mcp/notes/search should match content when title and tag miss', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { title: 'XYZ', content: 'SearchMeContent', tags: ['xyz'] },
+    });
+    const noteId = JSON.parse(create.body).note.id;
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/mcp/notes/search',
+      payload: { query: 'searchme', limit: 10 },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.notes.some((n: { id: string }) => n.id === noteId)).toBe(true);
+  });
+
+  it('GET /api/review/next should return a card or empty', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/review/next',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.card === null || typeof body.card === 'object').toBe(true);
+  });
+
+  it('GET /api/progress/streak should return streak data', async () => {
+    // Create a card without reviewing to ensure a cards_reviewed=0 record exists
+    await app.inject({
+      method: 'POST',
+      url: '/api/cards',
+      payload: { question: 'StreakQ', answer: 'StreakA' },
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/progress/streak',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(typeof body.current_streak).toBe('number');
+  });
+
+  it('GET /api/progress/history should return history', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/progress/history?days=7',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.history)).toBe(true);
+  });
+
+  it('GET /api/progress/heatmap should return heatmap data', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/progress/heatmap?days=30',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.data)).toBe(true);
+  });
+
+  it('GET /api/progress/history should default days for invalid input', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/progress/history?days=abc',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.days).toBe(30);
+  });
+
+  it('GET /api/progress/history should default days for zero', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/progress/history?days=0',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.days).toBe(30);
+  });
+
+  it('GET /api/progress/heatmap should default days for invalid input', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/progress/heatmap?days=abc',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.total_days).toBe(365);
+  });
+
+  it('GET /api/progress/heatmap should default days for zero', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/progress/heatmap?days=0',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.total_days).toBe(365);
+  });
+
+  it('POST /api/backup should create a backup', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/backup',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(typeof body.path).toBe('string');
+  });
+
+  it('POST /api/import should import JSON data', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/import',
+      payload: {
+        cards: [{ q: 'Q1', a: 'A1' }],
+        notes: [{ title: 'Note1', content: 'Body' }],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(typeof body.imported).toBe('number');
+  });
+
+  it('GET /api/export should return cards and notes', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/export',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.cards)).toBe(true);
+    expect(Array.isArray(body.notes)).toBe(true);
+  });
+
+  it('POST /api/import should handle invalid data gracefully', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/import',
+      payload: { cards: 'not-an-array' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.imported).toBe(0);
+  });
+
+  it('POST /api/import should handle varied card and note shapes', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/import',
+      payload: {
+        cards: [
+          { question: 'Q2', answer: 'A2', tags: ['t1'] },
+          { q: '', a: '', answer: 'A3', id: 'custom-id' },
+          null,
+        ],
+        notes: [
+          { title: '', folder: 'Custom', content: 'B', tags: ['t'], headings: [{ level: 1, text: 'H' }], outgoing_links: ['x'] },
+        ],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.imported).toBe(3);
+  });
+
+  it('POST /api/markdown/render should 400 without content', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/markdown/render',
+      payload: {},
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('GET /api/search should return empty for missing query', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/search',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.results).toEqual([]);
+    expect(body.total).toBe(0);
+  });
+
+  it('POST /api/cards should 400 without question or answer', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/cards',
+      payload: { q: '' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('POST /api/cards/import/txt should 400 for no valid cards', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/cards/import/txt',
+      payload: { content: 'no tabs here' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('GET /api/review/next should return null when no cards due', async () => {
+    const cardsRes = await app.inject({ method: 'GET', url: '/api/cards' });
+    const cards = JSON.parse(cardsRes.body).cards as Array<{ id: string }>;
+    for (const card of cards) {
+      await app.inject({ method: 'POST', url: `/api/review/${card.id}/rate`, payload: { grade: 3 } });
+    }
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/review/next',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.card).toBeNull();
+  });
+
+  it('GET /api/update/version should return version info', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/update/version',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(typeof body.version).toBe('string');
+    expect(typeof body.repository).toBe('string');
+  });
+
+  it('GET /api/update/check should handle failed fetch', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = () => Promise.resolve({ ok: false, status: 500 } as Response);
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/update/check',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(false);
+
+    global.fetch = originalFetch;
+  });
+
+  it('GET /api/update/check should handle fetch error', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = () => Promise.reject(new Error('network error'));
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/update/check',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(false);
+
+    global.fetch = originalFetch;
+  });
+
+  it('GET /api/update/check should parse successful response', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = () => Promise.resolve({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ tag_name: 'v999.0.0', html_url: 'https://example.com', assets: [] }),
+    } as unknown as Response);
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/update/check',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.data.has_update).toBe(true);
+
+    global.fetch = originalFetch;
+  });
+
+  it('POST /api/config/ai/test should test ollama connection', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = () => Promise.resolve({ ok: true, status: 200 } as Response);
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/config/ai',
+      payload: {
+        current_provider: 'ollama',
+        current_model: 'llama2',
+        providers: {
+          ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
+        },
+        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/config/ai/test',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(typeof body.success).toBe('boolean');
+
+    global.fetch = originalFetch;
+  });
+
+  it('POST /api/config/ai/test should handle ollama non-ok', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = () => Promise.resolve({ ok: false, status: 503 } as Response);
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/config/ai',
+      payload: {
+        current_provider: 'ollama',
+        current_model: 'llama2',
+        providers: {
+          ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
+        },
+        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/config/ai/test',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(false);
+    expect(body.message).toContain('503');
+
+    global.fetch = originalFetch;
+  });
+
+  it('POST /api/config/ai/test should succeed for non-ollama', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = () => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ data: [] }) } as unknown as Response);
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/config/ai',
+      payload: {
+        current_provider: 'openai',
+        current_model: 'gpt-4',
+        providers: {
+          openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+        },
+        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/config/ai/test',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+
+    global.fetch = originalFetch;
+  });
+
+  it('POST /api/config/ai/test should reject private url', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/config/ai',
+      payload: {
+        current_provider: 'openai',
+        current_model: 'gpt-4',
+        providers: {
+          openai: { api_key: 'sk-test', base_url: 'http://192.168.1.1/v1', models: ['gpt-4'] },
+        },
+        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/config/ai/test',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(false);
+    expect(body.message).toContain('SSRF');
+  });
+
+  it('POST /api/config/ai/test should report missing api key', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/config/ai',
+      payload: {
+        current_provider: 'openai',
+        current_model: 'gpt-4',
+        providers: {
+          openai: { api_key: '', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+        },
+        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/config/ai/test',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(false);
+    expect(body.message).toContain('API Key');
+  });
+
+  it('POST /api/config/ai/test should report missing base url', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/config/ai',
+      payload: {
+        current_provider: 'openai',
+        current_model: 'gpt-4',
+        providers: {
+          openai: { api_key: 'sk-test', base_url: '', models: ['gpt-4'] },
+        },
+        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/config/ai/test',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(false);
+    expect(body.message).toContain('Base URL');
+  });
+
+  it('POST /api/config/ai/test should handle 401 response', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = () => Promise.resolve({ ok: false, status: 401 } as Response);
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/config/ai',
+      payload: {
+        current_provider: 'openai',
+        current_model: 'gpt-4',
+        providers: {
+          openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+        },
+        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/config/ai/test',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(false);
+    expect(body.message).toContain('无效');
+
+    global.fetch = originalFetch;
+  });
+
+  it('POST /api/config/ai/test should handle 404 response', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = () => Promise.resolve({ ok: false, status: 404 } as Response);
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/config/ai',
+      payload: {
+        current_provider: 'openai',
+        current_model: 'gpt-4',
+        providers: {
+          openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+        },
+        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/config/ai/test',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+
+    global.fetch = originalFetch;
+  });
+
+  it('POST /api/config/ai/test should handle other error response', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = () => Promise.resolve({ ok: false, status: 503 } as Response);
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/config/ai',
+      payload: {
+        current_provider: 'openai',
+        current_model: 'gpt-4',
+        providers: {
+          openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+        },
+        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/config/ai/test',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(false);
+    expect(body.message).toContain('503');
+
+    global.fetch = originalFetch;
+  });
+
+  it('POST /api/config/ai/test should handle fetch exception', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = () => Promise.reject(new Error('timeout'));
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/config/ai',
+      payload: {
+        current_provider: 'openai',
+        current_model: 'gpt-4',
+        providers: {
+          openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+        },
+        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/config/ai/test',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(false);
+
+    global.fetch = originalFetch;
+  });
+
+  it('POST /api/config/ai/test should handle ollama fetch error', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = () => Promise.reject(new Error('ollama down'));
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/config/ai',
+      payload: {
+        current_provider: 'ollama',
+        current_model: 'llama2',
+        providers: {
+          ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
+        },
+        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/config/ai/test',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(false);
+
+    global.fetch = originalFetch;
+  });
+
+  it('POST /api/completion should stream ollama response', async () => {
+    const originalFetch = global.fetch;
+    const streamData = [
+      '{"message":{"content":"hello"}}',
+      '{"message":{"content":" world"}}',
+    ];
+
+    global.fetch = () => {
+      let index = 0;
+      const readable = new ReadableStream({
+        pull(controller) {
+          if (index < streamData.length) {
+            controller.enqueue(new TextEncoder().encode(streamData[index] + '\n'));
+            index++;
+          } else {
+            controller.close();
+          }
+        },
+      });
+      return Promise.resolve({ ok: true, body: readable } as unknown as Response);
+    };
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/config/ai',
+      payload: {
+        current_provider: 'ollama',
+        current_model: 'llama2',
+        providers: {
+          ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
+        },
+        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/completion',
+      payload: { prefix: 'hello' },
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    global.fetch = originalFetch;
+  });
+
+  it('POST /api/completion should handle ollama error', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = () => Promise.resolve({ ok: false, status: 500 } as Response);
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/config/ai',
+      payload: {
+        current_provider: 'ollama',
+        current_model: 'llama2',
+        providers: {
+          ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
+        },
+        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/completion',
+      payload: { prefix: 'hello' },
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    global.fetch = originalFetch;
+  });
+
+  it('POST /api/completion should stream openai-style response', async () => {
+    const originalFetch = global.fetch;
+    const streamData = [
+      'data: {"choices":[{"delta":{"content":"hello"}}]}',
+      'data: {"choices":[{"delta":{"content":" world"}}]}',
+      'data: [DONE]',
+    ];
+
+    global.fetch = () => {
+      let index = 0;
+      const readable = new ReadableStream({
+        pull(controller) {
+          if (index < streamData.length) {
+            controller.enqueue(new TextEncoder().encode(streamData[index] + '\n\n'));
+            index++;
+          } else {
+            controller.close();
+          }
+        },
+      });
+      return Promise.resolve({ ok: true, body: readable } as unknown as Response);
+    };
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/config/ai',
+      payload: {
+        current_provider: 'openai',
+        current_model: 'gpt-4',
+        providers: {
+          openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+        },
+        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/completion',
+      payload: { prefix: 'hello' },
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    global.fetch = originalFetch;
+  });
+
+  it('POST /api/completion should handle openai error', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = () => Promise.resolve({ ok: false, status: 503 } as Response);
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/config/ai',
+      payload: {
+        current_provider: 'openai',
+        current_model: 'gpt-4',
+        providers: {
+          openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+        },
+        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/completion',
+      payload: { prefix: 'hello' },
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    global.fetch = originalFetch;
+  });
+
+  it('POST /api/completion should reject missing api_key for non-ollama', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/config/ai',
+      payload: {
+        current_provider: 'openai',
+        current_model: 'gpt-4',
+        providers: {
+          openai: { api_key: '', base_url: 'https://api.openai.com', models: ['gpt-4'] },
+        },
+        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/completion',
+      payload: { prefix: 'hello' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(false);
+    expect(body.error).toContain('API Key');
+  });
+
+  it('POST /api/chat should stream ollama response', async () => {
+    const originalFetch = global.fetch;
+    const streamData = [
+      '{"message":{"content":"hi"}}',
+      '{"message":{"content":" there"}}',
+    ];
+
+    global.fetch = () => {
+      let index = 0;
+      const readable = new ReadableStream({
+        pull(controller) {
+          if (index < streamData.length) {
+            controller.enqueue(new TextEncoder().encode(streamData[index] + '\n'));
+            index++;
+          } else {
+            controller.close();
+          }
+        },
+      });
+      return Promise.resolve({ ok: true, body: readable } as unknown as Response);
+    };
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/config/ai',
+      payload: {
+        current_provider: 'ollama',
+        current_model: 'llama2',
+        providers: {
+          ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
+        },
+        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/chat',
+      payload: { message: 'hello' },
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    global.fetch = originalFetch;
+  });
+
+  it('POST /api/chat should handle stream error', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = () => Promise.reject(new Error('stream failed'));
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/config/ai',
+      payload: {
+        current_provider: 'ollama',
+        current_model: 'llama2',
+        providers: {
+          ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
+        },
+        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
+      },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/chat',
+      payload: { message: 'hello' },
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    global.fetch = originalFetch;
+  });
+
+  it('GET /api/providers should list providers', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/providers',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.providers)).toBe(true);
+  });
+
+  it('GET /api/config/logs/dir should return log files', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/config/logs/dir',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.files)).toBe(true);
+  });
+
+  it('DELETE /api/cards/:cardId should delete a card', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/cards',
+      payload: { q: 'ToDelete', a: 'A' },
+    });
+    const cardId = JSON.parse(create.body).card.id;
+
+    const response = await app.inject({
+      method: 'DELETE',
+      url: `/api/cards/${cardId}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body).success).toBe(true);
+  });
+
+  it('DELETE /api/cards/:cardId should 404 for non-existent', async () => {
+    const response = await app.inject({
+      method: 'DELETE',
+      url: '/api/cards/non-existent-id',
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('PATCH /api/cards/:cardId should update a card', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/cards',
+      payload: { q: 'Old', a: 'A' },
+    });
+    const cardId = JSON.parse(create.body).card.id;
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/api/cards/${cardId}`,
+      payload: { q: 'New' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.card.q).toBe('New');
+  });
+
+  it('PATCH /api/cards/:cardId should 404 for non-existent', async () => {
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/cards/non-existent-id',
+      payload: { q: 'New' },
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
+
+  it('POST /api/cards/import/txt should import cards', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/cards/import/txt',
+      payload: { content: 'Q1\tA1\nQ2\tA2' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.count).toBe(2);
+  });
+
+  it('POST /api/cards/import/txt should 400 for empty content', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/cards/import/txt',
+      payload: { content: '' },
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('GET /api/notes should list notes', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/notes',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.notes)).toBe(true);
+    expect(typeof body.count).toBe('number');
+  });
+
+  it('GET /api/notes/:noteId should get a note', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { title: 'GetMe', content: 'body' },
+    });
+    const noteId = JSON.parse(create.body).note.id;
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/notes/${noteId}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.note.title).toBe('GetMe');
+  });
+
+  it('GET /api/notes/:noteId should 404 for non-existent', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/notes/non-existent-id',
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
+
+  it('POST /api/notes should reject empty title', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { content: 'body' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('PATCH /api/notes/:noteId should update a note', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { title: 'Old', content: 'body' },
+    });
+    const noteId = JSON.parse(create.body).note.id;
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/api/notes/${noteId}`,
+      payload: { title: 'New' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.note.title).toBe('New');
+  });
+
+  it('PATCH /api/notes/:noteId should 404 for non-existent', async () => {
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/notes/non-existent-id',
+      payload: { title: 'X' },
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('DELETE /api/notes/:noteId should delete a note', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { title: 'DelMe', content: 'body' },
+    });
+    const noteId = JSON.parse(create.body).note.id;
+
+    const response = await app.inject({
+      method: 'DELETE',
+      url: `/api/notes/${noteId}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body).success).toBe(true);
+  });
+
+  it('POST /api/notes/import/obsidian should 400 without vault_path', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/notes/import/obsidian',
+      payload: {},
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('POST /api/review/:cardId/rate should rate a card', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/cards',
+      payload: { q: 'RateMe', a: 'A' },
+    });
+    const cardId = JSON.parse(create.body).card.id;
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/review/${cardId}/rate`,
+      payload: { grade: 3 },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.interval_days).toBeDefined();
+  });
+
+  it('POST /api/review/:cardId/rate should 400 for invalid grade', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/review/non-existent/rate',
+      payload: { grade: 5 },
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('POST /api/providers/:providerId/models should add a model', async () => {
+    const providers = await app.inject({ method: 'GET', url: '/api/providers' });
+    const providerId = JSON.parse(providers.body).providers[0].id;
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/providers/${providerId}/models`,
+      payload: { name: 'TestModel', modelId: 'test-model', port: 'openai' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(typeof body.modelId).toBe('string');
+  });
+
+  it('POST /api/providers/:providerId/apikeys should add an api key', async () => {
+    const providers = await app.inject({ method: 'GET', url: '/api/providers' });
+    const providerId = JSON.parse(providers.body).providers[0].id;
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/providers/${providerId}/apikeys`,
+      payload: { name: 'test-key', key: 'sk-test' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(typeof body.keyId).toBe('string');
+  });
+
+  it('POST /api/providers/:providerId/default should set default', async () => {
+    const providers = await app.inject({ method: 'GET', url: '/api/providers' });
+    const providerId = JSON.parse(providers.body).providers[0].id;
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/providers/${providerId}/default`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body).success).toBe(true);
+  });
+
+  it('POST /api/providers/:providerId/enabled should toggle enabled', async () => {
+    const providers = await app.inject({ method: 'GET', url: '/api/providers' });
+    const providerId = JSON.parse(providers.body).providers[0].id;
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/providers/${providerId}/enabled`,
+      payload: { enabled: true },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body).success).toBe(true);
+  });
+
+  it('POST /api/providers should create provider with apiKeys and models', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/providers',
+      payload: {
+        type: 'openai',
+        name: 'FullProvider',
+        baseUrl: 'http://localhost',
+        enabled: false,
+        apiKeys: [{ name: 'key1', key: 'sk-1' }],
+        models: [{ name: 'Model1', modelId: 'm1', port: 'openai' }],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.provider.name).toBe('FullProvider');
+  });
+
+  it('DELETE /api/providers/:providerId should 404 for non-existent', async () => {
+    const response = await app.inject({
+      method: 'DELETE',
+      url: '/api/providers/non-existent-id',
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('PUT /api/providers/:providerId should update provider', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/providers',
+      payload: { type: 'openai', name: 'Before', baseUrl: '', enabled: false },
+    });
+    const providerId = JSON.parse(create.body).provider.id;
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/api/providers/${providerId}`,
+      payload: { type: 'openai', name: 'After', baseUrl: '', enabled: false },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body).success).toBe(true);
+  });
+
+  it('PUT /api/providers/:providerId/models/:modelId should update model', async () => {
+    const providers = await app.inject({ method: 'GET', url: '/api/providers' });
+    const providerId = JSON.parse(providers.body).providers[0].id;
+
+    const model = await app.inject({
+      method: 'POST',
+      url: `/api/providers/${providerId}/models`,
+      payload: { name: 'UpdModel', modelId: 'upd-m', port: 'openai' },
+    });
+    const modelId = JSON.parse(model.body).modelId;
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/api/providers/${providerId}/models/${modelId}`,
+      payload: { name: 'UpdatedModel', modelId: 'upd-m', port: 'openai' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body).success).toBe(true);
+  });
+
+  it('DELETE /api/providers/:providerId/models/:modelId should delete model', async () => {
+    const providers = await app.inject({ method: 'GET', url: '/api/providers' });
+    const providerId = JSON.parse(providers.body).providers[0].id;
+
+    const model = await app.inject({
+      method: 'POST',
+      url: `/api/providers/${providerId}/models`,
+      payload: { name: 'DelModel', modelId: 'del-m', port: 'openai' },
+    });
+    const modelId = JSON.parse(model.body).modelId;
+
+    const response = await app.inject({
+      method: 'DELETE',
+      url: `/api/providers/${providerId}/models/${modelId}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body).success).toBe(true);
+  });
+
+  it('DELETE /api/providers/:providerId/apikeys/:keyId should delete api key', async () => {
+    const providers = await app.inject({ method: 'GET', url: '/api/providers' });
+    const providerId = JSON.parse(providers.body).providers[0].id;
+
+    const key = await app.inject({
+      method: 'POST',
+      url: `/api/providers/${providerId}/apikeys`,
+      payload: { name: 'del-key', key: 'sk-del' },
+    });
+    const keyId = JSON.parse(key.body).keyId;
+
+    const response = await app.inject({
+      method: 'DELETE',
+      url: `/api/providers/${providerId}/apikeys/${keyId}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body).success).toBe(true);
+  });
+
+  it('POST /api/config/logs should update log config', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/config/logs',
+      payload: { log_level: 'ERROR', max_log_files: 5, log_rotation: true },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body).success).toBe(true);
+  });
+
+  it('POST /api/config/logs should reject invalid log level', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/config/logs',
+      payload: { log_level: 'INVALID' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('POST /api/config/logs should reject log dir outside home', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/config/logs',
+      payload: { log_dir: '/tmp/invalid-log-dir' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('POST /api/config/logs/open-dir should return log path', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/config/logs/open-dir',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(typeof body.path).toBe('string');
+  });
+
+  it('GET /api/mcp/notes/:noteId should get a note', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { title: 'MCPNote', content: 'body' },
+    });
+    const noteId = JSON.parse(create.body).note.id;
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/mcp/notes/${noteId}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.note.title).toBe('MCPNote');
+  });
+
+  it('GET /api/mcp/notes/:noteId should 404 for non-existent', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/mcp/notes/non-existent-id',
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
+
+  it('POST /api/mcp/notes should create a note', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/mcp/notes',
+      payload: { title: 'MCPCreate', content: 'content' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.note.title).toBe('MCPCreate');
+  });
+
+  it('PATCH /api/mcp/notes/:noteId should update a note', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/mcp/notes',
+      payload: { title: 'Old', content: 'body' },
+    });
+    const noteId = JSON.parse(create.body).note.id;
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/api/mcp/notes/${noteId}`,
+      payload: { title: 'New' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.note.title).toBe('New');
+  });
+
+  it('PATCH /api/mcp/notes/:noteId should 404 for non-existent', async () => {
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/mcp/notes/non-existent-id',
+      payload: { title: 'New' },
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
+
+  it('DELETE /api/mcp/notes/:noteId should delete a note', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/mcp/notes',
+      payload: { title: 'MCPDel', content: 'body' },
+    });
+    const noteId = JSON.parse(create.body).note.id;
+
+    const response = await app.inject({
+      method: 'DELETE',
+      url: `/api/mcp/notes/${noteId}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body).success).toBe(true);
+  });
+
+  it('DELETE /api/mcp/notes/:noteId should 404 for non-existent', async () => {
+    const response = await app.inject({
+      method: 'DELETE',
+      url: '/api/mcp/notes/non-existent-id',
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
+
+  it('POST /api/mcp/notes/search should search tags only when search_content is false', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/mcp/notes/search',
+      payload: { query: 'Test', limit: 10, search_content: false },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.notes)).toBe(true);
+  });
+
+  it('POST /api/mcp/vault/index should list notes', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/mcp/vault/index',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.notes)).toBe(true);
+  });
+
+  it('POST /api/mcp/vault/read should read notes by ids', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { title: 'VaultRead', content: 'body' },
+    });
+    const noteId = JSON.parse(create.body).note.id;
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/mcp/vault/read',
+      payload: { ids: [noteId], format: 'summary' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.notes)).toBe(true);
+    expect(body.notes.length).toBeGreaterThan(0);
+  });
+
+  it('POST /api/mcp/vault/read should skip non-existent ids', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/mcp/vault/read',
+      payload: { ids: ['non-existent-id'], format: 'detail' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.notes.length).toBe(0);
+  });
+
+  it('POST /api/mcp/vault/read should return detail without links', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { title: 'DetailNoLinks', content: 'body' },
+    });
+    const noteId = JSON.parse(create.body).note.id;
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/mcp/vault/read',
+      payload: { ids: [noteId], format: 'detail' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.notes[0]?.content).toBe('body');
+    expect(body.notes[0]?.linked_notes).toBeUndefined();
+  });
+
+  it('POST /api/mcp/vault/read should support detail format with links', async () => {
+    const create1 = await app.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { title: 'LinkSource', content: 'body' },
+    });
+    const noteId1 = JSON.parse(create1.body).note.id;
+
+    const create2 = await app.inject({
+      method: 'POST',
+      url: '/api/notes',
+      payload: { title: 'LinkTarget', content: 'body' },
+    });
+    const noteId2 = JSON.parse(create2.body).note.id;
+
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/notes/${noteId1}`,
+      payload: { content: `link to [[${noteId2}]]` },
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/mcp/vault/read',
+      payload: { ids: [noteId1], format: 'detail', include_links: true },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.notes)).toBe(true);
+  });
+
+  it('POST /api/config/ai should update AI config', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/config/ai',
+      payload: {
+        current_provider: 'openai',
+        current_model: 'gpt-4',
+        providers: {
+          openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+        },
+        parameters: { temperature: 0.5, top_p: 0.9, max_tokens: 1000, presence_penalty: 0, frequency_penalty: 0 },
+        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body).success).toBe(true);
+  });
+
+  it('POST /api/config/ai should preserve masked api keys', async () => {
+    // First ensure a real key is stored
+    await app.inject({
+      method: 'POST',
+      url: '/api/config/ai',
+      payload: {
+        current_provider: 'openai',
+        current_model: 'gpt-4',
+        providers: {
+          openai: { api_key: 'sk-real-key', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+        },
+        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+        features: { auto_hint: false, auto_explain: false, context_length: 0, agent_enabled: false },
+      },
+    });
+
+    // Send masked key — should preserve the original
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/config/ai',
+      payload: {
+        current_provider: 'openai',
+        current_model: 'gpt-4',
+        providers: {
+          openai: { api_key: '********', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+        },
+        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+        features: { auto_hint: false, auto_explain: false, context_length: 0, agent_enabled: false },
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body).success).toBe(true);
+  });
+
+  it('GET /api/completion/config should return config', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/completion/config',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.config).toBeDefined();
+  });
+
+  it('POST /api/completion/config should update config', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/completion/config',
+      payload: { enabled: false },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body).success).toBe(true);
+  });
+
+  it('POST /api/sessions should create a session', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/sessions',
+      payload: { title: 'Test Session' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.session.title).toBe('Test Session');
+  });
+
+  it('POST /api/sessions/:sessionId/switch should switch session', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/sessions',
+      payload: { title: 'SwitchMe' },
+    });
+    const sessionId = JSON.parse(create.body).session.id;
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/sessions/${sessionId}/switch`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body).success).toBe(true);
+  });
+
+  it('PATCH /api/sessions/:sessionId should rename session', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/sessions',
+      payload: { title: 'OldName' },
+    });
+    const sessionId = JSON.parse(create.body).session.id;
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/api/sessions/${sessionId}`,
+      payload: { title: 'NewName' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body).success).toBe(true);
+  });
+
+  it('DELETE /api/sessions/:sessionId should delete session', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/sessions',
+      payload: { title: 'ToDelete' },
+    });
+    const sessionId = JSON.parse(create.body).session.id;
+
+    const response = await app.inject({
+      method: 'DELETE',
+      url: `/api/sessions/${sessionId}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body).success).toBe(true);
+  });
+
+  it('POST /api/sessions/:sessionId/switch should error for non-existent', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/sessions/non-existent-id/switch',
+    });
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('PATCH /api/sessions/:sessionId should error for non-existent', async () => {
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/sessions/non-existent-id',
+      payload: { title: 'X' },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('DELETE /api/sessions/:sessionId should error for non-existent', async () => {
+    const response = await app.inject({
+      method: 'DELETE',
+      url: '/api/sessions/non-existent-id',
+    });
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('POST /api/notes/import/obsidian should import markdown files', async () => {
+    const vaultDir = path.join(os.tmpdir(), `papyrus-obsidian-test-${Date.now()}`);
+    fs.mkdirSync(vaultDir, { recursive: true });
+    fs.writeFileSync(path.join(vaultDir, 'Test.md'), '# Hello\n\nWorld');
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/notes/import/obsidian',
+      payload: { vault_path: vaultDir },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.imported).toBeGreaterThanOrEqual(1);
+
+    fs.rmSync(vaultDir, { recursive: true, force: true });
+  });
+
+  it('GET /api/tools/pending should return pending calls', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/tools/pending',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.calls)).toBe(true);
+  });
+
+  it('POST /api/tools/approve/:callId should execute pending tool', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/tools/config',
+      payload: { mode: 'manual', auto_execute_tools: [] },
+    });
+
+    const submit = await app.inject({
+      method: 'POST',
+      url: '/api/tools/submit',
+      payload: { tool_name: 'create_card', params: { question: 'Q', answer: 'A' } },
+    });
+    const callId = JSON.parse(submit.body).call?.call_id;
+    expect(callId).toBeTruthy();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/tools/approve/${callId}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.result).toBeDefined();
+  });
+
+  it('POST /api/tools/reject/:callId should reject pending tool', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/tools/config',
+      payload: { mode: 'manual', auto_execute_tools: [] },
+    });
+
+    const submit = await app.inject({
+      method: 'POST',
+      url: '/api/tools/submit',
+      payload: { tool_name: 'create_card', params: { question: 'Q2', answer: 'A2' } },
+    });
+    const callId = JSON.parse(submit.body).call?.call_id;
+    expect(callId).toBeTruthy();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/tools/reject/${callId}`,
+      payload: { reason: 'test' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+  });
+
+  it('GET /api/tools/calls should list calls', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/tools/calls?limit=10',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.calls)).toBe(true);
+  });
+
+  it('GET /api/tools/calls/:callId should get a call', async () => {
+    const submit = await app.inject({
+      method: 'POST',
+      url: '/api/tools/submit',
+      payload: { tool_name: 'get_card_stats', params: {} },
+    });
+    const callId = JSON.parse(submit.body).call?.call_id;
+    expect(callId).toBeTruthy();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/tools/calls/${callId}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.call.call_id).toBe(callId);
+  });
+
+  it('DELETE /api/tools/history should clear history', async () => {
+    const response = await app.inject({
+      method: 'DELETE',
+      url: '/api/tools/history?keep_pending=true',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(typeof body.cleared_count).toBe('number');
+  });
+
+  it('POST /api/tools/approve/:callId should 404 for non-existent', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/tools/approve/no-such-id',
+    });
+    expect(response.statusCode).toBe(404);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('POST /api/tools/reject/:callId should 404 for non-existent', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/tools/reject/no-such-id',
+    });
+    expect(response.statusCode).toBe(404);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('GET /api/tools/calls/:callId should 404 for non-existent', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/tools/calls/no-such-id',
+    });
+    expect(response.statusCode).toBe(404);
+    expect(JSON.parse(response.body).success).toBe(false);
+  });
+
+  it('POST /api/tools/approve/:callId should handle execution error', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/tools/config',
+      payload: { mode: 'manual', auto_execute_tools: [] },
+    });
+
+    const submit = await app.inject({
+      method: 'POST',
+      url: '/api/tools/submit',
+      payload: { tool_name: 'create_card', params: { question: 'Q', answer: 'A' } },
+    });
+    const callId = JSON.parse(submit.body).call?.call_id;
+    expect(callId).toBeTruthy();
+
+    const original = CardTools.prototype.executeTool;
+    CardTools.prototype.executeTool = () => { throw new Error('tool crash'); };
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/tools/approve/${callId}`,
+    });
+
+    CardTools.prototype.executeTool = original;
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(false);
+    expect(body.message).toContain('tool crash');
+  });
+
+  it('POST /api/tools/submit should handle auto-execute error', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/tools/config',
+      payload: { mode: 'auto', auto_execute_tools: [] },
+    });
+
+    const original = CardTools.prototype.executeTool;
+    CardTools.prototype.executeTool = () => { throw new Error('auto crash'); };
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/tools/submit',
+      payload: { tool_name: 'get_card_stats', params: {} },
+    });
+
+    CardTools.prototype.executeTool = original;
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(false);
+    expect(body.message).toContain('auto crash');
   });
 });

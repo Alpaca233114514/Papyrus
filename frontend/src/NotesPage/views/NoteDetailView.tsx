@@ -39,6 +39,12 @@ const md = new MarkdownIt({
   typographer: true,
 });
 
+const ALLOWED_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'ftp:']);
+md.validateLink = (url: string): boolean => {
+  const str = url.trim().toLowerCase();
+  return ALLOWED_SCHEMES.has(str);
+};
+
 export const NoteDetailView = ({
   note,
   isCreateMode,

@@ -297,7 +297,14 @@ export class AIManager {
 
   private safeReadTextFile(absPath: string, maxChars = 6000): string {
     try {
-      return fs.readFileSync(absPath, 'utf8').slice(0, maxChars);
+      const fd = fs.openSync(absPath, 'r');
+      try {
+        const buffer = Buffer.alloc(maxChars * 4);
+        const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, 0);
+        return buffer.toString('utf8', 0, Math.min(bytesRead, maxChars * 4)).slice(0, maxChars);
+      } finally {
+        fs.closeSync(fd);
+      }
     } catch {
       return '';
     }
@@ -499,6 +506,7 @@ export class AIManager {
     const response = await fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(60000),
       body: JSON.stringify({
         model,
         messages,

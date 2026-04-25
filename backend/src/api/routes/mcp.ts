@@ -1,8 +1,7 @@
 import type { FastifyInstance } from 'fastify';
-import { v4 as uuidv4 } from 'uuid';
-import { loadAllNotes, getNoteById, insertNote, updateNote, deleteNoteById } from '../../db/database.js';
+import { loadAllNotes, getNoteById, deleteNoteById } from '../../db/database.js';
 import type { Note } from '../../core/types.js';
-import { computeWordCount, computeHash } from '../../core/notes.js';
+import { createNote, updateNote } from '../../core/notes.js';
 import { logger } from '../server.js';
 
 function noteToInfo(note: Note): Record<string, unknown> {
@@ -66,25 +65,7 @@ export default async function mcpRoutes(fastify: FastifyInstance): Promise<void>
       tags?: string[];
     };
 
-    const content = payload.content ?? '';
-    const now = Date.now() / 1000;
-    const note: Note = {
-      id: uuidv4().replace(/-/g, ''),
-      title: payload.title,
-      folder: payload.folder ?? '默认',
-      content,
-      preview: content.slice(0, 200),
-      tags: payload.tags ?? [],
-      created_at: now,
-      updated_at: now,
-      word_count: computeWordCount(content),
-      hash: computeHash(content),
-      headings: [],
-      outgoing_links: [],
-      incoming_count: 0,
-    };
-
-    insertNote(note, logger);
+    const note = createNote(payload.title, payload.content ?? '', payload.folder, payload.tags ?? [], logger);
     reply.send({ success: true, note: noteToDetail(note) });
   });
 
@@ -92,25 +73,13 @@ export default async function mcpRoutes(fastify: FastifyInstance): Promise<void>
     const { noteId } = request.params as { noteId: string };
     const payload = request.body as Partial<Pick<Note, 'title' | 'folder' | 'content' | 'tags'>>;
 
-    const note = getNoteById(noteId);
-    if (!note) {
+    const updated = updateNote(noteId, payload, logger);
+    if (!updated) {
       reply.status(404).send({ success: false, note: null, error: 'note not found' });
       return;
     }
 
-    if (payload.title !== undefined) note.title = payload.title;
-    if (payload.folder !== undefined) note.folder = payload.folder;
-    if (payload.content !== undefined) {
-      note.content = payload.content;
-      note.preview = payload.content.slice(0, 200);
-      note.word_count = computeWordCount(payload.content);
-      note.hash = computeHash(payload.content);
-    }
-    if (payload.tags !== undefined) note.tags = payload.tags;
-    note.updated_at = Date.now() / 1000;
-
-    updateNote(note, logger);
-    reply.send({ success: true, note: noteToDetail(note) });
+    reply.send({ success: true, note: noteToDetail(updated) });
   });
 
   fastify.delete('/notes/:noteId', async (request, reply) => {

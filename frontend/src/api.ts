@@ -1,12 +1,24 @@
 const BACKEND_URL = 'http://127.0.0.1:8000';
-const BASE = window.location.protocol === 'file:' 
-  ? `${BACKEND_URL}/api` 
+const BASE = window.location.protocol === 'file:'
+  ? `${BACKEND_URL}/api`
   : '/api';
+
+const authTokenPromise =
+  typeof window !== 'undefined' && (window as unknown as { electronAPI?: { getAuthToken?: () => Promise<string | null> } }).electronAPI?.getAuthToken
+    ? (window as unknown as { electronAPI: { getAuthToken: () => Promise<string | null> } }).electronAPI.getAuthToken()
+    : Promise.resolve<string | null>(null);
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
+    const token = await authTokenPromise;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['X-Papyrus-Token'] = token;
+    }
     const res = await fetch(`${BASE}${path}`, {
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       ...init,
     });
     if (!res.ok) {
@@ -54,11 +66,11 @@ export type ListNotesRes = { success: boolean; notes: Note[]; count: number };
 export type CreateNoteRes = { success: boolean; note: Note };
 export type UpdateNoteRes = { success: boolean; note: Note };
 export type DeleteNoteRes = { success: boolean };
-export type ImportObsidianRes = { 
-  success: boolean; 
-  imported: number; 
-  skipped: number; 
-  errors: string[];
+export type ImportObsidianRes = {
+  success: boolean;
+  imported: number;
+  skipped: number;
+  errors: number;
 };
 
 // ========== Search Types ==========

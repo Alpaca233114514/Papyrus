@@ -41,6 +41,12 @@ describe('MCPServer', () => {
     expect(server.getAuthToken()).toBe('test-token');
   });
 
+  it('should generate auth token when not provided', () => {
+    server = new MCPServer({ port: 0 });
+    expect(server.getAuthToken()).toBeTruthy();
+    expect(server.getAuthToken().length).toBeGreaterThan(0);
+  });
+
   it('should respond to health check', async () => {
     server = new MCPServer({ port: 0, authToken: 'test-token' });
     await server.start();
@@ -105,5 +111,114 @@ describe('MCPServer', () => {
       headers: { Origin: 'http://localhost:3000' },
     });
     expect(res.status).toBe(204);
+  });
+
+  it('should handle invalid origin in CORS preflight', async () => {
+    server = new MCPServer({ port: 0, authToken: 'test' });
+    await server.start();
+    const port = server.getActualPort();
+
+    const res = await makeRequest(port, '/health', {
+      method: 'OPTIONS',
+      headers: { Origin: 'not-a-valid-url' },
+    });
+    expect(res.status).toBe(204);
+  });
+
+  it('should resolve immediately if already started', async () => {
+    server = new MCPServer({ port: 0, authToken: 'test' });
+    await server.start();
+    await expect(server.start()).resolves.toBeUndefined();
+  });
+
+  it('should return 404 for unknown path', async () => {
+    server = new MCPServer({ port: 0, authToken: 'test' });
+    await server.start();
+    const port = server.getActualPort();
+
+    const res = await makeRequest(port, '/unknown');
+    expect(res.status).toBe(404);
+  });
+
+  it('should reject invalid JSON body', async () => {
+    server = new MCPServer({ port: 0, authToken: 'secret' });
+    await server.start();
+    const port = server.getActualPort();
+
+    const res = await makeRequest(port, '/call', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer secret' },
+      body: 'not-json',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('should reject non-object body', async () => {
+    server = new MCPServer({ port: 0, authToken: 'secret' });
+    await server.start();
+    const port = server.getActualPort();
+
+    const res = await makeRequest(port, '/call', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer secret' },
+      body: '123',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('should reject missing tool field', async () => {
+    server = new MCPServer({ port: 0, authToken: 'secret' });
+    await server.start();
+    const port = server.getActualPort();
+
+    const res = await makeRequest(port, '/call', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer secret' },
+      body: JSON.stringify({ params: {} }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('should execute vault_read tool', async () => {
+    server = new MCPServer({ port: 0, authToken: 'secret' });
+    await server.start();
+    const port = server.getActualPort();
+
+    const res = await makeRequest(port, '/call', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer secret' },
+      body: JSON.stringify({ tool: 'vault_read', params: { ids: [] } }),
+    });
+    expect(res.status).toBe(200);
+    expect((res.body as Record<string, unknown>).success).toBe(true);
+  });
+
+  it('should return error for unknown vault tool', async () => {
+    server = new MCPServer({ port: 0, authToken: 'secret' });
+    await server.start();
+    const port = server.getActualPort();
+
+    const res = await makeRequest(port, '/call', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer secret' },
+      body: JSON.stringify({ tool: 'vault_watch', params: {} }),
+    });
+    expect(res.status).toBe(200);
+    expect((res.body as Record<string, unknown>).success).toBe(false);
+  });
+
+  it('should execute vault_index tool', async () => {
+    server = new MCPServer({ port: 0, authToken: 'secret' });
+    await server.start();
+    const port = server.getActualPort();
+
+    const res = await makeRequest(port, '/call', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer secret' },
+      body: JSON.stringify({ tool: 'vault_index', params: {} }),
+    });
+    expect(res.status).toBe(200);
+    expect((res.body as Record<string, unknown>).success).toBe(true);
+    expect(Array.isArray((res.body as Record<string, unknown>).notes)).toBe(true);
   });
 });

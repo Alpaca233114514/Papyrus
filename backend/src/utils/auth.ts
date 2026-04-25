@@ -1,0 +1,64 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { randomBytes } from 'node:crypto';
+import { paths } from './paths.js';
+
+const TOKEN_FILE = path.join(paths.dataDir, '.api_token');
+
+function generateToken(): string {
+  return randomBytes(32).toString('base64url');
+}
+
+function readTokenFile(): string | null {
+  try {
+    if (fs.existsSync(TOKEN_FILE)) {
+      return fs.readFileSync(TOKEN_FILE, 'utf8').trim();
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function writeTokenFile(token: string): void {
+  try {
+    fs.mkdirSync(paths.dataDir, { recursive: true });
+    fs.writeFileSync(TOKEN_FILE, token, { mode: 0o600 });
+  } catch {
+    // ignore
+  }
+}
+
+export function getOrCreateAuthToken(): string {
+  const envToken = process.env.PAPYRUS_AUTH_TOKEN;
+  if (envToken && envToken.length >= 32) {
+    return envToken;
+  }
+  const fileToken = readTokenFile();
+  if (fileToken && fileToken.length >= 32) {
+    return fileToken;
+  }
+  const newToken = generateToken();
+  writeTokenFile(newToken);
+  return newToken;
+}
+
+export function getAuthToken(): string | null {
+  const envToken = process.env.PAPYRUS_AUTH_TOKEN;
+  if (envToken && envToken.length >= 32) {
+    return envToken;
+  }
+  return readTokenFile();
+}
+
+export function isAuthEnabled(): boolean {
+  return !!getAuthToken();
+}
+
+export function validateRequestToken(headerToken?: string): boolean {
+  const expected = getAuthToken();
+  if (!expected) {
+    return true;
+  }
+  return !!headerToken && headerToken === expected;
+}

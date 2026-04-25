@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { DatabaseSync } from 'node:sqlite';
 import { paths } from '../../utils/paths.js';
+import { recordCardCreated, recordCardReviewed, recordNoteCreated } from '../../core/progress.js';
 
 function getProgressDb(): DatabaseSync {
   const db = new DatabaseSync(paths.dbFile);
@@ -18,30 +19,6 @@ function getProgressDb(): DatabaseSync {
 
 function getToday(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-function recordActivity(type: 'cards_created' | 'cards_reviewed' | 'notes_created', count = 1): void {
-  const db = getProgressDb();
-  const today = getToday();
-  const stmt = db.prepare(`
-    INSERT INTO daily_progress (date, ${type})
-    VALUES (?, ?)
-    ON CONFLICT(date) DO UPDATE SET ${type} = ${type} + excluded.${type}
-  `);
-  stmt.run(today, count);
-  db.close();
-}
-
-export function recordCardCreated(): void {
-  recordActivity('cards_created');
-}
-
-export function recordCardReviewed(): void {
-  recordActivity('cards_reviewed');
-}
-
-export function recordNoteCreated(): void {
-  recordActivity('notes_created');
 }
 
 export default async function progressRoutes(fastify: FastifyInstance): Promise<void> {
@@ -99,7 +76,8 @@ export default async function progressRoutes(fastify: FastifyInstance): Promise<
 
   fastify.get('/history', async (request, reply) => {
     const { days = '30' } = request.query as { days?: string };
-    const numDays = parseInt(days, 10);
+    const parsedDays = parseInt(days, 10);
+    const numDays = Number.isFinite(parsedDays) && parsedDays > 0 ? parsedDays : 30;
     const db = getProgressDb();
     const stmt = db.prepare('SELECT * FROM daily_progress ORDER BY date DESC LIMIT ?');
     const rows = stmt.all(numDays) as Array<{
@@ -126,7 +104,8 @@ export default async function progressRoutes(fastify: FastifyInstance): Promise<
 
   fastify.get('/heatmap', async (request, reply) => {
     const { days = '365' } = request.query as { days?: string };
-    const numDays = parseInt(days, 10);
+    const parsedDays = parseInt(days, 10);
+    const numDays = Number.isFinite(parsedDays) && parsedDays > 0 ? parsedDays : 365;
     const db = getProgressDb();
     const stmt = db.prepare('SELECT * FROM daily_progress ORDER BY date DESC LIMIT ?');
     const rows = stmt.all(numDays) as Array<{ date: string; cards_reviewed: number }>;

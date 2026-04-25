@@ -312,7 +312,7 @@ export class AIConfig {
     const cfg: AIConfigData = JSON.parse(JSON.stringify(this.config));
     for (const provider of Object.values(cfg.providers)) {
       const key = provider.api_key;
-      if (key) {
+      if (key && !key.startsWith('enc:')) {
         provider.api_key = encryptApiKey(key);
       }
     }

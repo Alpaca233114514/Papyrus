@@ -1,6 +1,9 @@
 import type { FastifyInstance } from 'fastify';
+import { createRequire } from 'node:module';
 
-const CURRENT_VERSION = 'v2.0.0-beta.2';
+const require = createRequire(import.meta.url);
+const pkg = require('../../../package.json');
+const CURRENT_VERSION = pkg.version as string;
 const REPO = 'PapyrusOR/Papyrus_Desktop';
 
 export default async function updateRoutes(fastify: FastifyInstance): Promise<void> {

@@ -13,7 +13,11 @@ const path = require('path');
 const fs = require('fs');
 const { spawn, exec, execSync } = require('child_process');
 const os = require('os');
+const crypto = require('crypto');
 const { createDiagnosticWindow } = require('./diagnostic-window');
+
+// Generate a per-session auth token for backend API protection
+const PAPYRUS_AUTH_TOKEN = crypto.randomBytes(32).toString('base64url');
 
 // In-memory log storage for diagnostics
 const startupLogs = [];
@@ -163,6 +167,7 @@ async function startBackend() {
     ...process.env,
     PAPYRUS_DATA_DIR: app.getPath('userData'),
     PAPYRUS_PORT: CONFIG.backendPort.toString(),
+    PAPYRUS_AUTH_TOKEN: PAPYRUS_AUTH_TOKEN,
   };
 
   backendProcess = spawn(command, args, {
@@ -387,7 +392,10 @@ function setupIPC() {
   
   // Check if development mode
   ipcMain.handle('app:isDev', () => isDevMode);
-  
+
+  // Get backend auth token (for API requests from renderer)
+  ipcMain.handle('app:getAuthToken', () => PAPYRUS_AUTH_TOKEN);
+
   // Open external link
   ipcMain.handle('shell:openExternal', async (event, url) => {
     // SECURITY: whitelist protocols to prevent RCE via dangerous protocols
@@ -578,11 +586,19 @@ app.on('web-contents-created', (event, contents) => {
 // Handle certificate errors in development
 app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
   if (isDevMode) {
-    event.preventDefault();
-    callback(true);
-  } else {
-    callback(false);
+    try {
+      const parsed = new URL(url);
+      if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+        log(`[SECURITY WARNING] Ignoring certificate error for ${url} in dev mode`, 'warning');
+        event.preventDefault();
+        callback(true);
+        return;
+      }
+    } catch {
+      // invalid URL, fall through to deny
+    }
   }
+  callback(false);
 });
 
 // Kill all Papyrus processes (for Windows installer/updater)
@@ -600,14 +616,6 @@ function killAllPapyrusProcesses() {
     } catch (e) {
       // No processes found or already killed
     }
-    // Kill PapyrusAPI.exe (backend)
-    try {
-      execSync('taskkill /F /IM PapyrusAPI.exe 2>nul', { stdio: 'pipe' });
-      log('Killed PapyrusAPI.exe processes');
-    } catch (e) {
-      // No processes found or already killed
-    }
-    // Kill any python processes spawned by Papyrus (by window title or check parent)
     // Wait a bit for processes to fully terminate
     execSync('timeout /t 1 /nobreak >nul 2>&1', { stdio: 'pipe' });
   } catch (error) {
@@ -625,6 +633,7 @@ const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   log('Another instance is already running, quitting...');
   app.quit();
+  return;
 } else {
   app.on('second-instance', (event, commandLine, workingDirectory) => {
     log('Second instance detected, focusing window');

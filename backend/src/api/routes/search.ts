@@ -1,6 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { loadAllNotes } from '../../db/database.js';
-import { loadAllCards } from '../../db/database.js';
+import { loadAllNotes, loadAllCards } from '../../db/database.js';
 
 export default async function searchRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get('/', async (request, reply) => {

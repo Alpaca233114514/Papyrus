@@ -5,12 +5,13 @@
 
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 // Check if running in CI environment
 const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
 
-// Certificate configuration (only for local builds)
-const certificateFile = 'build/code-signing.pfx';
+// Certificate configuration (only for local builds, stored outside project dir)
+const certificateFile = path.join(os.homedir(), '.papyrus-certs', 'code-signing.pfx');
 const hasCertificate = fs.existsSync(certificateFile);
 
 module.exports = {
@@ -33,24 +34,14 @@ module.exports = {
   
   extraResources: [
     {
-      from: 'dist-python',
-      to: 'python',
-      filter: ['**/*'],
-    },
-    {
       from: 'assets',
       to: 'assets',
       filter: ['**/*'],
     },
-    {
-      from: 'build/root-ca.cer',
-      to: 'certs/root-ca.cer',
-    },
   ],
-  
+
   asar: true,
   asarUnpack: [
-    '**/python/**/*',
     '**/*.exe',
     '**/*.dll',
     '**/*.so',

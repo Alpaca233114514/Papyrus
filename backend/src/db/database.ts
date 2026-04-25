@@ -28,7 +28,10 @@ function closeDb(): void {
 }
 
 function initSchema(database: DatabaseSync): void {
-  const isNewDb = !fs.existsSync(paths.dbFile) || fs.statSync(paths.dbFile).size === 0;
+  const tableCheck = database.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='cards'"
+  );
+  const isNewDb = tableCheck.get() === undefined;
 
   database.exec(`
     CREATE TABLE IF NOT EXISTS cards (
@@ -222,14 +225,21 @@ export function loadAllCards(logger?: PapyrusLogger): CardRecord[] {
 
 export function saveAllCards(cards: CardRecord[], logger?: PapyrusLogger): void {
   const database = getDb();
-  database.exec('DELETE FROM cards');
-  const stmt = database.prepare(
-    'INSERT INTO cards (id, q, a, next_review, interval, ef, repetitions, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-  );
-  for (const card of cards) {
-    stmt.run(card.id, card.q, card.a, card.next_review, card.interval, card.ef, card.repetitions, tagsToJson(card.tags));
+  database.exec('BEGIN TRANSACTION;');
+  try {
+    database.exec('DELETE FROM cards');
+    const stmt = database.prepare(
+      'INSERT INTO cards (id, q, a, next_review, interval, ef, repetitions, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    );
+    for (const card of cards) {
+      stmt.run(card.id, card.q, card.a, card.next_review, card.interval, card.ef, card.repetitions, tagsToJson(card.tags));
+    }
+    database.exec('COMMIT;');
+    logger?.info(`保存 ${cards.length} 张卡片到数据库`);
+  } catch (e) {
+    database.exec('ROLLBACK;');
+    throw e;
   }
-  logger?.info(`保存 ${cards.length} 张卡片到数据库`);
 }
 
 export function insertCard(card: CardRecord, logger?: PapyrusLogger): void {
@@ -379,18 +389,25 @@ export function loadAllNotes(logger?: PapyrusLogger): Note[] {
 
 export function saveAllNotes(notes: Note[], logger?: PapyrusLogger): void {
   const database = getDb();
-  database.exec('DELETE FROM notes');
-  const stmt = database.prepare(
-    'INSERT INTO notes (id, title, folder, content, preview, tags, created_at, updated_at, word_count, hash, headings, outgoing_links, incoming_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  );
-  for (const note of notes) {
-    stmt.run(
-      note.id, note.title, note.folder, note.content, note.preview,
-      tagsToJson(note.tags), note.created_at, note.updated_at, note.word_count,
-      note.hash, JSON.stringify(note.headings), JSON.stringify(note.outgoing_links), note.incoming_count
+  database.exec('BEGIN TRANSACTION;');
+  try {
+    database.exec('DELETE FROM notes');
+    const stmt = database.prepare(
+      'INSERT INTO notes (id, title, folder, content, preview, tags, created_at, updated_at, word_count, hash, headings, outgoing_links, incoming_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
+    for (const note of notes) {
+      stmt.run(
+        note.id, note.title, note.folder, note.content, note.preview,
+        tagsToJson(note.tags), note.created_at, note.updated_at, note.word_count,
+        note.hash, JSON.stringify(note.headings), JSON.stringify(note.outgoing_links), note.incoming_count
+      );
+    }
+    database.exec('COMMIT;');
+    logger?.info(`保存 ${notes.length} 条笔记到数据库`);
+  } catch (e) {
+    database.exec('ROLLBACK;');
+    throw e;
   }
-  logger?.info(`保存 ${notes.length} 条笔记到数据库`);
 }
 
 export function insertNote(note: Note, logger?: PapyrusLogger): void {
@@ -697,4 +714,4 @@ export function runInTransaction(fn: () => void): void {
   }
 }
 
-export { closeDb };
+export { closeDb, getDb };

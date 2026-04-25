@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { getAllCards, createCard, updateCard, deleteCard, importCardsFromTxt } from '../../core/cards.js';
-import { recordCardCreated } from './progress.js';
+import { recordCardCreated } from '../../core/progress.js';
 
 export default async function cardsRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get('/', async (_request, reply) => {

@@ -11,13 +11,7 @@
     "!frontend/node_modules/**/*",
     "!**/*.map"
   ],
-  "extraResources": [
-    {
-      "from": "dist-python",
-      "to": "python",
-      "filter": ["**/*"]
-    }
-  ],
+  "extraResources": [],
   "win": {
     "target": [
       {

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { paths } from '../../utils/paths.js';
 import { PapyrusLogger } from '../../utils/logger.js';
 
@@ -35,6 +36,15 @@ export default async function logsRoutes(fastify: FastifyInstance): Promise<void
     }
 
     if (body.log_dir) {
+      const resolvedLogDir = path.resolve(body.log_dir);
+      const resolvedDataDir = path.resolve(paths.dataDir);
+      const homeDir = path.resolve(os.homedir());
+      const isUnderDataDir = resolvedLogDir === resolvedDataDir || resolvedLogDir.startsWith(resolvedDataDir + path.sep);
+      const isUnderHomeDir = resolvedLogDir === homeDir || resolvedLogDir.startsWith(homeDir + path.sep);
+      if (!isUnderDataDir && !isUnderHomeDir) {
+        reply.status(400).send({ success: false, error: 'Log directory must be within the user home or application data directory' });
+        return;
+      }
       globalLogger?.setLogDir(body.log_dir);
     }
     if (body.log_level) {

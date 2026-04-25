@@ -133,11 +133,11 @@ function createDiagnosticWindow(logs, paths, error) {
   ` : ''}
 
   <script>
-    const pythonPath = ${JSON.stringify(paths.pythonExecutableDir)};
-    
-    if (pythonPath && window.diagnosticAPI) {
+    const backendDir = ${JSON.stringify(paths.backendCwd)};
+
+    if (backendDir && window.diagnosticAPI) {
       try {
-        document.getElementById('dirContents').textContent = window.diagnosticAPI.listDir(pythonPath);
+        document.getElementById('dirContents').textContent = window.diagnosticAPI.listDir(backendDir);
       } catch (e) {
         document.getElementById('dirContents').textContent = 'Error: ' + e.message;
       }

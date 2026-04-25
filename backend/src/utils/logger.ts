@@ -94,7 +94,7 @@ export class PapyrusLogger {
 
     try {
       const files = fs.readdirSync(this._logDir)
-        .filter(f => f.endsWith('.log') && !f.startsWith('papyrus.log'))
+        .filter(f => f.endsWith('.log') && f.includes('.backup.'))
         .map(f => ({
           path: path.join(this._logDir, f),
           mtime: fs.statSync(path.join(this._logDir, f)).mtimeMs,
