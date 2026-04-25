@@ -216,4 +216,43 @@ describe('PapyrusLogger', () => {
     expect(logger.getConfig().max_log_files).toBe(1);
     spy.mockRestore();
   });
+
+  it('should rotate log file when size exceeds 10MB', () => {
+    const logger = new PapyrusLogger(testDir, 'DEBUG', 3, true);
+
+    // 手动把日志文件塞到 11MB（超过 10MB 阈值）
+    const bigContent = 'x'.repeat(11 * 1024 * 1024);
+    fs.writeFileSync(path.join(testDir, 'papyrus.log'), bigContent);
+
+    // 写一条新日志，触发轮转
+    logger.info('after rotation');
+
+    // 验证：目录里出现了 .backup. 文件
+    const files = fs.readdirSync(testDir);
+    const backups = files.filter(f => f.includes('.backup.'));
+    expect(backups.length).toBe(1);
+
+    // 验证：新日志写到了新文件里
+    const logs = logger.getLogs('all', 10);
+    expect(logs.some(l => l.includes('after rotation'))).toBe(true);
+  });
+
+  it('should clean up old backups when rotating', () => {
+    const logger = new PapyrusLogger(testDir, 'DEBUG', 2, true);
+
+    // 手动创建 3 个假的老备份文件
+    fs.writeFileSync(path.join(testDir, 'papyrus.backup.2024-01-01-00-00-00.log'), 'old1');
+    fs.writeFileSync(path.join(testDir, 'papyrus.backup.2024-02-01-00-00-00.log'), 'old2');
+    fs.writeFileSync(path.join(testDir, 'papyrus.backup.2024-03-01-00-00-00.log'), 'old3');
+
+    // 让主日志文件超过 10MB
+    fs.writeFileSync(path.join(testDir, 'papyrus.log'), 'x'.repeat(11 * 1024 * 1024));
+
+    // 触发轮转
+    logger.info('trigger cleanup');
+
+    // 验证：备份文件数量不超过 max_log_files（2 个）
+    const files = fs.readdirSync(testDir).filter(f => f.includes('.backup.'));
+    expect(files.length).toBeLessThanOrEqual(2);
+  });
 });

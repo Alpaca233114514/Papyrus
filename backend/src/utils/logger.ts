@@ -1,5 +1,7 @@
-import fs from 'node:fs';
+import fs, { Dir } from 'node:fs';
 import path from 'node:path';
+import { backup } from 'node:sqlite';
+import { Chat } from 'openai/resources.mjs';
 
 export type JSONScalar = string | number | boolean | null;
 export interface JSONObject {
@@ -117,14 +119,29 @@ export class PapyrusLogger {
     if (!this._logRotation) return;
     try {
       const stats = fs.statSync(filePath);
-      if (stats.size > 10 * 1024 * 1024) {
-        const content = fs.readFileSync(filePath, 'utf8');
-        const lines = content.split('\n');
-        const keep = lines.slice(-1000);
-        fs.writeFileSync(filePath, keep.join('\n'), 'utf8');
+      if (stats.size > 10 * 1024 * 1024) { 
+      //.todo:
+      //.1.生成时间戳字符串：XXXX-XX-XX-XX-XX-XX
+      const now = new Date();
+      const timestamp = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2,'0'),
+        String(now.getDate()).padStart(2,'0'),
+        String(now.getHours()).padStart(2,'0'),
+        String(now.getMinutes()).padStart(2,'0'),
+        String(now.getSeconds()).padStart(2,'0'),
+      ].join('-');
+      //.2.构造备份文件名称：原文件名去log，backup，时间戳与log
+      const dir= path.dirname(filePath);
+      const basename =path.basename(filePath,'.log');
+      const backupFile = path.join(dir,basename+'.backup.'+timestamp+'.log');
+      //.3.用fs.renameSync把原文件移到备份名
+      fs.renameSync(filePath,backupFile);
+      fs.writeFileSync(filePath,'','utf8');
+      this._cleanupOldLogs();
       }
-    } catch {
-      // Ignore
+    } catch (e){
+      console.error(`日志轮转失败: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
@@ -132,12 +149,12 @@ export class PapyrusLogger {
     if (!this._shouldLog(level)) return;
 
     const line = formatLogLine(level, message);
-    this._writeToFile(this.logFile, line);
     this._truncateIfNeeded(this.logFile);
+    this._writeToFile(this.logFile, line);
 
     if (level === 'ERROR') {
-      this._writeToFile(this.errorLogFile, line);
-      this._truncateIfNeeded(this.errorLogFile);
+    this._truncateIfNeeded(this.errorLogFile); 
+    this._writeToFile(this.errorLogFile, line);
     }
 
     if (level !== 'DEBUG') {
