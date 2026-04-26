@@ -9,12 +9,18 @@ import { CardTools } from '../../src/ai/tools.js';
 let aiManagerSingleton: Record<string, unknown> | null = null;
 
 describe('API Integration Tests', () => {
+  const testDir = path.join(os.tmpdir(), `papyrus-api-test-${Date.now()}`);
+
   beforeAll(async () => {
+    fs.mkdirSync(testDir, { recursive: true });
+    process.env.PAPYRUS_DATA_DIR = testDir;
     await initApp();
   });
 
   afterAll(() => {
     closeDb();
+    fs.rmSync(testDir, { recursive: true, force: true });
+    delete process.env.PAPYRUS_DATA_DIR;
   });
 
   it('GET /api/health should return ok', async () => {

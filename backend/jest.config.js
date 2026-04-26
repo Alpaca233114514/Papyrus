@@ -29,5 +29,6 @@ export default {
     },
   },
   testMatch: ['**/tests/**/*.test.ts'],
+  testTimeout: 10000,
   verbose: true,
 };

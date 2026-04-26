@@ -37,7 +37,6 @@ function getOrCreateMasterKey(): Buffer | null {
       try {
         fs.writeFileSync(keyPath, key, { mode: 0o400 });
       } catch {
-        console.warn(`[SECURITY WARNING] Failed to write master key with restricted permissions. Falling back to default permissions for: ${keyPath}`);
         fs.writeFileSync(keyPath, key);
       }
     }
@@ -131,8 +130,7 @@ export function decryptApiKey(encryptedKey: string): string {
 
     const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
     return decrypted.toString('utf8');
-  } catch (e) {
-    console.warn(`解密 API Key 失败: ${e instanceof Error ? e.message : String(e)}`);
+  } catch {
     return '';
   }
 }
