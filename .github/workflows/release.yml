@@ -277,6 +277,30 @@ jobs:
           name: release-notes
           path: .
 
+      - name: Extract Changelog Section
+        shell: bash
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          echo "Extracting CHANGELOG section for $TAG"
+          awk -v ver="$TAG" '
+            BEGIN { target = "## [" ver "]" }
+            index($0, target) == 1 { flag = 1; print; next }
+            flag && index($0, "## ") == 1 { exit }
+            flag { print }
+          ' CHANGELOG.md > CHANGELOG_SECTION.md
+          if [ ! -s CHANGELOG_SECTION.md ]; then
+            echo "Warning: no CHANGELOG section found for $TAG, falling back to generated notes"
+            cp RELEASE_NOTES.md CHANGELOG_SECTION.md
+          else
+            echo "" >> CHANGELOG_SECTION.md
+            echo "---" >> CHANGELOG_SECTION.md
+            echo "" >> CHANGELOG_SECTION.md
+            cat RELEASE_NOTES.md >> CHANGELOG_SECTION.md
+          fi
+          echo "=== Final release body ==="
+          cat CHANGELOG_SECTION.md
+          echo "=========================="
+
       - name: List Artifacts
         run: |
           echo "Build artifacts:"
@@ -305,7 +329,7 @@ jobs:
             artifacts/Papyrus-Linux-x64/dist-electron/*.tar.gz
           tag_name: ${{ steps.tag.outputs.tag }}
           name: ${{ steps.tag.outputs.tag }}
-          body_path: RELEASE_NOTES.md
+          body_path: CHANGELOG_SECTION.md
           draft: true
           prerelease: ${{ steps.release_type.outputs.is_prerelease == 'true' }}
           generate_release_notes: false
