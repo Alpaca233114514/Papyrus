@@ -9,17 +9,20 @@ function ensureDir(dirPath: string): string {
   return dirPath;
 }
 
-const dataDir = process.env.PAPYRUS_DATA_DIR
-  ? path.resolve(process.env.PAPYRUS_DATA_DIR)
-  : path.join(os.homedir(), 'PapyrusData');
+function getDataDir(): string {
+  const dir = process.env.PAPYRUS_DATA_DIR
+    ? path.resolve(process.env.PAPYRUS_DATA_DIR)
+    : path.join(os.homedir(), 'PapyrusData');
+  return ensureDir(dir);
+}
 
 export const paths = {
-  dataDir: ensureDir(dataDir),
-  dbFile: path.join(dataDir, 'papyrus.db'),
-  dataFile: path.join(dataDir, 'data.json'),
-  aiConfigFile: path.join(dataDir, 'ai_config.json'),
-  masterKeyFile: path.join(dataDir, '.master_key'),
-  logDir: ensureDir(path.join(dataDir, 'logs')),
-  vaultDir: path.join(dataDir, 'vault'),
-  backupDir: ensureDir(path.join(dataDir, 'backups')),
+  get dataDir() { return getDataDir(); },
+  get dbFile() { return path.join(getDataDir(), 'papyrus.db'); },
+  get dataFile() { return path.join(getDataDir(), 'data.json'); },
+  get aiConfigFile() { return path.join(getDataDir(), 'ai_config.json'); },
+  get masterKeyFile() { return path.join(getDataDir(), '.master_key'); },
+  get logDir() { return ensureDir(path.join(getDataDir(), 'logs')); },
+  get vaultDir() { return path.join(getDataDir(), 'vault'); },
+  get backupDir() { return ensureDir(path.join(getDataDir(), 'backups')); },
 };

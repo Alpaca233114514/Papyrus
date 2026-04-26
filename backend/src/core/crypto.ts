@@ -31,11 +31,15 @@ function getOrCreateMasterKey(): Buffer | null {
     const key = generateMasterKey();
     fs.mkdirSync(path.dirname(keyPath), { recursive: true });
 
-    try {
-      fs.writeFileSync(keyPath, key, { mode: 0o400 });
-    } catch {
-      console.error(`[SECURITY WARNING] Failed to write master key with restricted permissions. Falling back to default permissions for: ${keyPath}`);
+    if (process.platform === 'win32') {
       fs.writeFileSync(keyPath, key);
+    } else {
+      try {
+        fs.writeFileSync(keyPath, key, { mode: 0o400 });
+      } catch {
+        console.warn(`[SECURITY WARNING] Failed to write master key with restricted permissions. Falling back to default permissions for: ${keyPath}`);
+        fs.writeFileSync(keyPath, key);
+      }
     }
 
     return key;
@@ -54,10 +58,14 @@ function getOrCreateSalt(): Buffer {
     const salt = randomBytes(SALT_LENGTH);
     fs.mkdirSync(path.dirname(saltPath), { recursive: true });
 
-    try {
-      fs.writeFileSync(saltPath, salt, { mode: 0o600 });
-    } catch {
+    if (process.platform === 'win32') {
       fs.writeFileSync(saltPath, salt);
+    } else {
+      try {
+        fs.writeFileSync(saltPath, salt, { mode: 0o600 });
+      } catch {
+        fs.writeFileSync(saltPath, salt);
+      }
     }
 
     return salt;
@@ -124,7 +132,7 @@ export function decryptApiKey(encryptedKey: string): string {
     const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
     return decrypted.toString('utf8');
   } catch (e) {
-    console.error(`解密 API Key 失败: ${e instanceof Error ? e.message : String(e)}`);
+    console.warn(`解密 API Key 失败: ${e instanceof Error ? e.message : String(e)}`);
     return '';
   }
 }

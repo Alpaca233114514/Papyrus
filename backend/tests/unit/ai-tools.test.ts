@@ -39,8 +39,6 @@ describe('AIResponseParser', () => {
 
   afterAll(() => {
     closeDb();
-    fs.rmSync(testDir, { recursive: true, force: true });
-    delete process.env.PAPYRUS_DATA_DIR;
   });
 
   it('should parse reasoning tags', () => {

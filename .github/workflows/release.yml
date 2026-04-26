@@ -38,12 +38,15 @@ jobs:
       matrix:
         include:
           - platform: "windows"
+            target: "win"
             os: windows-latest
             artifact: "Papyrus-Win-x64"
           - platform: "macos"
+            target: "mac"
             os: macos-latest
             artifact: "Papyrus-Apple-Silicon-arm64"
           - platform: "linux"
+            target: "linux"
             os: ubuntu-latest
             artifact: "Papyrus-Linux-x64"
 
@@ -135,7 +138,7 @@ jobs:
             electron-${{ matrix.platform }}-
 
       - name: Build Electron App
-        run: npx electron-builder --${{ matrix.platform }}
+        run: npx electron-builder --${{ matrix.target }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # macOS signing: uncomment and set secrets when Apple Developer ID is available
@@ -229,7 +232,7 @@ jobs:
     name: Create Draft Release
     needs: [build, generate-notes]
     runs-on: ubuntu-latest
-    if: github.event.inputs.create_release == 'true' || startsWith(github.ref, 'refs/tags/v')
+    if: inputs.create_release == true || startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
 
