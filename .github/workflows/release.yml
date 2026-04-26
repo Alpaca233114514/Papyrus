@@ -90,7 +90,22 @@ jobs:
 
       - name: Test Backend
         working-directory: backend
-        run: npm test
+        shell: bash
+        run: |
+          npm test -- --verbose 2>&1 | tee test-output.log
+          TEST_EXIT=${PIPESTATUS[0]}
+          if [ $TEST_EXIT -ne 0 ]; then
+            echo "Tests failed with exit code $TEST_EXIT"
+            exit $TEST_EXIT
+          fi
+
+      - name: Upload Test Output on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output-${{ matrix.platform }}
+          path: backend/test-output.log
+          retention-days: 1
 
       - name: Build Frontend
         working-directory: frontend
