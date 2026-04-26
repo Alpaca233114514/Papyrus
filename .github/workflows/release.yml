@@ -227,7 +227,7 @@ jobs:
 
       - name: Generate Release Notes
         run: |
-          node scripts/generate-release-notes.js main HEAD
+          node scripts/generate-release-notes.js origin/main HEAD
           echo ""
           echo "=== Generated Release Notes ==="
           cat RELEASE_NOTES.md
