@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - develop
+      - 'TS后端重写'
     tags:
       - 'v*'
   pull_request:
