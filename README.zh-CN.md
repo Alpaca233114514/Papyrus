@@ -2,7 +2,7 @@
 
 [English](README.md) · **简体中文** · [日本語](README.ja.md)
 
-> ⚠️ **预览版 README** — 本版本描述的是即将到来的 **`v2.0.0-beta.3`**(TypeScript / Fastify 后端)。`main` 上的代码仍是旧的 Python 版本。本文件通过 PR 先于后端重写合并 —— 文中提到的特性与安装方式仅在后端重写合入 `main` 后才适用。
+> ⚠️ **预览版 README** — 本版本描述的是即将到来的 **`v2.0.0`**(TypeScript / Fastify 后端)。`main` 上的代码仍是旧的 Python 版本。本文件通过 PR 先于后端重写合并 —— 文中提到的特性与安装方式仅在后端重写合入 `main` 后才适用。
 
 ![Version](https://img.shields.io/badge/version-v2.0.0--beta.3-blue)
 ![Node.js](https://img.shields.io/badge/Node.js-24-339933)
