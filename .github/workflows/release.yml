@@ -153,16 +153,10 @@ jobs:
           restore-keys: |
             electron-${{ matrix.platform }}-
 
+      # macOS signing: uncomment the env block below and set the secrets when an Apple Developer ID is available.
+      #   CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID
       - name: Build Electron App
-        run: npx electron-builder --${{ matrix.target }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # macOS signing: uncomment and set secrets when Apple Developer ID is available
-          # CSC_LINK: ${{ secrets.CSC_LINK }}
-          # CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          # APPLE_ID: ${{ secrets.APPLE_ID }}
-          # APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npx electron-builder --${{ matrix.target }} --publish=never
 
       - name: Verify Electron Build
         shell: bash
