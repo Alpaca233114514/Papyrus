@@ -414,6 +414,7 @@ export class AIManager {
     userMessage: string,
     systemPrompt?: string,
     attachments?: Array<{ path?: string } | string>,
+    overrideModel?: string,
   ): AsyncGenerator<StreamChunk> {
     const providerName = this.config.config.current_provider;
     const providerConfig = this.config.config.providers[providerName];
@@ -439,7 +440,7 @@ export class AIManager {
     messages.push(this.buildUserMessageForProvider(providerName, userMessage, attachmentsMeta));
 
     const params = this.config.config.parameters;
-    const model = this.config.config.current_model;
+    const model = overrideModel || this.config.config.current_model;
 
     const cacheKey = this.llmCache.buildCacheKey(providerName, model, messages, params, systemPrompt);
     const cached = this.llmCache.get(cacheKey);

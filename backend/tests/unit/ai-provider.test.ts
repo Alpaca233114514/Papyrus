@@ -37,7 +37,7 @@ interface ManagerLike {
   resolveAttachmentPath(attachment: unknown): string | null;
   buildUserMessageForProvider(provider: string, content: string, attachments: unknown[]): Record<string, unknown>;
   messageToProviderFormat(provider: string, message: unknown): Record<string, unknown>;
-  chatStream(text: string, system?: string): AsyncGenerator<Record<string, unknown>>;
+  chatStream(text: string, system?: string, attachments?: unknown[], overrideModel?: string): AsyncGenerator<Record<string, unknown>>;
   config: unknown;
   activeSessionId: string;
   chat(text: string): Promise<unknown>;

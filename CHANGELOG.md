@@ -9,87 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [v2.0.0-beta.3] - 2026-04-26
-
-This release migrates the backend from Python/FastAPI to TypeScript/Fastify, hardens the cross-platform release pipeline, and ships note/card history. **The Python backend has been fully removed** — distributions no longer require a bundled CPython runtime.
-
-### 🚀 Architecture
-- **Backend rewritten in TypeScript** on Node.js + Fastify (was Python + FastAPI / Uvicorn). Single Node runtime now powers Electron, frontend tooling, and the API.
-- **AI subsystem rewritten in TypeScript**: provider abstraction, streaming, tools, and config validation all in TS.
-- **MCP subsystem rewritten in TypeScript**: REST endpoints for note/vault CRUD, search, and indexing.
-- **File watcher** (`chokidar`) wired into the server for live database/vault change detection.
-
-### 🎉 New Features
-- **Note & card version history** with rollback: every update auto-saves a content-hashed version; rollback creates a forward version (no destructive history).
-- **Tool-call approval flow**: AI tool invocations support manual / auto-approve modes with a pending queue and call history.
-- **Provider/model management API**: add, update, delete, enable, set-default for AI providers, models, and API keys.
-- **Encrypted API key storage** at rest (AES-GCM with a per-install master key, salt, and auth tag).
+## [v2.0.0beta.4] - 2026-04-27
 
 ### 🐛 Bug Fixes
-- **Obsidian vault import works on all platforms in CI**: replaced fragile string-prefix `home`-check with an OS-level `dev`+`ino` walk, fixing failures caused by Windows 8.3 short paths (`RUNNER~1`), macOS `/var` ↔ `/private/var` aliasing, and Linux `/tmp` not being under `$HOME`.
-- **Server direct-run detection** correctly identifies the packaged main entry on all platforms.
-- **API test isolation**: integration tests no longer share state across files; flaky timeouts removed.
-- **Console noise** removed from logger and AI provider tests.
-- Multiple P0/P1/P2 backend bugs surfaced by the TS migration audit.
+- **Chat panel model sync**: the model dropdown now loads live provider/model data from `/api/providers` instead of a hardcoded static list.
+- **AIConfig parsing**: `ChatPanel` now correctly unwraps the `{ success, config }` envelope returned by `/api/config/ai`, fixing the permanent "AI 配置不完整" warning.
+- **Chat API contract**: fixed the request URL (`/api/ai/chat/stream` → `/api/chat`) and request body to match the TypeScript/Fastify backend expectations.
+- **SSE format alignment**: backend `/chat` streaming now emits `{ type, data }` shaped events that the frontend `handleSSEStream` parser expects.
+- **Model override support**: backend `chatStream` accepts an optional `overrideModel` parameter so the user-selected model is actually used for the conversation.
+- **File attachment fallback**: the frontend no longer attempts multipart uploads (unsupported by the current Fastify backend); file names are appended to the message text as placeholders.
 
-### 🔒 Security
-- **Audit-driven hardening**: Critical/High advisories from the security review have been resolved. `npm audit --omit=dev --audit-level=high` is now enforced in CI for both `frontend/` and `backend/`.
-- **SSRF protection** for AI base URL validation; private/loopback addresses now rejected for cloud providers (still allowed for `ollama` / local).
-- **Explicit error reporting**: errors no longer silently swallowed — context is included in messages so failures are diagnosable.
-- **Path traversal hardened** for note attachments and Obsidian import (`dev`+`ino` containment instead of string compare).
-- **Auth token** required for mutating MCP/API requests; tokens generated and persisted on first run.
-- **Rate limiting** added to the public API surface.
-
-### 🔧 Build & Release Pipeline
-- **Three-platform GitHub Actions matrix** (Windows x64, macOS arm64, Linux x64) producing NSIS installer + portable, DMG + ZIP, AppImage + deb + tar.gz.
-- **Auto-trigger on tag push** (`v*`): builds run, draft GitHub Release is created with categorized release notes generated from commit history.
-- **Production dependency audit gate** before build.
-- **Backend / frontend build verification steps** fail fast if outputs are missing.
-- **Test artifact upload on failure** — CI now attaches `backend/test-output.log` to failed runs for offline debugging.
-- **Apple Developer signing slots** present (commented) — uncomment env vars when an Apple ID is available.
-
-### ⚠️ Breaking Changes
-- **Python backend removed**: `src/Papyrus.py`, `src/ai/*.py`, `src/mcp/*.py`, `tests/test_*.py`, `tools/diagnose.py`, `requirements.txt`, `run.pyw` are deleted. Anyone running from source must now use Node.js 24+ instead of Python.
-- **Data directory layout** now lives under the new `paths.dataDir` (defaults to `$HOME/PapyrusData` or `PAPYRUS_DATA_DIR`); the JSON-file migration path imports legacy `cards.json` / `notes.json` on first run.
-- **MCP / API auth** is mandatory for write operations; existing clients must include the auth token from `~/.papyrus/auth.token`.
-
----
-
-## [v2.0.0-beta.1] - 2026-03-29
-
-### 🎉 New Features
-- **Complete UI Rewrite**: Brand new interface with React 19 + TypeScript + Arco Design
-  - New Start Page with recent notes, review queue, and solar term themes
-  - New Scroll Page for flashcard study
-  - New Notes Page with folder management and relation graph
-  - Chat Panel for AI conversations
-  - Settings Page with accessibility options
-
-- **Accessibility Improvements**: WCAG 2.1 AAA compliance
-  - Global accessibility styles (`frontend/src/a11y.css`)
-  - Accessibility settings panel (reduce motion, high contrast, screen reader optimization)
-  - Complete ARIA attributes support
-  - Keyboard navigation optimization
-  - Skip Link navigation
-  - Accessibility icons
-
-- **MCP (Model Context Protocol) Support**
-  - REST API for note CRUD operations
-  - Vault indexing and reading endpoints
-  - Search functionality
-  - Extension-friendly architecture
-
-### 🚀 Architecture
-- **Frontend**: React 19 + TypeScript + Arco Design + Tailwind CSS
-- **Backend**: Python 3.14 + FastAPI + Uvicorn
-- **Desktop**: Electron 30 + Electron Builder
-- **AI Integration**: OpenAI, Anthropic, Ollama support
-
-### 🔧 Build & Distribution
-- Single-file PyInstaller builds
-- Cross-platform support (Windows, macOS, Linux)
-- Automated GitHub Actions workflows
-- Smaller app size with dependency optimization
+### 🔧 Refactor
+- Extracted shared AI types (`AIConfig`, `ProviderModel`) from `ChatPanel.tsx` into `frontend/src/types/ai.ts`.
 
 ---
 
@@ -175,9 +106,8 @@ When creating a new release:
 
 ---
 
-[Unreleased]: https://github.com/PapyrusOR/Papyrus_Desktop/compare/v2.0.0-beta.3...HEAD
-[v2.0.0-beta.3]: https://github.com/PapyrusOR/Papyrus_Desktop/compare/v2.0.0-beta.1...v2.0.0-beta.3
-[v2.0.0-beta.1]: https://github.com/PapyrusOR/Papyrus_Desktop/compare/v1.2.2...v2.0.0-beta.1
+[Unreleased]: https://github.com/PapyrusOR/Papyrus_Desktop/compare/v2.0.0beta.4...HEAD
+[v2.0.0beta.4]: https://github.com/PapyrusOR/Papyrus_Desktop/compare/v1.2.2...v2.0.0beta.4
 [v1.2.2]: https://github.com/PapyrusOR/Papyrus_Desktop/compare/v1.2.1...v1.2.2
 [v1.2.1]: https://github.com/PapyrusOR/Papyrus_Desktop/compare/v1.2.0...v1.2.1
 [v1.2.0]: https://github.com/PapyrusOR/Papyrus_Desktop/compare/v1.1.0...v1.2.0

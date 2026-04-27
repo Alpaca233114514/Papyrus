@@ -399,6 +399,7 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
       message: string;
       system_prompt?: string;
       attachments?: Array<{ path?: string } | string>;
+      model?: string;
     };
 
     reply.hijack();
@@ -414,6 +415,7 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
         payload.message,
         payload.system_prompt,
         payload.attachments,
+        payload.model,
       );
 
       let assistantContent = '';
@@ -422,18 +424,18 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
         if (chunk.type === 'content') {
           const text = typeof chunk.data === 'string' ? chunk.data : '';
           assistantContent += text;
-          reply.raw.write(`data: ${JSON.stringify({ text, done: false })}\n\n`);
+          reply.raw.write(`data: ${JSON.stringify({ type: 'text', data: text })}\n\n`);
         } else if (chunk.type === 'reasoning') {
           const text = typeof chunk.data === 'string' ? chunk.data : '';
           reasoningContent += text;
-          reply.raw.write(`data: ${JSON.stringify({ reasoning: text, done: false })}\n\n`);
+          reply.raw.write(`data: ${JSON.stringify({ type: 'reasoning', data: text })}\n\n`);
         } else if (chunk.type === 'tool_start') {
-          reply.raw.write(`data: ${JSON.stringify({ tool_call: chunk.data, done: false })}\n\n`);
+          reply.raw.write(`data: ${JSON.stringify({ type: 'tool_call', data: chunk.data })}\n\n`);
         } else if (chunk.type === 'done') {
-          reply.raw.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+          reply.raw.write(`data: ${JSON.stringify({ type: 'done', data: '' })}\n\n`);
         } else if (chunk.type === 'error') {
           const text = typeof chunk.data === 'string' ? chunk.data : 'Unknown error';
-          reply.raw.write(`data: ${JSON.stringify({ error: text, done: true })}\n\n`);
+          reply.raw.write(`data: ${JSON.stringify({ type: 'error', data: text })}\n\n`);
         }
       }
 
@@ -445,7 +447,7 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
 
       reply.raw.end();
     } catch (e) {
-      reply.raw.write(`data: ${JSON.stringify({ error: e instanceof Error ? e.message : String(e), done: true })}\n\n`);
+      reply.raw.write(`data: ${JSON.stringify({ type: 'error', data: e instanceof Error ? e.message : String(e) })}\n\n`);
       reply.raw.end();
     }
   });

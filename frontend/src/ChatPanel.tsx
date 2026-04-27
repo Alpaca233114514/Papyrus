@@ -4,14 +4,8 @@ import { IconArrowUp, IconAt, IconFile, IconMessage, IconDown, IconBulb, IconRec
 import IconAgentMode from './icons/IconAgentMode';
 import { ReasoningChain } from './components/ReasoningChain';
 import { ToolCallCard } from './components/ToolCallCard';
+import type { AIConfig, ProviderModel } from './types/ai';
 import './ChatPanel.css';
-
-const models = [
-  { key: 'claude-sonnet-4', label: 'Claude Sonnet 4' },
-  { key: 'claude-opus-4', label: 'Claude Opus 4' },
-  { key: 'gpt-4o', label: 'GPT-4o' },
-  { key: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
-];
 
 interface ChatPanelProps {
   open: boolean;
@@ -88,19 +82,6 @@ interface UserProfile {
   avatarUrl: string | null;
 }
 
-// AI 配置类型
-interface ProviderConfig {
-  api_key?: string;
-  base_url?: string;
-  models: string[];
-}
-
-interface AIConfig {
-  current_provider: string;
-  current_model: string;
-  providers: Record<string, ProviderConfig>;
-}
-
 // 从 localStorage 加载用户设置
 const loadUserProfile = (): UserProfile => {
   try {
@@ -127,6 +108,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   const [aiConfig, setAiConfig] = useState<AIConfig | null>(null);
   const [configChecked, setConfigChecked] = useState(false);
   const [agentModeEnabled, setAgentModeEnabled] = useState<boolean>(loadAgentModeEnabled());
+  const [availableModels, setAvailableModels] = useState<ProviderModel[]>([]);
   const dragStartY = useRef<number>(0);
   const dragStartHeight = useRef<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -185,7 +167,12 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
       const response = await fetch('/api/config/ai');
       if (response.ok) {
         const data = await response.json();
-        setAiConfig(data);
+        if (data.success && data.config) {
+          setAiConfig(data.config);
+          if (data.config.current_model) {
+            setModel(data.config.current_model);
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to load AI config:', error);
@@ -194,12 +181,43 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
     }
   }, []);
 
-  // 组件挂载时加载配置
+  // 加载供应商模型列表
+  const loadProviders = useCallback(async () => {
+    try {
+      const response = await fetch('/api/providers');
+      if (!response.ok) {
+        console.error('Failed to load providers:', response.status, response.statusText);
+        return;
+      }
+      const data = await response.json();
+      if (data.success && data.providers) {
+        const models: ProviderModel[] = [];
+        for (const provider of data.providers) {
+          if (!provider.enabled) continue;
+          for (const m of provider.models) {
+            if (!m.enabled) continue;
+            models.push({
+              key: m.modelId,
+              label: m.name,
+              providerId: provider.id,
+              providerType: provider.type,
+            });
+          }
+        }
+        setAvailableModels(models);
+      }
+    } catch (error) {
+      console.error('Failed to load providers:', error);
+    }
+  }, []);
+
+  // 组件挂载时加载配置和模型列表
   useEffect(() => {
     if (open) {
       loadAIConfig();
+      loadProviders();
     }
-  }, [open, loadAIConfig]);
+  }, [open, loadAIConfig, loadProviders]);
 
   // 检查 AI 配置是否有效
   const checkAIConfig = useCallback((): { valid: boolean; message?: string } => {
@@ -231,12 +249,14 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
       return { valid: false, message: '当前供应商没有可用的模型，请前往设置页面添加' };
     }
 
-    if (!provider.models.includes(aiConfig.current_model)) {
+    const modelInProviders = provider.models.includes(aiConfig.current_model);
+    const modelInDb = availableModels.some((m) => m.key === aiConfig.current_model);
+    if (!modelInProviders && !modelInDb) {
       return { valid: false, message: '当前选择的模型不可用，请前往设置页面重新选择' };
     }
 
     return { valid: true };
-  }, [aiConfig]);
+  }, [aiConfig, availableModels]);
 
   // 跳转到设置页面
   const goToSettings = useCallback(() => {
@@ -485,10 +505,20 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
       return;
     }
 
+    // 保存当前文件列表并清空（后端暂不支持 multipart，文件名会拼入消息文本）
+    const filesToUpload = [...selectedFiles];
+    setSelectedFiles([]);
+
+    let messageText = trimmedText;
+    if (filesToUpload.length > 0) {
+      const fileNames = filesToUpload.map((f) => `[附件: ${f.name}]`).join(' ');
+      messageText = messageText ? `${messageText}\n${fileNames}` : fileNames;
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: trimmedText || (selectedFiles.length > 0 ? `[发送了 ${selectedFiles.length} 个文件]` : ''),
+      content: messageText,
     };
 
     const assistantMessage: Message = {
@@ -502,56 +532,20 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
     setText('');
     setIsGenerating(true);
 
-    // 保存当前文件列表并清空
-    const filesToUpload = [...selectedFiles];
-    setSelectedFiles([]);
-
     // 创建 AbortController
     abortControllerRef.current = new AbortController();
 
     try {
-      let response: Response;
-
-      // 如果有文件，使用 FormData 发送
-      if (filesToUpload.length > 0) {
-        const formData = new FormData();
-        formData.append('message', trimmedText);
-        formData.append('model', model);
-        formData.append('mode', mode);
-        formData.append('reasoning', String(reasoning));
-        formData.append('messages', JSON.stringify([...messages, userMessage].map((m) => ({
-          role: m.role,
-          content: m.content,
-        }))));
-        
-        filesToUpload.forEach((fileInfo) => {
-          formData.append('attachments', fileInfo.file);
-        });
-
-        response = await fetch('/api/ai/chat/stream', {
-          method: 'POST',
-          body: formData,
-          signal: abortControllerRef.current.signal,
-        });
-      } else {
-        // 纯文本消息使用 JSON
-        response = await fetch('/api/ai/chat/stream', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            messages: [...messages, userMessage].map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
-            model,
-            mode,
-            reasoning,
-          }),
-          signal: abortControllerRef.current.signal,
-        });
-      }
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: messageText,
+        }),
+        signal: abortControllerRef.current.signal,
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -734,21 +728,44 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
     setMode(newMode);
   };
 
+  const handleModelSelect = async (key: string) => {
+    setModel(key);
+    const selected = availableModels.find((m) => m.key === key);
+    if (!selected || !aiConfig) return;
+
+    const updatedConfig = {
+      ...aiConfig,
+      current_provider: selected.providerType,
+      current_model: key,
+    };
+
+    try {
+      await fetch('/api/config/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedConfig),
+      });
+      await loadAIConfig();
+    } catch (error) {
+      console.error('Failed to update AI config:', error);
+    }
+  };
+
   return (
     <div className="chat-panel" style={{ width }}>
       <div className="chat-panel-header">
         <Dropdown
           trigger="click"
           droplist={
-            <Menu onClickMenuItem={(key) => setModel(key)}>
-              {models.map((m) => (
+            <Menu onClickMenuItem={(key) => handleModelSelect(key)}>
+              {availableModels.map((m) => (
                 <Menu.Item key={m.key}>{m.label}</Menu.Item>
               ))}
             </Menu>
           }
         >
           <button className="chat-model-btn">
-            <span>{models.find((m) => m.key === model)!.label}</span>
+            <span>{availableModels.find((m) => m.key === model)?.label ?? model}</span>
             <IconDown className="tw-text-xs" />
           </button>
         </Dropdown>
@@ -815,7 +832,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
                 )}
                 {msg.role === 'assistant' && (
                   <div className="chat-message-with-avatar tw-items-start">
-                    <span className="chat-message-model-label">{models.find((m) => m.key === model)!.label}</span>
+                    <span className="chat-message-model-label">{availableModels.find((m) => m.key === model)?.label ?? model}</span>
                     <div className="chat-message-blocks">
                       {msg.blocks?.map((block) => renderMessageBlock(block, msg.id))}
                     </div>
