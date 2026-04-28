@@ -30,7 +30,6 @@ module.exports = {
     'backend/dist/**/*',
     'backend/package.json',
     '!frontend/node_modules/**/*',
-    '!backend/node_modules/**/*',
     '!**/*.map',
     '!**/.*',
   ],
