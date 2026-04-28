@@ -7,6 +7,10 @@ import type { AIConfig } from './config.js';
 import { isPrivateUrl } from './config.js';
 import { LLMCache } from './llm-cache.js';
 
+type OpenAIFetchParam = NonNullable<
+  NonNullable<ConstructorParameters<typeof OpenAI>[0]>['fetch']
+>;
+
 export type StreamEventType = 'content' | 'reasoning' | 'tool_start' | 'tool_result' | 'done' | 'error';
 
 export interface StreamChunk {
@@ -508,13 +512,16 @@ export class AIManager {
     const client = new OpenAI({
       apiKey: apiKey || 'dummy',
       baseURL: baseUrl,
-      fetch: (url, init) => {
-        const headers = new Headers(init?.headers);
+      fetch: ((url: string, init?: RequestInit) => {
+        const reqUrl = url as string;
+        const reqInit = init as RequestInit | undefined;
+        const headers = new Headers(reqInit?.headers);
         if (providerName === 'liyuan-deepseek' && !apiKey) {
           headers.delete('Authorization');
         }
-        return fetch(url, { ...init, headers });
-      },
+        // url 运行时恒为 string；node-fetch v2 与 undici 类型声明不兼容但运行时一致
+        return fetch(reqUrl, { ...reqInit, headers });
+      }) as unknown as OpenAIFetchParam,
     });
 
     const requestParams: OpenAI.Chat.ChatCompletionCreateParams = {
