@@ -6,7 +6,7 @@ on:
       - main
       - develop
       - 'TS后端重写'
-      - 'v2.0.0beta.3'
+      - 'v2.0.0beta.4'
     tags:
       - 'v*'
   pull_request:
@@ -121,6 +121,17 @@ jobs:
         working-directory: backend
         run: npm prune --production
 
+      - name: Verify Backend Dependencies
+        shell: bash
+        run: |
+          FASTIFY_PKG="backend/node_modules/fastify/package.json"
+          if [ ! -f "$FASTIFY_PKG" ]; then
+            echo "Error: fastify not found after prune at $FASTIFY_PKG"
+            exit 1
+          fi
+          echo "fastify present: $(node -p "require('./backend/node_modules/fastify/package.json').version")"
+          echo "Production dependencies verified."
+
       - name: Verify Backend Build
         shell: bash
         run: |
@@ -172,20 +183,33 @@ jobs:
                 echo "Error: No Windows installer found"
                 exit 1
               fi
+              UNPACKED_NODE_MODULES="dist-electron/win-unpacked/resources/app.asar.unpacked/backend/node_modules"
               ;;
             macos)
               if [ -z "$(ls dist-electron/*.dmg 2>/dev/null)" ]; then
                 echo "Error: No macOS dmg found"
                 exit 1
               fi
+              UNPACKED_NODE_MODULES="dist-electron/mac/*.app/Contents/Resources/app.asar.unpacked/backend/node_modules"
               ;;
             linux)
               if [ -z "$(ls dist-electron/*.AppImage 2>/dev/null)" ] && [ -z "$(ls dist-electron/*.deb 2>/dev/null)" ]; then
                 echo "Error: No Linux package found"
                 exit 1
               fi
+              UNPACKED_NODE_MODULES="dist-electron/linux-unpacked/resources/app.asar.unpacked/backend/node_modules"
               ;;
           esac
+
+          # Verify backend production dependencies were packaged and unpacked
+          FASTIFY_PATH="$UNPACKED_NODE_MODULES/fastify/package.json"
+          if [ ! -f "$FASTIFY_PATH" ]; then
+            echo "Error: fastify not found in unpacked app at $FASTIFY_PATH"
+            echo "Contents of unpacked backend:"
+            ls -la "$UNPACKED_NODE_MODULES" 2>/dev/null || echo "(directory does not exist)"
+            exit 1
+          fi
+          echo "fastify present in unpacked app: $(node -p "require('./$FASTIFY_PATH').version")"
           echo "Build verification passed"
 
       - name: Upload Artifact
@@ -270,14 +294,6 @@ jobs:
           name: release-notes
           path: .
 
-      - name: Prepare Release Notes
-        shell: bash
-        run: |
-          cp RELEASE_NOTES.md CHANGELOG_SECTION.md
-          echo "=== Final release body ==="
-          cat CHANGELOG_SECTION.md
-          echo "=========================="
-
       - name: List Artifacts
         run: |
           echo "Build artifacts:"
@@ -303,7 +319,7 @@ jobs:
             artifacts/Papyrus-Linux-x64/**/*.deb
           tag_name: ${{ steps.tag.outputs.tag }}
           name: ${{ steps.tag.outputs.tag }}
-          body_path: CHANGELOG_SECTION.md
+          body_path: RELEASE_NOTES.md
           draft: true
           prerelease: ${{ steps.release_type.outputs.is_prerelease == 'true' }}
           generate_release_notes: false
