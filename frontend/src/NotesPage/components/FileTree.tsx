@@ -34,8 +34,9 @@ const buildTree = (notes: Note[]): TreeNode[] => {
 
   notes.forEach(note => {
     // 确保文件夹节点存在
-    if (!folderMap.has(note.folder)) {
-      const folderNode: TreeNode = {
+    let folderNode = folderMap.get(note.folder);
+    if (!folderNode) {
+      folderNode = {
         id: `folder-${note.folder}`,
         name: note.folder,
         type: 'folder',
@@ -46,7 +47,6 @@ const buildTree = (notes: Note[]): TreeNode[] => {
     }
 
     // 添加笔记到对应文件夹
-    const folderNode = folderMap.get(note.folder)!;
     folderNode.children!.push({
       id: note.id,
       name: note.title,

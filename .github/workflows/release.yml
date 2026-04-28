@@ -6,7 +6,7 @@ on:
       - main
       - develop
       - 'TS后端重写'
-      - 'v2.0.0beta.4'
+      - 'v2.0.0beta.3'
     tags:
       - 'v*'
   pull_request:

@@ -275,7 +275,8 @@ export class AIConfig {
         log: this.normalizeLogConfig(dict.log, defaultConfig.log),
       };
       this.decryptProviderKeys();
-    } catch {
+    } catch (e) {
+      console.error('AI 配置加载失败，已重置为默认配置:', e instanceof Error ? e.message : String(e));
       this.config = defaultConfig;
     }
   }

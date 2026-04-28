@@ -36,13 +36,22 @@ if (prefersDark) {
 }
 
 // 监听深色模式变化
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+const handleDarkModeChange = (e: MediaQueryListEvent) => {
   if (e.matches) {
     document.body.setAttribute('arco-theme', 'dark');
   } else {
     document.body.removeAttribute('arco-theme');
   }
-});
+};
+darkModeQuery.addEventListener('change', handleDarkModeChange);
+
+// HMR cleanup: remove listener on hot reload to prevent duplicate listeners
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    darkModeQuery.removeEventListener('change', handleDarkModeChange);
+  });
+}
 
 // ============================================
 // 渲染应用

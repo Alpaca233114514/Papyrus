@@ -27,11 +27,14 @@ module.exports = {
   files: [
     'electron/**/*',
     'frontend/dist/**/*',
+    'backend/dist/**/*',
+    'backend/package.json',
     '!frontend/node_modules/**/*',
+    '!backend/node_modules/**/*',
     '!**/*.map',
     '!**/.*',
   ],
-  
+
   extraResources: [
     {
       from: 'assets',
@@ -42,10 +45,7 @@ module.exports = {
 
   asar: true,
   asarUnpack: [
-    '**/*.exe',
-    '**/*.dll',
-    '**/*.so',
-    '**/*.dylib',
+    'backend/**/*',
   ],
   
   // Windows configuration - 仅 NSIS 安装器

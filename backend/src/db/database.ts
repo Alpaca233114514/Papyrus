@@ -96,7 +96,7 @@ function initSchema(database: DatabaseSync): void {
 
     CREATE TABLE IF NOT EXISTS note_versions (
       id TEXT PRIMARY KEY,
-      note_id TEXT NOT NULL,
+      note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
       version INTEGER NOT NULL,
       title TEXT NOT NULL DEFAULT '',
       folder TEXT NOT NULL DEFAULT '',
@@ -113,7 +113,7 @@ function initSchema(database: DatabaseSync): void {
 
     CREATE TABLE IF NOT EXISTS card_versions (
       id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL,
+      card_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
       version INTEGER NOT NULL,
       q TEXT NOT NULL,
       a TEXT NOT NULL,

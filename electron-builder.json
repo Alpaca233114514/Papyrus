@@ -1,4 +1,5 @@
 {
+  "_deprecated": "此文件已被 .electron-builder.config.js 取代，保留仅作参考。请使用 JS 配置文件。",
   "appId": "com.papyrus.app",
   "productName": "Papyrus",
   "copyright": "Copyright © 2026 Papyrus Team",

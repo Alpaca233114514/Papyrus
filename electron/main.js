@@ -273,6 +273,19 @@ function createWindow() {
     titleBarOverlay: false,
   });
 
+  // Set Content Security Policy to mitigate XSS risks
+  // unsafe-inline is needed for React/CSS-in-JS; connect-src allows AI API calls
+  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:* http://localhost:* https:; img-src 'self' data: https: blob:; font-src 'self' data:",
+        ],
+      },
+    });
+  });
+
   // Load content
   if (isDevMode) {
     log(`Loading development URL: ${CONFIG.frontendDevUrl}`);
@@ -284,8 +297,22 @@ function createWindow() {
     mainWindow.loadFile(indexPath);
   }
 
-  // Remove default menu bar
-  mainWindow.setMenu(null);
+  // Set minimal application menu to preserve standard keyboard shortcuts (Ctrl+C/V/X/A/Z)
+  // Without this, setMenu(null) on Windows/Linux disables all standard edit accelerators
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+      ],
+    },
+  ]));
   
   // Window event handlers
   mainWindow.once('ready-to-show', () => {
@@ -297,18 +324,16 @@ function createWindow() {
   });
 
   mainWindow.on('close', (event) => {
-    if (!isQuitting && process.platform !== 'darwin') {
+    if (!isQuitting && process.platform !== 'darwin' && tray) {
       event.preventDefault();
       mainWindow.hide();
-      
-      if (tray) {
-        tray.displayBalloon({
-          iconType: 'info',
-          title: 'Papyrus',
-          content: 'Papyrus is running in the background. Click the tray icon to restore.',
-        });
-      }
+      tray.displayBalloon({
+        iconType: 'info',
+        title: 'Papyrus',
+        content: 'Papyrus is running in the background. Click the tray icon to restore.',
+      });
     }
+    // If tray is not available, let the window close normally so user isn't locked out
   });
 
   mainWindow.on('closed', () => {
@@ -498,6 +523,25 @@ function setupIPC() {
 // SECURITY: Root certificate installation removed to prevent MITM attacks.
 // Self-signed root certificates should NEVER be installed into the system trust store.
 
+// Single instance lock — must be checked BEFORE app.whenReady() to prevent
+// a second instance from initializing backend processes and creating windows
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  log('Another instance is already running, quitting...');
+  app.quit();
+  // return is unreachable due to app.quit(), but explicitly return for clarity
+}
+
+app.on('second-instance', () => {
+  log('Second instance detected, focusing window');
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  }
+});
+
 // App event handlers
 app.whenReady().then(async () => {
   log('App is ready');
@@ -636,24 +680,6 @@ function killAllPapyrusProcesses() {
 // NOTE: killAllPapyrusProcesses() is intentionally NOT called here.
 // It should only be called by the installer/updater to avoid the app killing itself.
 // See: https://github.com/electron/electron/issues/36554
-
-// Single instance lock
-const gotTheLock = app.requestSingleInstanceLock();
-
-if (!gotTheLock) {
-  log('Another instance is already running, quitting...');
-  app.quit();
-  return;
-} else {
-  app.on('second-instance', (event, commandLine, workingDirectory) => {
-    log('Second instance detected, focusing window');
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.show();
-      mainWindow.focus();
-    }
-  });
-}
 
 // Error handling
 process.on('uncaughtException', (error) => {

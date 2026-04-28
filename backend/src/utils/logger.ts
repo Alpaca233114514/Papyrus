@@ -1,7 +1,5 @@
 import fs, { Dir } from 'node:fs';
 import path from 'node:path';
-import { backup } from 'node:sqlite';
-import { Chat } from 'openai/resources.mjs';
 
 export type JSONScalar = string | number | boolean | null;
 export interface JSONObject {

@@ -3,7 +3,12 @@
 
 $certName = "Papyrus Self-Signed Root CA"
 $codeCertName = "Papyrus Code Signing"
-$password = ConvertTo-SecureString -String "papyrus123" -Force -AsPlainText
+if ($env:CERTIFICATE_PASSWORD) {
+    $password = ConvertTo-SecureString -String $env:CERTIFICATE_PASSWORD -Force -AsPlainText
+} else {
+    Write-Host "CERTIFICATE_PASSWORD environment variable not set." -ForegroundColor Yellow
+    $password = Read-Host -AsSecureString "Enter certificate password"
+}
 
 # 1. Create root CA
 Write-Host "Creating root CA..." -ForegroundColor Cyan
@@ -65,5 +70,5 @@ Write-Host "========================================" -ForegroundColor Yellow
 Write-Host "Signing Config (for electron-builder):" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
 Write-Host "Certificate: build\code-signing.pfx"
-Write-Host "Password: papyrus123"
+Write-Host "Password: (from CERTIFICATE_PASSWORD environment variable)"
 Write-Host ""

@@ -160,11 +160,12 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
     // 监听自定义事件（同页面内更新）
     window.addEventListener('papyrus_agent_settings_changed', handleAgentModeChange as EventListener);
     // 同时监听 storage 事件（跨标签页）
-    window.addEventListener('storage', () => handleAgentModeChange());
+    const storageHandler = () => handleAgentModeChange();
+    window.addEventListener('storage', storageHandler);
 
     return () => {
       window.removeEventListener('papyrus_agent_settings_changed', handleAgentModeChange as EventListener);
-      window.removeEventListener('storage', () => handleAgentModeChange());
+      window.removeEventListener('storage', storageHandler);
     };
   }, [mode]);
 
@@ -364,7 +365,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
       }
 
       newFiles.push({
-        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
         file,
         name: file.name,
         size: file.size,
@@ -724,7 +725,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
 
   if (!open) return null;
 
-  const currentMode = modes.find((m) => m.key === mode)!;
+  const currentMode = modes.find((m) => m.key === mode) ?? modes[0]!;
   
   // 处理模式切换，检查 Agent 是否被禁用
   const handleModeChange = (newMode: string) => {

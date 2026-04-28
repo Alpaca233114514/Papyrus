@@ -125,7 +125,8 @@ export class AIManager {
           updated_at: typeof s.updated_at === 'number' ? s.updated_at : Date.now() / 1000,
         };
       }
-    } catch {
+    } catch (e) {
+      console.error('会话数据加载失败，已重置:', e instanceof Error ? e.message : String(e));
       this.sessions = {};
       this.activeSessionId = null;
     }

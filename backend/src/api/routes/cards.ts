@@ -1,11 +1,22 @@
 import type { FastifyInstance } from 'fastify';
 import { getAllCards, createCard, updateCard, deleteCard, importCardsFromTxt } from '../../core/cards.js';
+import { getCardById } from '../../db/database.js';
 import { recordCardCreated } from '../../core/progress.js';
 
 export default async function cardsRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get('/', async (_request, reply) => {
     const cards = getAllCards();
     reply.send({ success: true, cards, count: cards.length });
+  });
+
+  fastify.get('/:cardId', async (request, reply) => {
+    const { cardId } = request.params as { cardId: string };
+    const card = getCardById(cardId);
+    if (!card) {
+      reply.status(404).send({ success: false, error: 'Card not found' });
+      return;
+    }
+    reply.send({ success: true, card });
   });
 
   fastify.post('/', async (request, reply) => {

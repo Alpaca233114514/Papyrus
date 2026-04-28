@@ -226,8 +226,7 @@ function devMode() {
   logSection('Starting Development Mode');
   
   const waitOn = require('wait-on');
-  const { spawn } = require('child_process');
-  
+
   // Release ports before starting
   log('Checking port usage...');
   killPort(8000);

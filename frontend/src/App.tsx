@@ -167,7 +167,7 @@ const App = () => {
             bottom: 48,
             transition: 'right 0.3s ease',
           }}
-          target={() => document.getElementById('start-page-scroll')!}
+          target={() => document.getElementById('start-page-scroll') ?? window as unknown as HTMLElement}
           aria-label="返回顶部"
         />
       )}
