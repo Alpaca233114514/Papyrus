@@ -42,7 +42,10 @@ const NAV_ITEMS = [
 const GeneralView = ({ onBack }: GeneralViewProps) => {
   const { contentRef, activeSection, scrollToSection } = useScrollNavigation(NAV_ITEMS);
   const [autoStart, setAutoStart] = useState(false);
-  const [minimizeToTray, setMinimizeToTray] = useState(true);
+  const [minimizeToTray, setMinimizeToTray] = useState(() => {
+    const saved = localStorage.getItem('papyrus_minimize_to_tray');
+    return saved !== null ? saved === 'true' : true;
+  });
   const [reviewReminder, setReviewReminder] = useState(true);
   const [language, setLanguage] = useState('zh-CN');
   
@@ -67,6 +70,10 @@ const GeneralView = ({ onBack }: GeneralViewProps) => {
       });
   }, []);
 
+  useEffect(() => {
+    localStorage.setItem('papyrus_minimize_to_tray', String(minimizeToTray));
+  }, [minimizeToTray]);
+
   const saveLogsConfig = async (updates: Partial<LogsConfig>) => {
     const newConfig = { ...logsConfig, ...updates };
     setLogsConfig(newConfig);
@@ -81,10 +88,10 @@ const GeneralView = ({ onBack }: GeneralViewProps) => {
       if (data.success) {
         Message.success('设置已保存');
       } else {
-        Message.error('保存失败');
+        Message.error(data.error || '保存失败');
       }
     } catch (err) {
-      Message.error('保存失败');
+      Message.error(err instanceof Error ? err.message : '保存失败');
     }
   };
 

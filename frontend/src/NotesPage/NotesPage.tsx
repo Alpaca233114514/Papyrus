@@ -157,7 +157,7 @@ const NotesPage = () => {
             onFolderChange={setActiveFolder}
             onNoteClick={handleNoteClick}
             onCreateClick={handleCreateClick}
-
+            onNotesDeleted={refreshNotes}
           />
         ) : (
           <NoteDetailView

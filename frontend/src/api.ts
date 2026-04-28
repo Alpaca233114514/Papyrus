@@ -3,14 +3,29 @@ const BASE = window.location.protocol === 'file:'
   ? `${BACKEND_URL}/api`
   : '/api';
 
-const authTokenPromise =
-  typeof window !== 'undefined' && (window as unknown as { electronAPI?: { getAuthToken?: () => Promise<string | null> } }).electronAPI?.getAuthToken
-    ? (window as unknown as { electronAPI: { getAuthToken: () => Promise<string | null> } }).electronAPI.getAuthToken()
-    : Promise.resolve<string | null>(null);
+let cachedToken: string | null | undefined;
+
+async function getAuthToken(): Promise<string | null> {
+  if (cachedToken !== undefined) {
+    return cachedToken;
+  }
+  try {
+    const api = (window as unknown as { electronAPI?: { getAuthToken?: () => Promise<string | null> } }).electronAPI;
+    if (api?.getAuthToken) {
+      cachedToken = await api.getAuthToken();
+    } else {
+      cachedToken = null;
+    }
+  } catch {
+    // IPC might not be ready on first call; return null and retry next request
+    return null;
+  }
+  return cachedToken;
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
-    const token = await authTokenPromise;
+    const token = await getAuthToken();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -23,7 +38,25 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      throw new Error(body.detail ?? res.statusText);
+      const message = body.detail ?? body.error ?? res.statusText;
+      // If we got a 401 but have no token cached, retry token fetch once
+      if (res.status === 401 && cachedToken === undefined) {
+        cachedToken = undefined; // force re-fetch
+        const retryToken = await getAuthToken();
+        if (retryToken) {
+          headers['X-Papyrus-Token'] = retryToken;
+          const retryRes = await fetch(`${BASE}${path}`, {
+            headers,
+            ...init,
+          });
+          if (retryRes.ok) {
+            return retryRes.json();
+          }
+          const retryBody = await retryRes.json().catch(() => ({}));
+          throw new Error(retryBody.detail ?? retryBody.error ?? retryRes.statusText);
+        }
+      }
+      throw new Error(message);
     }
     return res.json();
   } catch (err) {
@@ -144,6 +177,23 @@ export type LogsConfig = {
   backup_count: number;
 };
 
+// ========== File Types ==========
+export type FileItemData = {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  mime_type: string;
+  parent_id: string | null;
+  file_storage_path: string | null;
+  is_folder: boolean | number;
+  itemCount?: number;
+  created_at: number;
+  updated_at: number;
+};
+
+export type ListFilesRes = { success: boolean; files: FileItemData[]; count: number };
+
 // ========== Chat Session Types ==========
 export type ChatSession = {
   id: string;
@@ -187,7 +237,11 @@ export const api = {
     body: JSON.stringify({ q, a, tags }) 
   }),
   deleteCard: (id: string) => request<{ success: boolean }>(`/cards/${id}`, { method: 'DELETE' }),
-  updateCard: (id: string, data: { q?: string; a?: string; tags?: string[] }) => 
+  batchDeleteCards: (ids: string[]) => request<{ success: boolean; deleted: number }>('/cards/batch-delete', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  }),
+  updateCard: (id: string, data: { q?: string; a?: string; tags?: string[] }) =>
     request<UpdateCardRes>(`/cards/${id}`, { 
       method: 'PATCH', 
       body: JSON.stringify(data) 
@@ -216,7 +270,11 @@ export const api = {
       body: JSON.stringify(data) 
     }),
   deleteNote: (id: string) => request<DeleteNoteRes>(`/notes/${id}`, { method: 'DELETE' }),
-  
+  batchDeleteNotes: (ids: string[]) => request<{ success: boolean; deleted: number }>('/notes/batch-delete', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  }),
+
   // Obsidian Import
   importObsidian: (vaultPath: string, excludeFolders?: string[]) => 
     request<ImportObsidianRes>('/notes/import/obsidian', { 
@@ -269,6 +327,21 @@ export const api = {
     }),
   openLogsDir: () =>
     request<{ success: boolean }>('/logs/open-dir', { method: 'POST' }),
+
+  // Files
+  listFiles: () => request<ListFilesRes>('/files'),
+  createFolder: (name: string, parentId?: string) =>
+    request<{ success: boolean; file: FileItemData }>('/files/folder', {
+      method: 'POST',
+      body: JSON.stringify({ name, parentId }),
+    }),
+  uploadFiles: (files: Array<{ name: string; content: string; mimeType?: string }>, parentId?: string) =>
+    request<{ success: boolean; files: FileItemData[]; count: number }>('/files/upload', {
+      method: 'POST',
+      body: JSON.stringify({ files, parentId }),
+    }),
+  deleteFile: (id: string) =>
+    request<{ success: boolean; deleted: number }>(`/files/${id}`, { method: 'DELETE' }),
 
   // Chat Sessions
   listChatSessions: () =>

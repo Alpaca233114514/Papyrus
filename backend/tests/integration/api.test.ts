@@ -2543,4 +2543,211 @@ describe('API Integration Tests', () => {
     expect(response.statusCode).toBe(404);
     expect(JSON.parse(response.body).success).toBe(false);
   });
+
+  describe('Files API', () => {
+    let folderId: string;
+
+    it('GET /api/files should return empty list initially', async () => {
+      const response = await app.inject({ method: 'GET', url: '/api/files' });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.files).toEqual([]);
+      expect(body.count).toBe(0);
+    });
+
+    it('POST /api/files/folder should create a folder', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/files/folder',
+        payload: { name: 'Test Folder' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.file.name).toBe('Test Folder');
+      expect(body.file.is_folder).toBe(1);
+      folderId = body.file.id;
+    });
+
+    it('POST /api/files/folder should reject empty name', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/files/folder',
+        payload: { name: '  ' },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('POST /api/files/folder should create subfolder', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/files/folder',
+        payload: { name: 'Sub Folder', parentId: folderId },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.file.parent_id).toBe(folderId);
+    });
+
+    it('POST /api/files/upload should upload files', async () => {
+      const content = Buffer.from('Hello API').toString('base64');
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/files/upload',
+        payload: {
+          files: [{ name: 'api-test.txt', content, mimeType: 'text/plain' }],
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.count).toBe(1);
+      expect(body.files[0].name).toBe('api-test.txt');
+      expect(body.files[0].size).toBe(9);
+    });
+
+    it('POST /api/files/upload should reject empty file list', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/files/upload',
+        payload: { files: [] },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('GET /api/files should return all files', async () => {
+      const response = await app.inject({ method: 'GET', url: '/api/files' });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.files.length).toBeGreaterThanOrEqual(3);
+      // Folders should come before files
+      const types = body.files.map((f: { is_folder: number }) => f.is_folder);
+      for (let i = 1; i < types.length; i++) {
+        expect(types[i - 1]).toBeGreaterThanOrEqual(types[i]);
+      }
+    });
+
+    it('GET /api/files/:id should return single file', async () => {
+      const list = await app.inject({ method: 'GET', url: '/api/files' });
+      const files = JSON.parse(list.body).files;
+      const firstFile = files.find((f: { is_folder: number }) => !f.is_folder);
+      if (!firstFile) return;
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/files/${firstFile.id}`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.file.id).toBe(firstFile.id);
+    });
+
+    it('GET /api/files/:id/download should return file headers', async () => {
+      // Upload a file first
+      const content = Buffer.from('download content').toString('base64');
+      const upload = await app.inject({
+        method: 'POST',
+        url: '/api/files/upload',
+        payload: { files: [{ name: 'download.txt', content, mimeType: 'text/plain' }] },
+      });
+      const fileId = JSON.parse(upload.body).files[0].id;
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/files/${fileId}/download`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      // The file stream may not be fully captured by inject(),
+      // but headers should be set correctly
+      expect(response.headers['content-type']).toBe('text/plain');
+      expect(response.headers['content-disposition']).toContain('download.txt');
+    });
+
+    it('GET /api/files/:id/download should 404 for non-existent file', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/files/non-existent/download',
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('DELETE /api/files/:id should delete a file', async () => {
+      const content = Buffer.from('delete me').toString('base64');
+      const upload = await app.inject({
+        method: 'POST',
+        url: '/api/files/upload',
+        payload: { files: [{ name: 'delete-me.txt', content }] },
+      });
+      const fileId = JSON.parse(upload.body).files[0].id;
+
+      const response = await app.inject({
+        method: 'DELETE',
+        url: `/api/files/${fileId}`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.deleted).toBe(1);
+    });
+
+    it('DELETE /api/files/:id should 404 for non-existent file', async () => {
+      const response = await app.inject({
+        method: 'DELETE',
+        url: '/api/files/non-existent',
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('DELETE /api/files/:id should recursively delete folder', async () => {
+      // Create folder with files
+      const folder = await app.inject({
+        method: 'POST',
+        url: '/api/files/folder',
+        payload: { name: 'Delete Folder' },
+      });
+      const folderId = JSON.parse(folder.body).file.id;
+
+      const content = Buffer.from('nested').toString('base64');
+      await app.inject({
+        method: 'POST',
+        url: '/api/files/upload',
+        payload: {
+          files: [
+            { name: 'nested-a.txt', content },
+            { name: 'nested-b.txt', content },
+          ],
+          parentId: folderId,
+        },
+      });
+
+      const deleteRes = await app.inject({
+        method: 'DELETE',
+        url: `/api/files/${folderId}`,
+      });
+
+      expect(deleteRes.statusCode).toBe(200);
+      expect(JSON.parse(deleteRes.body).deleted).toBe(3);
+
+      // Verify folder is gone
+      const getRes = await app.inject({ method: 'GET', url: '/api/files' });
+      const files = JSON.parse(getRes.body).files;
+      expect(files.some((f: { id: string }) => f.id === folderId)).toBe(false);
+    });
+  });
 });

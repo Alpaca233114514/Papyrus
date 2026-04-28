@@ -3,21 +3,13 @@ import { useState, useEffect, useRef } from 'react';
 import { IconFolderAdd, IconUpload, IconFolder, IconImage, IconFileVideo, IconMusic, IconFile, IconDownload, IconDelete } from '@arco-design/web-react/icon';
 import { usePageScenery } from '../hooks/useScenery';
 import { useSceneryColor } from '../hooks/useSceneryColor';
+import { api } from '../api';
+import type { FileItemData } from '../api';
 
 import ZipIcon from './ZipIcon';
 
 const PRIMARY_COLOR = '#206CCF';
 const SECONDARY_COLOR = '#9FD4FD';
-
-// 类型定义
-interface FileItem {
-  id: string;
-  name: string;
-  type: 'folder' | 'image' | 'video' | 'audio' | 'document' | 'archive' | 'unknown';
-  size?: string;
-  updatedAt: string;
-  itemCount?: number;
-}
 
 // 通用卡片样式
 const useCardStyle = (hovered: boolean) => ({
@@ -29,7 +21,7 @@ const useCardStyle = (hovered: boolean) => ({
 });
 
 // 文件图标
-const FileIcon = ({ type, size = 48 }: { type: FileItem['type']; size?: number }) => {
+const FileTypeIcon = ({ type, size = 48 }: { type: string; size?: number }) => {
   const iconSize = size * 0.5;
 
   switch (type) {
@@ -48,8 +40,18 @@ const FileIcon = ({ type, size = 48 }: { type: FileItem['type']; size?: number }
   }
 };
 
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDate(timestamp: number): string {
+  return new Date(timestamp * 1000).toLocaleDateString('zh-CN');
+}
+
 // 网格文件卡片
-const GridFileCard = ({ file }: { file: FileItem }) => {
+const GridFileCard = ({ file }: { file: FileItemData }) => {
   const [hovered, setHovered] = useState(false);
   const cardStyle = useCardStyle(hovered);
 
@@ -68,13 +70,13 @@ const GridFileCard = ({ file }: { file: FileItem }) => {
           gap: '12px',
         }}
       >
-        <FileIcon type={file.type} size={48} />
+        <FileTypeIcon type={file.type} size={48} />
         <div style={{ width: '100%' }}>
           <Typography.Text style={{ fontSize: '14px', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={file.name}>
             {file.name}
           </Typography.Text>
           <Typography.Text type='secondary' style={{ fontSize: '12px' }}>
-            {file.type === 'folder' ? `${file.itemCount} 项` : file.size} · {file.updatedAt}
+            {file.is_folder ? `${file.itemCount ?? 0} 项` : formatSize(file.size)} · {formatDate(file.updated_at)}
           </Typography.Text>
         </div>
       </div>
@@ -83,7 +85,7 @@ const GridFileCard = ({ file }: { file: FileItem }) => {
 };
 
 // 列表文件行
-const ListFileRow = ({ file, onDownload, onDelete }: { file: FileItem; onDownload?: (f: FileItem) => void; onDelete?: (id: string) => void }) => {
+const ListFileRow = ({ file, onDownload, onDelete }: { file: FileItemData; onDownload?: (f: FileItemData) => void; onDelete?: (id: string) => void }) => {
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -102,17 +104,17 @@ const ListFileRow = ({ file, onDownload, onDelete }: { file: FileItem; onDownloa
         gap: '12px',
       }}
     >
-      <FileIcon type={file.type} size={32} />
+      <FileTypeIcon type={file.type} size={32} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <Typography.Text style={{ fontSize: '14px', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: hovered ? '#57A9FB' : 'var(--color-text-1)' }} title={file.name}>
           {file.name}
         </Typography.Text>
       </div>
       <Typography.Text type='secondary' style={{ fontSize: '13px', width: '100px' }}>
-        {file.type === 'folder' ? `${file.itemCount} 项` : file.size}
+        {file.is_folder ? `${file.itemCount ?? 0} 项` : formatSize(file.size)}
       </Typography.Text>
       <Typography.Text type='secondary' style={{ fontSize: '13px', width: '80px' }}>
-        {file.updatedAt}
+        {formatDate(file.updated_at)}
       </Typography.Text>
       <div style={{ display: 'flex', gap: '8px', opacity: hovered ? 1 : 0, transition: 'opacity 0.2s' }}>
         <IconDownload style={{ fontSize: '16px', color: 'var(--color-text-3)', cursor: 'pointer' }} onClick={(e: React.MouseEvent) => { e.stopPropagation(); onDownload?.(file); }} />
@@ -234,19 +236,33 @@ const StatsBar = ({ stats, viewMode, setViewMode, loading }: StatsBarProps) => {
   );
 };
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // Strip the "data:...;base64," prefix
+      const base64 = result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 const FilesPage = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [files, setFiles] = useState<FileItem[]>([]);
+  const [files, setFiles] = useState<FileItemData[]>([]);
   const [loading, setLoading] = useState(true);
   const [folderModalVisible, setFolderModalVisible] = useState(false);
   const [folderName, setFolderName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // 模拟加载文件列表
-    setTimeout(() => {
-      setLoading(false);
-    }, 500);
+    api.listFiles()
+      .then(res => setFiles(res.files))
+      .catch(() => Message.error('加载文件列表失败'))
+      .finally(() => setLoading(false));
   }, []);
 
   const handleNewFolder = () => {
@@ -254,51 +270,47 @@ const FilesPage = () => {
     setFolderModalVisible(true);
   };
 
-  const handleCreateFolder = () => {
+  const handleCreateFolder = async () => {
     const trimmed = folderName.trim();
     if (!trimmed) {
       Message.warning('请输入文件夹名称');
       return;
     }
-    const newFolder: FileItem = {
-      id: crypto.randomUUID(),
-      name: trimmed,
-      type: 'folder',
-      updatedAt: new Date().toLocaleDateString('zh-CN'),
-      itemCount: 0,
-    };
-    setFiles(prev => [newFolder, ...prev]);
-    Message.success(`已创建文件夹 "${trimmed}"`);
-    setFolderModalVisible(false);
+    try {
+      const res = await api.createFolder(trimmed);
+      setFiles(prev => [res.file, ...prev]);
+      Message.success(`已创建文件夹 "${trimmed}"`);
+      setFolderModalVisible(false);
+    } catch {
+      Message.error('创建文件夹失败');
+    }
   };
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = e.target.files;
     if (!selectedFiles || selectedFiles.length === 0) return;
-    const newFiles: FileItem[] = [];
-    for (let i = 0; i < selectedFiles.length; i++) {
-      const f = selectedFiles[i];
-      const ext = f.name.split('.').pop()?.toLowerCase() || '';
-      const type: FileItem['type'] = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(ext) ? 'image'
-        : ['mp4', 'webm', 'mov'].includes(ext) ? 'video'
-        : ['mp3', 'wav', 'ogg'].includes(ext) ? 'audio'
-        : ['zip', 'rar', '7z', 'tar', 'gz'].includes(ext) ? 'archive'
-        : 'document';
-      const size = f.size < 1024 * 1024 ? `${(f.size / 1024).toFixed(1)} KB` : `${(f.size / (1024 * 1024)).toFixed(1)} MB`;
-      newFiles.push({
-        id: crypto.randomUUID(),
-        name: f.name,
-        type,
-        size,
-        updatedAt: new Date().toLocaleDateString('zh-CN'),
-      });
+
+    const uploadTasks: Array<{ name: string; content: string; mimeType: string }> = [];
+
+    try {
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const f = selectedFiles[i];
+        const base64 = await fileToBase64(f);
+        uploadTasks.push({ name: f.name, content: base64, mimeType: f.type });
+      }
+
+      await api.uploadFiles(uploadTasks);
+      const listRes = await api.listFiles();
+      setFiles(listRes.files);
+      Message.success(`已上传 ${uploadTasks.length} 个文件`);
+    } catch {
+      Message.error('上传文件失败');
     }
-    setFiles(prev => [...newFiles, ...prev]);
-    Message.success(`已上传 ${selectedFiles.length} 个文件`);
+
     e.target.value = '';
   };
 
@@ -308,25 +320,32 @@ const FilesPage = () => {
     Modal.confirm({
       title: '删除确认',
       content: `确定要删除 "${file.name}" 吗？`,
-      onOk: () => {
-        setFiles(prev => prev.filter(f => f.id !== fileId));
-        Message.success('文件已删除');
+      onOk: async () => {
+        try {
+          await api.deleteFile(fileId);
+          setFiles(prev => prev.filter(f => f.id !== fileId));
+          Message.success('文件已删除');
+        } catch {
+          Message.error('删除失败');
+        }
       },
     });
   };
 
-  const handleDownloadFile = (file: FileItem) => {
-    if (file.type === 'folder') {
+  const handleDownloadFile = (file: FileItemData) => {
+    if (file.is_folder) {
       Message.info('文件夹下载功能即将推出');
       return;
     }
-    Message.info('文件下载功能即将推出');
+    const backendUrl = 'http://127.0.0.1:8000';
+    window.open(`${backendUrl}/api/files/${file.id}/download`, '_blank');
   };
 
+  const totalSizeBytes = files.filter(f => !f.is_folder).reduce((sum, f) => sum + f.size, 0);
   const stats = {
-    totalFiles: files.filter(f => f.type !== 'folder').length,
-    totalFolders: files.filter(f => f.type === 'folder').length,
-    totalSize: '-',
+    totalFiles: files.filter(f => !f.is_folder).length,
+    totalFolders: files.filter(f => f.is_folder).length,
+    totalSize: totalSizeBytes > 0 ? formatSize(totalSizeBytes) : '-',
   };
 
   return (

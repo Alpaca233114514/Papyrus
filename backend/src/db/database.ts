@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { paths } from '../utils/paths.js';
 import { encryptApiKey, decryptApiKey } from '../core/crypto.js';
-import type { CardRecord, Note, Provider } from '../core/types.js';
+import type { CardRecord, Note, Provider, FileRecord } from '../core/types.js';
 import type { PapyrusLogger } from '../utils/logger.js';
 
 let db: DatabaseSync | null = null;
@@ -15,6 +15,7 @@ function getDb(): DatabaseSync {
     db = new DatabaseSync(dbPath);
     db.exec('PRAGMA journal_mode = WAL;');
     db.exec('PRAGMA foreign_keys = ON;');
+    db.exec('PRAGMA busy_timeout = 5000;');
     initSchema(db);
   }
   return db;
@@ -128,6 +129,21 @@ function initSchema(database: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_notes_hash ON notes(hash);
     CREATE INDEX IF NOT EXISTS idx_api_keys_provider ON api_keys(provider_id);
     CREATE INDEX IF NOT EXISTS idx_models_provider ON provider_models(provider_id);
+    CREATE TABLE IF NOT EXISTS files (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'unknown',
+      size INTEGER DEFAULT 0,
+      mime_type TEXT DEFAULT '',
+      parent_id TEXT,
+      file_storage_path TEXT,
+      is_folder INTEGER DEFAULT 0,
+      created_at REAL DEFAULT 0.0,
+      updated_at REAL DEFAULT 0.0
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_files_parent ON files(parent_id);
+    CREATE INDEX IF NOT EXISTS idx_files_updated ON files(updated_at DESC);
     CREATE INDEX IF NOT EXISTS idx_note_versions_note ON note_versions(note_id, version DESC);
     CREATE INDEX IF NOT EXISTS idx_card_versions_card ON card_versions(card_id, version DESC);
   `);
@@ -291,6 +307,16 @@ export function deleteCardById(cardId: string, logger?: PapyrusLogger): boolean 
   const result = stmt.run(cardId);
   logger?.info(`删除卡片: ${cardId}`);
   return result.changes > 0;
+}
+
+export function deleteCardsByIds(cardIds: string[], logger?: PapyrusLogger): number {
+  if (cardIds.length === 0) return 0;
+  const database = getDb();
+  const placeholders = cardIds.map(() => '?').join(',');
+  const stmt = database.prepare(`DELETE FROM cards WHERE id IN (${placeholders})`);
+  const result = stmt.run(...cardIds);
+  logger?.info(`批量删除 ${result.changes} 张卡片`);
+  return result.changes;
 }
 
 export function getCardById(cardId: string): CardRecord | null {
@@ -463,6 +489,16 @@ export function deleteNoteById(noteId: string, logger?: PapyrusLogger): boolean 
   const result = stmt.run(noteId);
   logger?.info(`删除笔记: ${noteId}`);
   return result.changes > 0;
+}
+
+export function deleteNotesByIds(noteIds: string[], logger?: PapyrusLogger): number {
+  if (noteIds.length === 0) return 0;
+  const database = getDb();
+  const placeholders = noteIds.map(() => '?').join(',');
+  const stmt = database.prepare(`DELETE FROM notes WHERE id IN (${placeholders})`);
+  const result = stmt.run(...noteIds);
+  logger?.info(`批量删除 ${result.changes} 条笔记`);
+  return result.changes;
 }
 
 export function getNoteById(noteId: string): Note | null {
@@ -909,6 +945,94 @@ export function getLatestCardVersionHash(cardId: string): string | null {
   return row?.content_hash ?? null;
 }
 
+// ==================== Files ====================
+
+export function loadAllFiles(logger?: PapyrusLogger): FileRecord[] {
+  const database = getDb();
+  const stmt = database.prepare('SELECT * FROM files ORDER BY is_folder DESC, name ASC');
+  const rows = stmt.all() as Record<string, unknown>[];
+  return rows.map(rowToFileRecord);
+}
+
+export function getFileById(fileId: string): FileRecord | null {
+  const database = getDb();
+  const stmt = database.prepare('SELECT * FROM files WHERE id = ?');
+  const row = stmt.get(fileId) as Record<string, unknown> | undefined;
+  if (!row) return null;
+  return rowToFileRecord(row);
+}
+
+function rowToFileRecord(row: Record<string, unknown>): FileRecord {
+  return {
+    id: String(row.id ?? ''),
+    name: String(row.name ?? ''),
+    type: String(row.type ?? 'unknown'),
+    size: Number(row.size ?? 0),
+    mime_type: String(row.mime_type ?? ''),
+    parent_id: row.parent_id != null ? String(row.parent_id) : null,
+    file_storage_path: row.file_storage_path != null ? String(row.file_storage_path) : null,
+    is_folder: Number(row.is_folder ?? 0),
+    created_at: Number(row.created_at ?? 0),
+    updated_at: Number(row.updated_at ?? 0),
+  };
+}
+
+export function getFilesByParentId(parentId: string | null): FileRecord[] {
+  const database = getDb();
+  if (parentId === null) {
+    const stmt = database.prepare('SELECT * FROM files WHERE parent_id IS NULL ORDER BY is_folder DESC, name ASC');
+    const rows = stmt.all() as Record<string, unknown>[];
+    return rows.map(rowToFileRecord);
+  }
+  const stmt = database.prepare('SELECT * FROM files WHERE parent_id = ? ORDER BY is_folder DESC, name ASC');
+  const rows = stmt.all(parentId) as Record<string, unknown>[];
+  return rows.map(rowToFileRecord);
+}
+
+export function insertFile(file: FileRecord, logger?: PapyrusLogger): void {
+  const database = getDb();
+  const stmt = database.prepare(
+    'INSERT INTO files (id, name, type, size, mime_type, parent_id, file_storage_path, is_folder, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  );
+  stmt.run(file.id, file.name, file.type, file.size, file.mime_type, file.parent_id, file.file_storage_path, file.is_folder, file.created_at, file.updated_at);
+  logger?.info(`插入文件: ${file.id}`);
+}
+
+export function deleteFileById(fileId: string, logger?: PapyrusLogger): boolean {
+  const database = getDb();
+  const stmt = database.prepare('DELETE FROM files WHERE id = ?');
+  const result = stmt.run(fileId);
+  logger?.info(`删除文件: ${fileId}`);
+  return result.changes > 0;
+}
+
+export function deleteFilesByIds(fileIds: string[], logger?: PapyrusLogger): number {
+  if (fileIds.length === 0) return 0;
+  const database = getDb();
+  const placeholders = fileIds.map(() => '?').join(',');
+  const stmt = database.prepare(`DELETE FROM files WHERE id IN (${placeholders})`);
+  const result = stmt.run(...fileIds);
+  logger?.info(`批量删除 ${result.changes} 个文件`);
+  return Number(result.changes);
+}
+
+export function updateFile(file: Partial<FileRecord> & { id: string }, logger?: PapyrusLogger): boolean {
+  const database = getDb();
+  const sets: string[] = [];
+  const values: (string | number | null)[] = [];
+  for (const [key, value] of Object.entries(file)) {
+    if (key !== 'id' && value !== undefined) {
+      sets.push(`${key} = ?`);
+      values.push(value as string | number | null);
+    }
+  }
+  if (sets.length === 0) return false;
+  values.push(file.id);
+  const stmt = database.prepare(`UPDATE files SET ${sets.join(', ')} WHERE id = ?`);
+  const result = stmt.run(...values);
+  return Number(result.changes) > 0;
+}
+
 // ==================== Migration ====================
 
 export function migrateFromJson(cardsFile?: string, notesFile?: string, logger?: PapyrusLogger): void {
@@ -954,6 +1078,12 @@ export function runInTransaction(fn: () => void): void {
     database.exec('ROLLBACK;');
     throw e;
   }
+}
+
+export function clearAllData(): void {
+  const database = getDb();
+  database.exec('DELETE FROM cards;');
+  database.exec('DELETE FROM notes;');
 }
 
 export { closeDb, getDb };

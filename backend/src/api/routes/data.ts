@@ -6,6 +6,7 @@ import { paths } from '../../utils/paths.js';
 import {
   loadAllCards, saveAllCards, insertCard, checkpointDb, runInTransaction,
   loadAllNotes, saveAllNotes, insertNote,
+  clearAllData,
 } from '../../db/database.js';
 
 function safeNumber(value: unknown, defaultValue: number): number {
@@ -22,6 +23,19 @@ export default async function dataRoutes(fastify: FastifyInstance): Promise<void
     checkpointDb();
     fs.copyFileSync(paths.dbFile, backupPath);
     reply.send({ success: true, path: backupPath });
+  });
+
+  fastify.post('/data/reset', async (_request, reply) => {
+    try {
+      clearAllData();
+      checkpointDb();
+      reply.send({ success: true });
+    } catch (err) {
+      reply.status(500).send({
+        success: false,
+        error: err instanceof Error ? err.message : 'Failed to reset data',
+      });
+    }
   });
 
   fastify.get('/export', async (_request, reply) => {

@@ -5,9 +5,10 @@ import { pathToFileURL } from 'node:url';
 import { paths } from '../utils/paths.js';
 import { PapyrusLogger } from '../utils/logger.js';
 import { MCPServer } from '../mcp/server.js';
-import { startFileWatching } from '../integrations/file-watcher.js';
+import { startFileWatching, stopFileWatching } from '../integrations/file-watcher.js';
 import { setGlobalLogger } from './routes/logs.js';
 import { isAuthEnabled, validateRequestToken } from '../utils/auth.js';
+import { closeDb } from '../db/database.js';
 
 const logger = new PapyrusLogger(paths.logDir, 'INFO');
 
@@ -114,6 +115,7 @@ export async function initApp(): Promise<void> {
   const { default: mcpRoutes } = await import('./routes/mcp.js');
   const { default: noteVersionRoutes } = await import('./routes/note-versions.js');
   const { default: cardVersionRoutes } = await import('./routes/card-versions.js');
+  const { default: filesRoutes } = await import('./routes/files.js');
 
   app.register(cardsRoutes, { prefix: '/api/cards' });
   app.register(reviewRoutes, { prefix: '/api/review' });
@@ -129,6 +131,7 @@ export async function initApp(): Promise<void> {
   app.register(mcpRoutes, { prefix: '/api/mcp' });
   app.register(noteVersionRoutes, { prefix: '/api/notes/:noteId' });
   app.register(cardVersionRoutes, { prefix: '/api/cards/:cardId' });
+  app.register(filesRoutes, { prefix: '/api/files' });
 }
 
 let mcpServer: MCPServer | null = null;
@@ -151,7 +154,28 @@ export async function start(): Promise<void> {
   }
 }
 
-export { app, logger };
+async function gracefulShutdown(signal: string) {
+  logger.info(`Received ${signal}, shutting down gracefully...`);
+  try {
+    if (mcpServer) {
+      await mcpServer.stop();
+      mcpServer = null;
+    }
+    stopFileWatching();
+    await app.close();
+    closeDb();
+    logger.info('Graceful shutdown complete');
+    process.exit(0);
+  } catch (err) {
+    logger.error(`Error during shutdown: ${err}`);
+    process.exit(1);
+  }
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+export { app, logger, gracefulShutdown };
 
 // Start if run directly
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

@@ -92,7 +92,7 @@ const loadUserProfile = (): UserProfile => {
   } catch {
     // ignore
   }
-  return { userId: 'P', avatarUrl: null };
+  return { userId: '', avatarUrl: null };
 };
 
 const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
@@ -826,7 +826,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                         />
                       ) : (
-                        userProfile.userId?.charAt(0) || 'P'
+                        userProfile.userId?.charAt(0)?.toUpperCase() || '?'
                       )}
                     </Avatar>
                     <div className="chat-message-bubble">{msg.content}</div>

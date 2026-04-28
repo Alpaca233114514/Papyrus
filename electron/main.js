@@ -227,24 +227,48 @@ async function startBackend() {
   }
 }
 
-// Stop Python backend
+// Stop Node backend
 function stopBackend() {
-  if (backendProcess) {
-    log('Stopping backend...');
-    
-    if (process.platform === 'win32') {
-      // On Windows, we need to kill the process tree
+  if (!backendProcess) return;
+
+  const pid = backendProcess.pid;
+  log(`Stopping backend process (PID: ${pid})...`);
+
+  if (process.platform === 'win32') {
+    // Use execSync so the kill completes before we continue
+    try {
+      execSync(`taskkill /pid ${pid} /T /F`, { stdio: 'pipe' });
+    } catch (e) {
+      log(`taskkill failed, falling back to SIGTERM: ${e.message}`, 'error');
       try {
-        exec(`taskkill /pid ${backendProcess.pid} /T /F`);
-      } catch (e) {
         backendProcess.kill('SIGTERM');
+      } catch {
+        // process already dead
       }
-    } else {
-      backendProcess.kill('SIGTERM');
     }
-    
-    backendProcess = null;
+    // Verify the process is actually gone
+    try {
+      execSync(`tasklist /FI "PID eq ${pid}" 2>nul | findstr /i "${pid}"`, { stdio: 'pipe' });
+      // If we get here, the process is still alive — force kill
+      log(`Process ${pid} still alive after first kill, retrying...`, 'error');
+      execSync(`taskkill /pid ${pid} /T /F`, { stdio: 'pipe' });
+    } catch {
+      // findstr failed = process is dead, which is what we want
+    }
+  } else {
+    backendProcess.kill('SIGTERM');
+    // Give it 3 seconds, then SIGKILL
+    setTimeout(() => {
+      try {
+        backendProcess?.kill('SIGKILL');
+      } catch {
+        // already dead
+      }
+    }, 3000);
   }
+
+  backendProcess = null;
+  log('Backend process stopped');
 }
 
 // Create main window
@@ -431,6 +455,12 @@ function setupIPC() {
   // Get backend auth token (for API requests from renderer)
   ipcMain.handle('app:getAuthToken', () => PAPYRUS_AUTH_TOKEN);
 
+  // Quit the application (sets isQuitting so window.close() actually quits)
+  ipcMain.handle('app:quit', () => {
+    isQuitting = true;
+    app.quit();
+  });
+
   // Open external link
   ipcMain.handle('shell:openExternal', async (event, url) => {
     // SECURITY: whitelist protocols to prevent RCE via dangerous protocols
@@ -559,10 +589,13 @@ app.whenReady().then(async () => {
       await startBackend();
     }
     
+    // Register IPC handlers BEFORE creating the window so the renderer
+    // can retrieve the auth token immediately on load.
+    setupIPC();
+
     // Create window and tray
     createWindow();
     createTray();
-    setupIPC();
     
   } catch (error) {
     log(`Failed to initialize: ${error.message}`, 'error');

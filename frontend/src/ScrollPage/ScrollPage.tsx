@@ -458,6 +458,8 @@ const ScrollPage = () => {
   const [manageModalVisible, setManageModalVisible] = useState(false);
   const [manageCollectionId, setManageCollectionId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [batchCardModalVisible, setBatchCardModalVisible] = useState(false);
+  const [batchSelectedIds, setBatchSelectedIds] = useState<Set<string>>(new Set());
   
   const { config: sceneryConfig } = usePageScenery('scroll');
 
@@ -471,12 +473,12 @@ const ScrollPage = () => {
           api.nextDue(),
           api.listCards(),
         ]);
-        
+
         if (nextDueRes.success) {
           setDueCount(nextDueRes.due_count);
           setTotalCount(nextDueRes.total_count);
         }
-        
+
         if (cardsRes.success) {
           setCards(cardsRes.cards);
           const mastered = cardsRes.cards.filter(c => (c.interval || 0) > 1).length;
@@ -489,10 +491,29 @@ const ScrollPage = () => {
         setLoading(false);
       }
     };
-    
+
     if (!isStudying) {
       fetchStats();
     }
+  }, [isStudying]);
+
+  // Refresh data when cards are imported or changed externally
+  useEffect(() => {
+    const handleCardsChanged = () => {
+      if (!isStudying) {
+        api.listCards()
+          .then(res => {
+            if (res.success) {
+              setCards(res.cards);
+              const mastered = res.cards.filter(c => (c.interval || 0) > 1).length;
+              setMasteredCount(mastered);
+            }
+          })
+          .catch(console.error);
+      }
+    };
+    window.addEventListener('papyrus_cards_changed', handleCardsChanged);
+    return () => window.removeEventListener('papyrus_cards_changed', handleCardsChanged);
   }, [isStudying]);
 
   const startStudy = (tag?: string) => {
@@ -577,6 +598,22 @@ const ScrollPage = () => {
           卷轴
         </Typography.Title>
         <div style={{ display: 'flex', gap: '12px' }}>
+          <Button
+            shape='round'
+            size='large'
+            icon={<IconEdit />}
+            onClick={() => {
+              setBatchSelectedIds(new Set());
+              setBatchCardModalVisible(true);
+            }}
+            style={{
+              height: '40px',
+              padding: '0 20px',
+              fontSize: '14px',
+            }}
+          >
+            管理卡片
+          </Button>
           <Button
             shape='round'
             size='large'
@@ -821,6 +858,87 @@ const ScrollPage = () => {
           {cards.filter(c => manageCollectionId && (c.tags || []).includes(manageCollectionId)).length === 0 && (
             <Empty description="该卷帙暂无卡片" />
           )}
+        </div>
+      </Modal>
+
+      {/* 批量管理卡片模态框 */}
+      <Modal
+        title={`管理卡片 (${cards.length} 张)`}
+        visible={batchCardModalVisible}
+        onCancel={() => setBatchCardModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setBatchCardModalVisible(false)}>
+            关闭
+          </Button>,
+          <Button
+            key="delete"
+            type="primary"
+            status="danger"
+            disabled={batchSelectedIds.size === 0}
+            onClick={() => {
+              Modal.confirm({
+                title: '批量删除卡片',
+                content: `确定要删除选中的 ${batchSelectedIds.size} 张卡片吗？此操作不可撤销。`,
+                onOk: async () => {
+                  try {
+                    const res = await api.batchDeleteCards([...batchSelectedIds]);
+                    Message.success(`已删除 ${res.deleted} 张卡片`);
+                    setBatchCardModalVisible(false);
+                    setBatchSelectedIds(new Set());
+                    const cardsRes = await api.listCards();
+                    if (cardsRes.success) setCards(cardsRes.cards);
+                  } catch {
+                    Message.error('批量删除失败');
+                  }
+                },
+              });
+            }}
+          >
+            删除选中 ({batchSelectedIds.size})
+          </Button>,
+        ]}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 400, overflowY: 'auto' }}>
+          {cards.map(card => (
+            <div
+              key={card.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '10px 14px',
+                background: batchSelectedIds.has(card.id) ? `${PRIMARY_COLOR}10` : 'var(--color-fill-2)',
+                borderRadius: 8,
+                cursor: 'pointer',
+                border: batchSelectedIds.has(card.id) ? `1px solid ${PRIMARY_COLOR}` : '1px solid transparent',
+              }}
+              onClick={() => {
+                setBatchSelectedIds(prev => {
+                  const next = new Set(prev);
+                  if (next.has(card.id)) {
+                    next.delete(card.id);
+                  } else {
+                    next.add(card.id);
+                  }
+                  return next;
+                });
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={batchSelectedIds.has(card.id)}
+                onChange={() => {}}
+                style={{ cursor: 'pointer', accentColor: PRIMARY_COLOR }}
+              />
+              <Typography.Text style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {card.q.slice(0, 60) || '无标题'}
+              </Typography.Text>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                {card.tags?.join(', ') || '未分类'}
+              </Typography.Text>
+            </div>
+          ))}
+          {cards.length === 0 && <Empty description="暂无卡片" />}
         </div>
       </Modal>
     </div>

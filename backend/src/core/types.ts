@@ -25,6 +25,19 @@ export interface Note {
   incoming_count: number;
 }
 
+export interface FileRecord {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  mime_type: string;
+  parent_id: string | null;
+  file_storage_path: string | null;
+  is_folder: number;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface Provider {
   id: string;
   type: string;

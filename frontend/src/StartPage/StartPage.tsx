@@ -27,6 +27,7 @@ type StartPageData = {
 
 type StartPageProps = {
   onDoneChange?: (done: boolean) => void;
+  onNavigate?: (page: string) => void;
 };
 
 type PendingCardProps = {
@@ -188,7 +189,59 @@ const ShelfSection = ({ label, children }: { label: string; children: ReactNode 
   </section>
 );
 
-const ShelfSections = ({ onStudyTag }: { onStudyTag?: (tag: string) => void }) => {
+const ShortcutCard = ({ icon, label, onClick }: { icon: ReactNode; label: string; onClick: () => void }) => {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={label}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); }
+      }}
+      style={{
+        flex: '0 0 auto',
+        width: '160px',
+        height: '100px',
+        borderRadius: '16px',
+        border: `2px solid ${hovered ? SECONDARY_COLOR : 'var(--color-text-3)'}`,
+        background: hovered ? `${PRIMARY_COLOR}08` : 'transparent',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '12px',
+        cursor: 'pointer',
+        transition: 'border-color 0.2s, background 0.2s',
+        boxSizing: 'border-box' as const,
+      }}
+    >
+      <div style={{ fontSize: '28px', color: hovered ? PRIMARY_COLOR : 'var(--color-text-3)' }}>
+        {icon}
+      </div>
+      <Typography.Text
+        type={hovered ? 'primary' : 'secondary'}
+        style={{ fontSize: '14px', fontWeight: 500 }}
+      >
+        {label}
+      </Typography.Text>
+    </div>
+  );
+};
+
+const shelfContainerStyle = {
+  display: 'flex',
+  flexDirection: 'row' as const,
+  gap: '16px',
+  overflowX: 'auto' as const,
+  overflowY: 'hidden' as const,
+  paddingBottom: '8px',
+};
+
+const ShelfSections = ({ onStudyTag, onNavigate }: { onStudyTag?: (tag: string) => void; onNavigate?: (page: string) => void }) => {
   const { ref, height } = useCardHeight();
 
   return (
@@ -202,6 +255,33 @@ const ShelfSections = ({ onStudyTag }: { onStudyTag?: (tag: string) => void }) =
           pointerEvents: 'none',
         }}
       />
+
+      {onNavigate && (
+        <ShelfSection label='快捷方式'>
+          <div style={shelfContainerStyle}>
+            <ShortcutCard
+              icon={<span style={{ fontSize: '28px' }}>📝</span>}
+              label='笔记'
+              onClick={() => onNavigate('notes')}
+            />
+            <ShortcutCard
+              icon={<span style={{ fontSize: '28px' }}>📁</span>}
+              label='文件'
+              onClick={() => onNavigate('files')}
+            />
+            <ShortcutCard
+              icon={<span style={{ fontSize: '28px' }}>📊</span>}
+              label='统计'
+              onClick={() => onNavigate('charts')}
+            />
+            <ShortcutCard
+              icon={<span style={{ fontSize: '28px' }}>⚙️</span>}
+              label='设置'
+              onClick={() => onNavigate('settings')}
+            />
+          </div>
+        </ShelfSection>
+      )}
 
       <ShelfSection label='待复习'>
         <ReviewQueue height={height} />
@@ -505,7 +585,7 @@ const DoneCard = ({ scenery }: { scenery: SceneryContent | null }) => {
   );
 };
 
-const StartPage = ({ onDoneChange }: StartPageProps) => {
+const StartPage = ({ onDoneChange, onNavigate }: StartPageProps) => {
   const data = useStartPageData();
   const done = !data.loading && data.stats.cardsDue === 0;
   const [isStudying, setIsStudying] = useState(false);
@@ -560,6 +640,7 @@ const StartPage = ({ onDoneChange }: StartPageProps) => {
         </Typography.Title>
 
         <ShelfSections
+          onNavigate={onNavigate}
           onStudyTag={(tag) => {
             setStudyTag(tag);
             setIsStudying(true);

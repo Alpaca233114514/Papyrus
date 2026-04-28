@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import type { CardRecord, Note } from '../../src/core/types.js';
+import type { CardRecord, Note, FileRecord } from '../../src/core/types.js';
 
 describe('Database', () => {
   const testDir = path.join(os.tmpdir(), `papyrus-db-test-${Date.now()}`);
@@ -38,6 +38,12 @@ describe('Database', () => {
   let migrateFromJson: typeof import('../../src/db/database.js').migrateFromJson;
   let checkpointDb: typeof import('../../src/db/database.js').checkpointDb;
   let runInTransaction: typeof import('../../src/db/database.js').runInTransaction;
+  let loadAllFiles: typeof import('../../src/db/database.js').loadAllFiles;
+  let getFileById: typeof import('../../src/db/database.js').getFileById;
+  let getFilesByParentId: typeof import('../../src/db/database.js').getFilesByParentId;
+  let insertFile: typeof import('../../src/db/database.js').insertFile;
+  let deleteFileById: typeof import('../../src/db/database.js').deleteFileById;
+  let updateFile: typeof import('../../src/db/database.js').updateFile;
 
   beforeAll(async () => {
     fs.mkdirSync(testDir, { recursive: true });
@@ -75,6 +81,12 @@ describe('Database', () => {
     migrateFromJson = db.migrateFromJson as typeof migrateFromJson;
     checkpointDb = db.checkpointDb as typeof checkpointDb;
     runInTransaction = db.runInTransaction as typeof runInTransaction;
+    loadAllFiles = db.loadAllFiles as typeof loadAllFiles;
+    getFileById = db.getFileById as typeof getFileById;
+    getFilesByParentId = db.getFilesByParentId as typeof getFilesByParentId;
+    insertFile = db.insertFile as typeof insertFile;
+    deleteFileById = db.deleteFileById as typeof deleteFileById;
+    updateFile = db.updateFile as typeof updateFile;
 
     dbPath = path.join(testDir, 'papyrus.db');
   });
@@ -431,6 +443,104 @@ describe('Database', () => {
         });
       }).toThrow('abort');
       expect(loadAllCards().some(c => c.q === 'TxFail')).toBe(false);
+    });
+  });
+
+  describe('Files', () => {
+    function makeFile(overrides?: Partial<FileRecord>): FileRecord {
+      return {
+        id: 'file-' + Math.random().toString(36).slice(2),
+        name: 'test.txt',
+        type: 'document',
+        size: 1024,
+        mime_type: 'text/plain',
+        parent_id: null,
+        file_storage_path: '/tmp/test.txt',
+        is_folder: 0,
+        created_at: 1000,
+        updated_at: 1000,
+        ...overrides,
+      };
+    }
+
+    it('should insert and load a file', () => {
+      const file = makeFile({ name: 'doc.pdf' });
+      insertFile(file);
+      const all = loadAllFiles();
+      expect(all.length).toBe(1);
+      expect(all[0]?.name).toBe('doc.pdf');
+    });
+
+    it('should get file by id', () => {
+      const file = makeFile();
+      insertFile(file);
+      const found = getFileById(file.id);
+      if (found === null) throw new Error('expected file');
+      expect(found.name).toBe('test.txt');
+    });
+
+    it('should return null for non-existent file', () => {
+      expect(getFileById('no-such-id')).toBeNull();
+    });
+
+    it('should delete a file by id', () => {
+      const file = makeFile();
+      insertFile(file);
+      expect(deleteFileById(file.id)).toBe(true);
+      expect(getFileById(file.id)).toBeNull();
+    });
+
+    it('should return false when deleting non-existent file', () => {
+      expect(deleteFileById('no-such-id')).toBe(false);
+    });
+
+    it('should get files by parent id', () => {
+      const parent = makeFile({ id: 'parent-1', name: 'Folder', is_folder: 1, file_storage_path: null });
+      const child = makeFile({ name: 'child.txt', parent_id: 'parent-1' });
+      insertFile(parent);
+      insertFile(child);
+
+      const children = getFilesByParentId('parent-1');
+      expect(children.length).toBe(1);
+      expect(children[0]?.name).toBe('child.txt');
+    });
+
+    it('should get root files (null parent_id)', () => {
+      const root = makeFile({ name: 'root.txt', parent_id: null });
+      const child = makeFile({ name: 'nested.txt', parent_id: 'some-folder' });
+      insertFile(root);
+      insertFile(child);
+
+      const roots = getFilesByParentId(null);
+      expect(roots.some(f => f.name === 'root.txt')).toBe(true);
+      expect(roots.some(f => f.name === 'nested.txt')).toBe(false);
+    });
+
+    it('should update file fields', () => {
+      const file = makeFile();
+      insertFile(file);
+      const updated = updateFile({ id: file.id, name: 'renamed.txt' });
+      expect(updated).toBe(true);
+
+      const found = getFileById(file.id);
+      if (found === null) throw new Error('expected file');
+      expect(found.name).toBe('renamed.txt');
+    });
+
+    it('should return false when updating non-existent file', () => {
+      expect(updateFile({ id: 'no-such' })).toBe(false);
+    });
+
+    it('should order folders before files', () => {
+      const file = makeFile({ name: 'a.txt', is_folder: 0 });
+      const folder = makeFile({ name: 'z-folder', is_folder: 1, file_storage_path: null });
+      insertFile(file);
+      insertFile(folder);
+
+      const all = loadAllFiles();
+      const fileIdx = all.findIndex(f => f.id === file.id);
+      const folderIdx = all.findIndex(f => f.id === folder.id);
+      expect(folderIdx).toBeLessThan(fileIdx);
     });
   });
 });

@@ -153,7 +153,7 @@ const loadUserProfile = (): UserProfile => {
   } catch {
     // ignore
   }
-  return { userId: 'P', avatarUrl: null };
+  return { userId: '', avatarUrl: null };
 };
 
 const saveUserProfile = (profile: UserProfile) => {
@@ -289,7 +289,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
           key: k.key.trim()
         }));
       
-      const finalApiKeys = validApiKeys.length > 0 ? validApiKeys : [{id: '1', name: 'default', key: ''}];
+      const finalApiKeys = validApiKeys.length > 0 ? validApiKeys : [{id: Date.now().toString(), name: 'default', key: ''}];
       
       const newProvider: Provider = {
         id: Date.now().toString(),
@@ -311,13 +311,16 @@ const ChatView = ({ onBack }: ChatViewProps) => {
         .then(data => {
           if (data.success) {
             Message.success('供应商添加成功');
+            setAddModalVisible(false);
+            addForm.resetFields();
+            setApiKeys([{ id: '1', key: '', name: '' }]);
             loadProviders();
             const firstKey = validApiKeys.find(k => k.key.trim() !== '');
             if (firstKey) {
               syncKeyToAIConfig(newProviderType, firstKey.key);
             }
           } else {
-            Message.error(data.message || '添加失败');
+            Message.error(data.message || data.error || '添加失败');
           }
         })
         .catch(err => {
@@ -325,9 +328,6 @@ const ChatView = ({ onBack }: ChatViewProps) => {
           Message.error('添加供应商失败');
         });
 
-      setAddModalVisible(false);
-      addForm.resetFields();
-      setApiKeys([{ id: '1', key: '', name: '' }]);
     });
   };
 
@@ -513,7 +513,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
   
   const handleUserIdChange = (value: string) => {
     const userId = value.trim().slice(0, 10);
-    const newProfile = { ...userProfile, userId: userId || 'P' };
+    const newProfile = { ...userProfile, userId };
     setUserProfile(newProfile);
     saveUserProfile(newProfile);
   };
@@ -760,7 +760,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       />
                     ) : (
-                      userProfile.userId?.charAt(0) || 'P'
+                      userProfile.userId?.charAt(0)?.toUpperCase() || '?'
                     )}
                   </div>
                   
@@ -1248,7 +1248,7 @@ const ProvidersSection = ({ providers, loadProviders, deleteProvider, setDefault
             syncKeyToAIConfig(provider.type, firstKey.key);
           }
         } else {
-          Message.error(data.message || '保存失败');
+          Message.error(data.message || data.error || '保存失败');
         }
       })
       .catch(err => {

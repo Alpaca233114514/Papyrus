@@ -6,6 +6,7 @@ import {
   Spin,
   Modal,
   Input,
+  Popconfirm,
 } from '@arco-design/web-react';
 import {
   IconArrowLeft,
@@ -36,6 +37,7 @@ const DataView = ({ onBack }: DataViewProps) => {
   const [loading, setLoading] = useState(false);
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [vaultPath, setVaultPath] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
 
   const handleBackup = async () => {
     setLoading(true);
@@ -90,6 +92,24 @@ const DataView = ({ onBack }: DataViewProps) => {
       Message.error(`导入失败: ${err instanceof Error ? err.message : '未知错误'}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleReset = async () => {
+    setResetLoading(true);
+    try {
+      const res = await fetch('/api/data/reset', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        Message.success('所有数据已重置');
+        window.dispatchEvent(new CustomEvent('papyrus_cards_changed'));
+      } else {
+        Message.error(data.error || '重置失败');
+      }
+    } catch (err) {
+      Message.error(`重置失败: ${err instanceof Error ? err.message : '未知错误'}`);
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -227,9 +247,15 @@ const DataView = ({ onBack }: DataViewProps) => {
             </SettingItem>
 
             <SettingItem title="重置所有数据" desc="永久删除所有数据，不可恢复" divider={false}>
-              <Button status="danger" shape="round" disabled>
-                重置
-              </Button>
+              <Popconfirm
+                title="确认重置"
+                content="确定要重置所有数据吗？此操作不可恢复！"
+                onOk={handleReset}
+              >
+                <Button status="danger" shape="round" loading={resetLoading}>
+                  重置
+                </Button>
+              </Popconfirm>
             </SettingItem>
           </div>
 
@@ -253,7 +279,7 @@ const DataView = ({ onBack }: DataViewProps) => {
             marginBottom: 24,
           }}>
             <SettingItem title="本地存储" desc="使用本地文件系统存储数据">
-              <Button shape="round" disabled>
+              <Button shape="round" onClick={() => window.electronAPI?.openDataFolder?.()}>
                 查看位置
               </Button>
             </SettingItem>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Typography, Tag } from '@arco-design/web-react';
+import { Typography, Tag, Checkbox } from '@arco-design/web-react';
 import { IconFolder } from '@arco-design/web-react/icon';
 import type { Note } from '../types';
 import { PRIMARY_COLOR } from '../constants';
@@ -7,15 +7,18 @@ import { PRIMARY_COLOR } from '../constants';
 interface NoteCardProps {
   note: Note;
   onClick: () => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
-export const NoteCard = ({ note, onClick }: NoteCardProps) => {
+export const NoteCard = ({ note, onClick, selectable, selected, onToggleSelect }: NoteCardProps) => {
   const [hovered, setHovered] = useState(false);
 
   const cardStyle = {
     borderRadius: '16px',
-    border: `1px solid ${hovered ? PRIMARY_COLOR : 'var(--color-text-3)'}`,
-    background: hovered ? `${PRIMARY_COLOR}08` : 'var(--color-bg-1)',
+    border: `1px solid ${selected ? PRIMARY_COLOR : hovered ? PRIMARY_COLOR : 'var(--color-text-3)'}`,
+    background: selected ? `${PRIMARY_COLOR}10` : hovered ? `${PRIMARY_COLOR}08` : 'var(--color-bg-1)',
     transition: 'border-color 0.2s, background 0.2s',
     cursor: 'pointer',
     height: '200px',
@@ -23,15 +26,24 @@ export const NoteCard = ({ note, onClick }: NoteCardProps) => {
     padding: '20px',
     display: 'flex',
     flexDirection: 'column' as const,
+    position: 'relative' as const,
   };
 
   return (
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      onClick={onClick}
+      onClick={selectable ? () => onToggleSelect?.(note.id) : onClick}
       style={cardStyle}
     >
+      {selectable && (
+        <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 1 }} onClick={e => e.stopPropagation()}>
+          <Checkbox
+            checked={selected}
+            onChange={() => onToggleSelect?.(note.id)}
+          />
+        </div>
+      )}
       {/* 头部：文件夹和时间 */}
       <div style={{ 
         display: 'flex', 

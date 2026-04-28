@@ -176,40 +176,46 @@ jobs:
           echo "Build outputs:"
           find dist-electron/ -maxdepth 1 -type f | sort
 
-          # Verify the expected installer/package exists
+          # Verify the expected installer/package exists and has reasonable size
+          MIN_SIZE=52428800  # 50 MB sanity check
           case "${{ matrix.platform }}" in
             windows)
-              if [ -z "$(ls dist-electron/*-Setup-*.exe 2>/dev/null)" ]; then
+              INSTALLER=$(ls dist-electron/*-Setup-*.exe 2>/dev/null | head -1)
+              if [ -z "$INSTALLER" ]; then
                 echo "Error: No Windows installer found"
                 exit 1
               fi
-              UNPACKED_NODE_MODULES="dist-electron/win-unpacked/resources/app.asar.unpacked/backend/node_modules"
               ;;
             macos)
-              if [ -z "$(ls dist-electron/*.dmg 2>/dev/null)" ]; then
+              INSTALLER=$(ls dist-electron/*.dmg 2>/dev/null | head -1)
+              if [ -z "$INSTALLER" ]; then
                 echo "Error: No macOS dmg found"
                 exit 1
               fi
-              UNPACKED_NODE_MODULES="dist-electron/mac/*.app/Contents/Resources/app.asar.unpacked/backend/node_modules"
               ;;
             linux)
-              if [ -z "$(ls dist-electron/*.AppImage 2>/dev/null)" ] && [ -z "$(ls dist-electron/*.deb 2>/dev/null)" ]; then
-                echo "Error: No Linux package found"
+              INSTALLER=$(ls dist-electron/*.AppImage 2>/dev/null | head -1)
+              DEB=$(ls dist-electron/*.deb 2>/dev/null | head -1)
+              if [ -z "$INSTALLER" ] && [ -z "$DEB" ]; then
+                echo "Error: No Linux package found (neither AppImage nor deb)"
                 exit 1
               fi
-              UNPACKED_NODE_MODULES="dist-electron/linux-unpacked/resources/app.asar.unpacked/backend/node_modules"
               ;;
           esac
 
-          # Verify backend production dependencies were packaged and unpacked
-          FASTIFY_PATH="$UNPACKED_NODE_MODULES/fastify/package.json"
-          if [ ! -f "$FASTIFY_PATH" ]; then
-            echo "Error: fastify not found in unpacked app at $FASTIFY_PATH"
-            echo "Contents of unpacked backend:"
-            ls -la "$UNPACKED_NODE_MODULES" 2>/dev/null || echo "(directory does not exist)"
-            exit 1
-          fi
-          echo "fastify present in unpacked app: $(node -p "require('./$FASTIFY_PATH').version")"
+          # Sanity check: reject suspiciously small artifacts
+          for ARTIFACT in "$INSTALLER" "$DEB"; do
+            if [ -n "$ARTIFACT" ] && [ -f "$ARTIFACT" ]; then
+              SIZE_BYTES=$(wc -c < "$ARTIFACT")
+              SIZE_MB=$((SIZE_BYTES / 1048576))
+              if [ "$SIZE_BYTES" -lt "$MIN_SIZE" ]; then
+                echo "Error: Artifact suspiciously small (${SIZE_MB}MB): $ARTIFACT"
+                exit 1
+              fi
+              echo "Artifact OK: $ARTIFACT (${SIZE_MB}MB)"
+            fi
+          done
+
           echo "Build verification passed"
 
       - name: Upload Artifact

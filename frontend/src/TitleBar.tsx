@@ -25,7 +25,7 @@ interface TitleBarProps {
 }
 
 const DEFAULT_PROFILE: UserProfile = {
-  userId: 'P',
+  userId: '',
   avatarUrl: null,
 };
 
@@ -36,7 +36,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
   const [importContent, setImportContent] = useState('');
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile>(DEFAULT_PROFILE);
-  const [tempUserId, setTempUserId] = useState('P');
+  const [tempUserId, setTempUserId] = useState('');
   const [tempAvatarUrl, setTempAvatarUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { getShortcutDisplay } = useShortcuts();
@@ -85,7 +85,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
   // 关闭弹窗并保存
   const handleCloseProfileModal = () => {
     const newProfile: UserProfile = {
-      userId: tempUserId.trim() || 'P',
+      userId: tempUserId.trim(),
       avatarUrl: tempAvatarUrl,
     };
     saveUserProfile(newProfile);
@@ -128,7 +128,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
 
   // 恢复默认设置
   const handleResetDefault = () => {
-    setTempUserId('P');
+    setTempUserId('');
     setTempAvatarUrl(null);
   };
 
@@ -210,6 +210,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
         Message.success(`成功导入 ${result.count} 张卡片`);
         setImportModalVisible(false);
         setImportContent('');
+        window.dispatchEvent(new CustomEvent('papyrus_cards_changed'));
       }
     } catch (error) {
       Message.error('导入失败: ' + (error as Error).message);
@@ -235,9 +236,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
       title: '确认退出',
       content: '确定要退出 Papyrus 吗？未保存的更改将会丢失。',
       onOk: () => {
-        Message.success('退出应用');
-        // 在实际应用中调用退出逻辑
-        window.close();
+        window.electronAPI?.quitApp?.();
       },
     });
   };
@@ -422,7 +421,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
         className="tw-cursor-pointer"
         style={{ backgroundColor: '#206CCF', fontSize: size * 0.4 }} 
       >
-        {userId.charAt(0).toUpperCase()}
+        {(userId?.charAt(0) || '?').toUpperCase()}
       </Avatar>
     );
   };
@@ -466,7 +465,14 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
           <button className="titlebar-btn no-drag" aria-label="最大化" onClick={() => window.electronAPI?.maximizeWindow?.()}>
             <IconExpand />
           </button>
-          <button className="titlebar-btn titlebar-btn-close no-drag" aria-label="关闭" onClick={() => window.electronAPI?.closeWindow?.()}>
+          <button className="titlebar-btn titlebar-btn-close no-drag" aria-label="关闭" onClick={() => {
+            const minimize = localStorage.getItem('papyrus_minimize_to_tray') !== 'false';
+            if (minimize) {
+              window.electronAPI?.closeWindow?.();
+            } else {
+              window.electronAPI?.quitApp?.();
+            }
+          }}>
             <IconClose />
           </button>
         </div>

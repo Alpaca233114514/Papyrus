@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   maximizeWindow: () => ipcRenderer.invoke('window:maximize'),
   closeWindow: () => ipcRenderer.invoke('window:close'),
   isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
+  quitApp: () => ipcRenderer.invoke('app:quit'),
   
   // Backend operations
   checkBackendHealth: () => ipcRenderer.invoke('backend:checkHealth'),

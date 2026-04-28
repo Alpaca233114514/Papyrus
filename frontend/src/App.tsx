@@ -120,7 +120,7 @@ const App = () => {
     const animationClass = animationDirection ? `page-transition-${animationDirection}` : '';
     
     const pages: Record<string, React.ReactNode> = {
-      start: <StartPage onDoneChange={setTodayDone} />,
+      start: <StartPage onDoneChange={setTodayDone} onNavigate={handlePageChange} />,
       scroll: <ScrollPage />,
       notes: <NotesPage />,
       charts: <ChartsPage />,

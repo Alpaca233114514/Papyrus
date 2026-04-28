@@ -5,6 +5,7 @@ import {
   saveAllCards,
   insertCard as dbInsertCard,
   deleteCardById,
+  deleteCardsByIds,
   getCardById,
   updateCard as dbUpdateCard,
   getCardsDueBefore,
@@ -65,6 +66,10 @@ export async function updateCard(
 
 export function deleteCard(cardId: string, logger?: PapyrusLogger): boolean {
   return deleteCardById(cardId, logger);
+}
+
+export function deleteCards(cardIds: string[], logger?: PapyrusLogger): number {
+  return deleteCardsByIds(cardIds, logger);
 }
 
 export function getNextDueCard(_logger?: PapyrusLogger): CardRecord | null {

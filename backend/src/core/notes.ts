@@ -2,11 +2,11 @@ import { v4 as uuidv4 } from 'uuid';
 import matter from 'gray-matter';
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import {
   loadAllNotes,
   insertNote,
   deleteNoteById,
+  deleteNotesByIds,
   getNoteById as dbGetNoteById,
   updateNote as dbUpdateNote,
   getNotesByFolder,
@@ -133,6 +133,10 @@ export function deleteNote(noteId: string, logger?: PapyrusLogger): boolean {
   return deleteNoteById(noteId, logger);
 }
 
+export function deleteNotes(noteIds: string[], logger?: PapyrusLogger): number {
+  return deleteNotesByIds(noteIds, logger);
+}
+
 export function searchNotes(query: string): Note[] {
   const notes = loadAllNotes();
   const lowerQuery = query.toLowerCase();
@@ -156,55 +160,49 @@ export function getStats(): { total: number } {
   return { total: getNoteCount() };
 }
 
-function statOrNull(target: string): fs.Stats | null {
-  try {
-    return fs.statSync(target);
-  } catch {
-    return null;
-  }
-}
-
-function isPathUnderRoot(targetPath: string, rootPath: string): boolean {
-  const rootStat = statOrNull(rootPath);
-  if (rootStat === null) return false;
-
-  let current = path.resolve(targetPath);
-  for (;;) {
-    const currentStat = statOrNull(current);
-    if (currentStat === null) return false;
-    if (currentStat.dev === rootStat.dev && currentStat.ino === rootStat.ino) return true;
-    const parent = path.dirname(current);
-    if (parent === current) return false;
-    current = parent;
-  }
-}
-
-export function importObsidianVault(vaultPath: string, logger?: PapyrusLogger): { imported: number; errors: number } {
+export function importObsidianVault(
+  vaultPath: string,
+  excludeFolders: string[] = ['.obsidian', '.git'],
+  logger?: PapyrusLogger,
+): { imported: number; errors: number; error?: string } {
   let imported = 0;
   let errors = 0;
 
   if (!fs.existsSync(vaultPath)) {
-    return { imported: 0, errors: 0 };
+    return { imported: 0, errors: 0, error: `路径不存在: ${vaultPath}` };
   }
 
-  const isAllowedRoot =
-    isPathUnderRoot(vaultPath, os.homedir()) || isPathUnderRoot(vaultPath, os.tmpdir());
-  if (!isAllowedRoot) {
-    logger?.error(`Obsidian 导入被拒绝: 路径必须在用户主目录或系统临时目录内 (${vaultPath})`);
-    return { imported: 0, errors: 1 };
+  const stat = fs.statSync(vaultPath);
+  if (!stat.isDirectory()) {
+    return { imported: 0, errors: 0, error: `路径不是目录: ${vaultPath}` };
   }
+
+  // Build set of existing note titles for deduplication
+  const existingTitles = new Set(
+    loadAllNotes().map(n => n.title.toLowerCase()),
+  );
+
+  const excludeSet = new Set(excludeFolders.map(f => f.toLowerCase()));
 
   function scanDir(dir: string, relPath = ''): void {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
+      const entryRelPath = path.join(relPath, entry.name);
       if (entry.isDirectory()) {
-        scanDir(fullPath, path.join(relPath, entry.name));
+        if (excludeSet.has(entry.name.toLowerCase())) {
+          continue;
+        }
+        scanDir(fullPath, entryRelPath);
       } else if (entry.name.endsWith('.md')) {
         try {
           const raw = fs.readFileSync(fullPath, 'utf8');
           const parsed = matter(raw);
-          const title = parsed.data.title ?? entry.name.replace('.md', '');
+          const title = parsed.data.title ?? entry.name.replace(/\.md$/i, '');
+          // Skip if a note with the same title already exists
+          if (existingTitles.has(title.toLowerCase())) {
+            return;
+          }
           const folder = relPath || 'Obsidian';
           const tags = Array.isArray(parsed.data.tags)
             ? parsed.data.tags.map(String)
@@ -213,6 +211,7 @@ export function importObsidianVault(vaultPath: string, logger?: PapyrusLogger): 
               : [];
 
           createNote(title, parsed.content, folder, tags, logger);
+          existingTitles.add(title.toLowerCase());
           imported++;
         } catch {
           errors++;
@@ -221,9 +220,7 @@ export function importObsidianVault(vaultPath: string, logger?: PapyrusLogger): 
     }
   }
 
-  if (fs.existsSync(vaultPath)) {
-    scanDir(vaultPath);
-  }
+  scanDir(vaultPath);
 
   logger?.info(`Obsidian 导入完成: ${imported} 成功, ${errors} 失败`);
   return { imported, errors };

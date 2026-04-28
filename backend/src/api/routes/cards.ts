@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { getAllCards, createCard, updateCard, deleteCard, importCardsFromTxt } from '../../core/cards.js';
+import { getAllCards, createCard, updateCard, deleteCard, deleteCards, importCardsFromTxt } from '../../core/cards.js';
 import { getCardById } from '../../db/database.js';
 import { recordCardCreated } from '../../core/progress.js';
 
@@ -40,6 +40,16 @@ export default async function cardsRoutes(fastify: FastifyInstance): Promise<voi
       return;
     }
     reply.send({ success: true });
+  });
+
+  fastify.post('/batch-delete', async (request, reply) => {
+    const body = request.body as { ids?: string[] };
+    if (!body.ids || body.ids.length === 0) {
+      reply.status(400).send({ success: false, error: 'ids is required' });
+      return;
+    }
+    const deleted = deleteCards(body.ids);
+    reply.send({ success: true, deleted });
   });
 
   fastify.patch('/:cardId', async (request, reply) => {

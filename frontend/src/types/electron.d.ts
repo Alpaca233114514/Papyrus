@@ -32,7 +32,13 @@ export interface ElectronAPI {
   
   /** Close the window */
   closeWindow(): Promise<void>;
-  
+
+  /** Quit the entire application */
+  quitApp(): Promise<void>;
+
+  /** Get the backend auth token */
+  getAuthToken(): Promise<string | null>;
+
   /** Check if window is maximized */
   isMaximized(): Promise<boolean>;
   

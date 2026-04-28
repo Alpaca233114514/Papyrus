@@ -20,33 +20,43 @@ export default async function providersRoutes(fastify: FastifyInstance): Promise
 
   fastify.post('/', async (request, reply) => {
     const body = request.body as Partial<Provider>;
-    const id = saveProvider(body);
+    try {
+      const id = saveProvider(body);
 
-    if (body.apiKeys) {
-      for (const key of body.apiKeys) {
-        saveApiKey(id, key);
+      if (body.apiKeys) {
+        for (const key of body.apiKeys) {
+          saveApiKey(id, key);
+        }
       }
-    }
-    if (body.models) {
-      for (const model of body.models) {
-        saveModel(id, model);
+      if (body.models) {
+        for (const model of body.models) {
+          saveModel(id, model);
+        }
       }
-    }
 
-    reply.send({ success: true, provider: { ...body, id }, message: 'Provider created' });
+      reply.send({ success: true, provider: { ...body, id }, message: 'Provider created' });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      reply.status(500).send({ success: false, error: `添加供应商失败: ${msg}` });
+    }
   });
 
   fastify.put('/:providerId', async (request, reply) => {
     const { providerId } = request.params as { providerId: string };
     const body = request.body as Partial<Provider>;
-    saveProvider({ ...body, id: providerId });
+    try {
+      saveProvider({ ...body, id: providerId });
 
-    if (body.apiKeys) {
-      for (const key of body.apiKeys) {
-        saveApiKey(providerId, key);
+      if (body.apiKeys) {
+        for (const key of body.apiKeys) {
+          saveApiKey(providerId, key);
+        }
       }
+      reply.send({ success: true, message: 'Provider updated' });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      reply.status(500).send({ success: false, error: `更新供应商失败: ${msg}` });
     }
-    reply.send({ success: true, message: 'Provider updated' });
   });
 
   fastify.delete('/:providerId', async (request, reply) => {
