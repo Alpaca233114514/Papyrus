@@ -1,61 +1,81 @@
-# Release Notes
+# 版本发布说明
 
-**Version**: v2.0.0-beta.4
-**Date**: 2026-04-28
+**版本**: v2.0.0-beta.5
+**日期**: 2026-04-29
 
-## Highlights
+---
 
-- **File Management**: Browse, upload, and organize files directly within Papyrus with a new dedicated Files page
-- **Batch Operations**: Select and delete multiple cards or notes at once
-- **Data Reset**: Clear all app data with a single click from Settings
+## 公告
 
-## What's New
+1. 本版本为 beta 版本且由于时间限制未充分测试，可能遇到功能不可用情况，若发现 bug，请及时提供反馈，谢谢。
+2. 本版本包含笔记关联系统、AI 聊天改进和文件管理增强等多项更新，建议用户升级体验。
 
-### File Management System
-- New **Files page** with a real folder tree and file list, replacing the previous static mock data
-- Create folders, upload files, and download files through the UI
-- Full backend support: dedicated database table, core CRUD logic, and REST API endpoints at `/api/files`
+---
 
-### Batch Operations
-- **Batch delete cards**: Select multiple cards in the Scroll page and delete them in one action
-- **Batch delete notes**: Multi-select notes with checkbox UI in the Notes page, then delete all selected
+## 亮点
 
-### Data Reset
-- New "Reset Data" button in Settings → Data, with a confirmation popup
-- Clears all cards, notes, and associated data from the local database
+- **笔记关联系统**: 笔记之间可以创建双向链接，支持知识图谱可视化，构建你的知识网络
+- **AI 聊天增强**: 消息流式状态管理重构，配置更改实时生效，聊天体验更稳定
+- **文件管理增强**: 支持文件夹双击进入、面包屑导航、按类型筛选文件
+- **开始页面实时刷新**: 完成闪卡学习后，开始页统计自动刷新，无需手动切换页面
 
-## Improvements
+---
 
-### Backend
-- **Graceful shutdown**: Server now handles SIGTERM/SIGINT to cleanly stop MCP server, file watcher, HTTP server, and database connection
-- **Database robustness**: Added `PRAGMA busy_timeout = 5000` to prevent SQLITE_BUSY errors under concurrent access
-- **Obsidian import**: Enhanced with folder exclusion support and title-based deduplication
+## 新增功能
 
-### Electron
-- **Reliable process termination**: Backend process kill now uses `taskkill /T /F` on Windows with retry logic; Unix uses SIGTERM with 3-second SIGKILL fallback
-- **Quit app API**: Frontend can now programmatically trigger app quit via `electronAPI.quitApp()`
+### 笔记关联系统
+- 全新 **笔记关联** 功能，可在笔记之间建立双向链接关系
+- 后端支持完整的关系 CRUD 操作和 BFS 图遍历查询
+- 为后续知识图谱可视化提供数据基础
 
-### Build & CI
-- **Optimized packaging**: `asarUnpack` narrowed from `backend/**/*` to specific paths, reducing package size
-- **Dependency verification**: CI now verifies backend production dependencies (e.g., fastify) exist after pruning
-- **Platform-specific artifact checks**: Each build verifies its unpacked app contains required dependencies
+### 文件页面改进
+- **文件夹导航**: 双击文件夹进入子目录，支持面包屑返回上级
+- **文件类型筛选**: 可按文档、图片、视频、音频等类型过滤文件列表
+- 文件页面背景随图片亮度自适应调整
 
-### Frontend
-- **Auth resilience**: API client caches auth tokens and retries on 401 responses
-- **Persistent minimize-to-tray**: Setting is now saved to `localStorage` across sessions
-- **Start page shortcuts**: Quick links to Notes, Files, Charts, and Settings
-- **Avatar fallback**: User avatar defaults to initials or "?" when no name is set
+### Electron 桌面端
+- 新增安全的 `shell:openFolder` 接口，可在用户目录或应用数据目录内打开文件夹
+- 后端健康检查间隔从 2 秒缩短至 500 毫秒，启动检测更快
 
-## Bug Fixes
-- Card list now refreshes automatically when cards are imported from the Title Bar
-- Provider form reset now happens after successful API save, preventing data loss
-- Error messages throughout Settings show backend error details instead of generic messages
-- API key IDs now use `Date.now()` instead of hardcoded `'1'`
+---
 
-## Testing
-- New unit tests for the file management core module (`backend/tests/unit/files.test.ts`)
-- Production dependency audit integrated into CI pipeline
+## 改进
 
-## Contributors
+### AI 与聊天
+- **聊天状态管理**: 消息流式输出改用不可变状态更新，修复潜在的渲染异常
+- **配置实时同步**: 设置页修改 AI 配置后，聊天面板无需重启即可生效
+- **AI 补全优化**: 默认 max tokens 从 150 调整为 50，响应更快
+- 助手消息头像改为顶部对齐，长推理内容更易阅读
+
+### 编辑器与输入
+- **SmartTextArea**: 重写 ghost text 定位逻辑，解决相对容器偏移问题
+- 新增后端状态指示器，AI 补全服务不可用时显示状态提示
+
+### 笔记与学习
+- **笔记保存体验**: 从编辑模式切换到预览模式后，不再自动跳回笔记列表
+- **开始页面**: 退出闪卡学习后自动刷新统计数据和复习进度
+
+### 后端与 API
+- **搜索 API**: 增加 try-catch 错误处理，数据库锁定时返回 500 而非崩溃
+- **API 认证**: Token 缓存和重试逻辑加固，减少 401 错误
+
+### 构建与部署
+- 发布工作流支持 `v2.0.0beta.5` 分支自动触发构建
+
+---
+
+## Bug 修复
+- 修复 Provider 表单重置时机，成功保存后再重置，防止数据丢失
+- 修复设置页错误提示，现在显示后端具体错误信息而非通用文案
+- 修复托盘关闭操作的错误处理，避免异常崩溃
+
+---
+
+## 测试
+- 新增笔记关联系统核心模块单元测试
+
+---
+
+## 贡献者
 
 - ALPACA LI
