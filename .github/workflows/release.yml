@@ -242,58 +242,7 @@ jobs:
           echo "Build verification passed"
 
       - name: Verify Packaged Dependencies
-        shell: bash
-        run: |
-          echo "Checking packaged backend dependencies..."
-          echo ""
-          echo "=== dist-electron directory structure (top 3 levels) ==="
-          find dist-electron/ -maxdepth 3 -type d 2>/dev/null | sort || true
-          echo ""
-
-          # Check unpacked directories first
-          FASTIFY_UNPACKED=$(find dist-electron/ -path "*/app.asar.unpacked/backend/node_modules/fastify/package.json" 2>/dev/null | head -1)
-
-          # Also check asar contents
-          ASAR=$(find dist-electron/ -name "app.asar" -type f 2>/dev/null | head -1)
-          FASTIFY_IN_ASAR=""
-          if [ -n "$ASAR" ]; then
-            echo "Found asar: $ASAR"
-            FASTIFY_IN_ASAR=$(npx asar list "$ASAR" 2>/dev/null | grep "backend/node_modules/fastify/package.json" | head -1)
-          else
-            echo "No app.asar found"
-          fi
-          echo ""
-
-          if [ -n "$FASTIFY_UNPACKED" ]; then
-            echo "fastify found unpacked: $FASTIFY_UNPACKED"
-          elif [ -n "$FASTIFY_IN_ASAR" ]; then
-            echo "fastify found INSIDE asar (should be unpacked): $FASTIFY_IN_ASAR"
-          else
-            echo "Error: fastify not found in packaged Electron app"
-            if [ -n "$ASAR" ]; then
-              echo "asar contents matching 'backend/node_modules':"
-              npx asar list "$ASAR" 2>/dev/null | grep "backend/node_modules" | head -10 || true
-            fi
-            exit 1
-          fi
-
-          # Verify backend entry point is also present
-          SERVER_UNPACKED=$(find dist-electron/ -path "*/app.asar.unpacked/backend/dist/api/server.js" 2>/dev/null | head -1)
-          SERVER_IN_ASAR=""
-          if [ -n "$ASAR" ]; then
-            SERVER_IN_ASAR=$(npx asar list "$ASAR" 2>/dev/null | grep "backend/dist/api/server.js" | head -1)
-          fi
-
-          if [ -n "$SERVER_UNPACKED" ]; then
-            echo "server.js found unpacked: $SERVER_UNPACKED"
-          elif [ -n "$SERVER_IN_ASAR" ]; then
-            echo "server.js found in asar: $SERVER_IN_ASAR"
-          else
-            echo "Error: backend server.js not found in packaged app"
-            exit 1
-          fi
-
-          echo "Packaged dependency verification passed"
+        run: node scripts/verify-packaged-deps.js
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4

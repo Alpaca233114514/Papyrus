@@ -29,11 +29,7 @@ module.exports = {
     'frontend/dist/**/*',
     'backend/dist/**/*',
     'backend/package.json',
-    {
-      from: 'backend/node_modules',
-      to: 'backend/node_modules',
-      filter: ['**/*'],
-    },
+    'backend/node_modules/**/*',
     '!frontend/node_modules/**/*',
     '!**/*.map',
   ],
@@ -48,9 +44,9 @@ module.exports = {
 
   asar: true,
   asarUnpack: [
-    'backend/dist/**/*',
+    'backend/dist',
     'backend/package.json',
-    'backend/node_modules/**/*',
+    'backend/node_modules',
   ],
   
   // Windows configuration - 仅 NSIS 安装器
