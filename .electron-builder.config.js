@@ -29,7 +29,11 @@ module.exports = {
     'frontend/dist/**/*',
     'backend/dist/**/*',
     'backend/package.json',
-    'backend/node_modules/**/*',
+    {
+      from: 'backend/node_modules',
+      to: 'backend/node_modules',
+      filter: ['**/*'],
+    },
     '!frontend/node_modules/**/*',
     '!**/*.map',
   ],
