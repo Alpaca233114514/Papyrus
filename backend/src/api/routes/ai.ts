@@ -6,7 +6,8 @@ import { getToolManager } from '../../ai/tool-manager.js';
 import type { ToolCallRecord } from '../../ai/tool-manager.js';
 import { isPrivateUrl } from '../../ai/config.js';
 import { paths } from '../../utils/paths.js';
-import { syncDBToAIConfig, syncAIConfigToDB, getProviderApiKeyFromDB } from '../../ai/db-sync.js';
+import { syncDBToAIConfig, syncAIConfigToDB, getProviderApiKeyFromDB, getProviderConfigFromDB } from '../../ai/db-sync.js';
+import { loadAllProviders } from '../../db/database.js';
 
 export const aiConfig = new AIConfig(paths.dataDir);
 const aiManager = new AIManager(aiConfig);
@@ -67,14 +68,26 @@ function convertCallToResponse(call: ToolCallRecord): Record<string, unknown> {
 export default async function aiRoutes(fastify: FastifyInstance): Promise<void> {
   // AI Config
   fastify.get('/config/ai', async (_request, reply) => {
-    syncDBToAIConfig(aiConfig);
     const masked = aiConfig.getMaskedConfig();
+    // 从数据库读取 provider 列表，确保与前端一致
+    const dbProviders = loadAllProviders();
+    const providersFromDB: Record<string, { api_key: string; base_url: string; models: string[] }> = {};
+    for (const p of dbProviders) {
+      const firstKey = p.apiKeys.find((k) => k.key.trim() !== '');
+      providersFromDB[p.type] = {
+        api_key: firstKey?.key
+          ? '*'.repeat(firstKey.key.length - 4) + firstKey.key.slice(-4)
+          : '',
+        base_url: p.baseUrl ?? '',
+        models: p.models.filter((m) => m.enabled).map((m) => m.modelId),
+      };
+    }
     reply.send({
       success: true,
       config: {
         current_provider: masked.current_provider,
         current_model: masked.current_model,
-        providers: masked.providers,
+        providers: providersFromDB,
         parameters: masked.parameters,
         features: masked.features,
       },
@@ -84,26 +97,10 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
   fastify.post('/config/ai', async (request, reply) => {
     try {
       const payload = request.body as AIConfigPayload;
-      if (!payload.providers || typeof payload.providers !== 'object' || Array.isArray(payload.providers)) {
-        reply.status(400).send({ success: false, error: 'providers 字段必须为对象' });
-        return;
-      }
       aiConfig.config.current_provider = payload.current_provider;
       aiConfig.config.current_model = payload.current_model;
 
-      for (const [providerName, providerData] of Object.entries(payload.providers)) {
-        const newKey = providerData.api_key;
-        const existing = aiConfig.config.providers[providerName];
-        if (existing && newKey.includes('*') && existing.api_key) {
-          providerData.api_key = existing.api_key;
-        }
-        aiConfig.config.providers[providerName] = {
-          api_key: providerData.api_key,
-          base_url: providerData.base_url,
-          models: providerData.models,
-        };
-      }
-
+      // 只同步全局参数，provider 配置由数据库独立维护
       if (payload.parameters) {
         aiConfig.config.parameters = {
           temperature: payload.parameters.temperature ?? aiConfig.config.parameters.temperature,
@@ -135,10 +132,14 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
   fastify.post('/config/ai/test', async (_request, reply) => {
     try {
       const providerName = aiConfig.config.current_provider;
-      const providerConfig = aiConfig.getProviderConfig();
+      const providerConfig = getProviderConfigFromDB(providerName);
+      if (!providerConfig) {
+        reply.send({ success: false, message: 'Provider 未配置' });
+        return;
+      }
 
-      // 如果 aiConfig 中没有 key，尝试从数据库 fallback
-      if (!providerConfig.api_key && providerName !== 'ollama' && providerName !== 'liyuan-deepseek') {
+      // 如果数据库中没有 key，尝试 fallback（兼容旧逻辑）
+      if (!providerConfig.api_key) {
         const dbKey = getProviderApiKeyFromDB(providerName);
         if (dbKey) providerConfig.api_key = dbKey;
       }
@@ -159,7 +160,7 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
       }
 
       const apiKey = providerConfig.api_key;
-      if (!apiKey && providerName !== 'liyuan-deepseek' && providerName !== 'ollama') {
+      if (!apiKey) {
         reply.send({ success: false, message: 'API Key 未设置' });
         return;
       }
@@ -215,16 +216,9 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
   fastify.post('/completion', async (request, reply) => {
     const payload = request.body as CompletionPayload;
     const providerName = aiConfig.config.current_provider;
-    const providerConfig = aiConfig.getProviderConfig();
-
-    // 如果 aiConfig 中没有 key，尝试从数据库 fallback
-    if (!providerConfig.api_key && providerName !== 'ollama' && providerName !== 'liyuan-deepseek') {
-      const dbKey = getProviderApiKeyFromDB(providerName);
-      if (dbKey) providerConfig.api_key = dbKey;
-    }
-
-    if (providerName !== 'ollama' && providerName !== 'liyuan-deepseek' && !providerConfig.api_key) {
-      reply.status(400).send({ success: false, error: 'AI API Key 未设置' });
+    const providerConfig = getProviderConfigFromDB(providerName);
+    if (!providerConfig) {
+      reply.status(400).send({ success: false, error: 'Provider 未配置' });
       return;
     }
 
@@ -299,6 +293,12 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
           }
         }
       } else {
+        if (!providerConfig.api_key) {
+          reply.raw.write(`data: {"error":"AI API Key 未设置"}\n\n`);
+          reply.raw.write(`data: {"done":true}\n\n`);
+          reply.raw.end();
+          return;
+        }
         const baseUrl = providerConfig.base_url || 'https://api.openai.com/v1';
         if (isPrivateUrl(baseUrl)) {
           reply.raw.write(`data: {"error":"SSRF: 禁止通过非本地 provider 访问私有地址"}\n\n`);
@@ -430,6 +430,25 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
     }
   });
 
+  fastify.get('/sessions/:sessionId/messages', async (request, reply) => {
+    const { sessionId } = request.params as { sessionId: string };
+    const session = aiManager.getSession(sessionId);
+    if (!session) {
+      reply.status(404).send({ success: false, error: '会话不存在' });
+      return;
+    }
+    reply.send({
+      success: true,
+      session: {
+        id: session.id,
+        title: session.title,
+        messages: session.messages,
+        created_at: session.created_at,
+        updated_at: session.updated_at,
+      },
+    });
+  });
+
   // Chat streaming
   fastify.post('/chat', async (request, reply) => {
     const payload = request.body as {
@@ -438,7 +457,7 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
       attachments?: Array<{ path?: string } | string>;
       model?: string;
       mode?: string;
-      reasoning?: boolean;
+      reasoning?: boolean | string;
     };
 
     if (!payload.message || typeof payload.message !== 'string') {
@@ -447,15 +466,19 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
     }
 
     const providerName = aiConfig.config.current_provider;
-    const providerConfig = aiConfig.getProviderConfig();
+    const providerConfig = getProviderConfigFromDB(providerName);
+    if (!providerConfig) {
+      reply.status(400).send({ success: false, error: 'Provider 未配置' });
+      return;
+    }
 
-    // 如果 aiConfig 中没有 key，尝试从数据库 fallback
-    if (!providerConfig.api_key && providerName !== 'ollama' && providerName !== 'liyuan-deepseek') {
+    // 如果数据库中没有 key，尝试 fallback
+    if (!providerConfig.api_key) {
       const dbKey = getProviderApiKeyFromDB(providerName);
       if (dbKey) providerConfig.api_key = dbKey;
     }
 
-    if (providerName !== 'ollama' && providerName !== 'liyuan-deepseek' && !providerConfig.api_key) {
+    if (!providerConfig.api_key) {
       reply.status(400).send({ success: false, error: 'AI API Key 未设置' });
       return;
     }
@@ -480,6 +503,7 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
 
       let assistantContent = '';
       let reasoningContent = '';
+      const pendingToolCalls: Array<{ name: string; args: string; id?: string }> = [];
       for await (const chunk of stream) {
         if (chunk.type === 'content') {
           const text = typeof chunk.data === 'string' ? chunk.data : '';
@@ -490,7 +514,16 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
           reasoningContent += text;
           reply.raw.write(`data: ${JSON.stringify({ type: 'reasoning', data: text })}\n\n`);
         } else if (chunk.type === 'tool_start') {
-          reply.raw.write(`data: ${JSON.stringify({ type: 'tool_call', data: chunk.data })}\n\n`);
+          const toolData = chunk.data as Record<string, unknown>;
+          reply.raw.write(`data: ${JSON.stringify({ type: 'tool_call', data: toolData })}\n\n`);
+          const func = toolData.function as Record<string, unknown> | undefined;
+          if (func) {
+            pendingToolCalls.push({
+              name: String(func.name ?? ''),
+              args: String(func.arguments ?? ''),
+              id: String(toolData.id ?? ''),
+            });
+          }
         } else if (chunk.type === 'done') {
           reply.raw.write(`data: ${JSON.stringify({ type: 'done', data: '' })}\n\n`);
         } else if (chunk.type === 'error') {
@@ -503,6 +536,36 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
       const finalContent = assistantContent || reasoningContent;
       if (finalContent) {
         await aiManager.appendAssistantMessage(finalContent);
+      }
+
+      // Auto-execute tools and send tool_result events
+      for (const toolCall of pendingToolCalls) {
+        try {
+          const toolManager = getToolManager();
+          if (!toolManager.shouldAutoExecute(toolCall.name)) continue;
+          if (!toolCall.args) continue;
+
+          const params = JSON.parse(toolCall.args);
+          const result = cardTools.executeTool(toolCall.name, params);
+
+          reply.raw.write(`data: ${JSON.stringify({
+            type: 'tool_result',
+            data: {
+              name: toolCall.name,
+              success: true,
+              result,
+            },
+          })}\n\n`);
+        } catch (err) {
+          reply.raw.write(`data: ${JSON.stringify({
+            type: 'tool_result',
+            data: {
+              name: toolCall.name,
+              success: false,
+              error: err instanceof Error ? err.message : String(err),
+            },
+          })}\n\n`);
+        }
       }
 
       reply.raw.end();
@@ -682,3 +745,5 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
     });
   });
 }
+
+export { aiManager, aiConfig };

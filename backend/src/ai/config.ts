@@ -113,48 +113,7 @@ export class AIConfig {
   private buildDefaultConfig(): AIConfigData {
     const defaultLogDir = path.join(paths.dataDir, 'logs');
     return {
-      providers: {
-        openai: {
-          api_key: '',
-          base_url: 'https://api.openai.com/v1',
-          models: ['gpt-4o', 'gpt-4', 'gpt-3.5-turbo', 'gpt-4-turbo'],
-        },
-        'openai-response': {
-          api_key: '',
-          base_url: 'https://api.openai.com/v1',
-          models: ['gpt-4o'],
-        },
-        anthropic: {
-          api_key: '',
-          base_url: 'https://api.anthropic.com/v1',
-          models: ['claude-3-opus-20240229', 'claude-3-sonnet-20240229'],
-        },
-        gemini: {
-          api_key: '',
-          base_url: 'https://generativelanguage.googleapis.com/v1beta',
-          models: ['gemini-3.1-pro-preview'],
-        },
-        ollama: {
-          api_key: '',
-          base_url: 'http://localhost:11434',
-          models: ['llama2', 'mistral', 'qwen'],
-        },
-        moonshot: {
-          api_key: '',
-          base_url: 'https://api.moonshot.cn/v1',
-          models: ['kimi-k2.5'],
-        },
-        'liyuan-deepseek': {
-          api_key: '',
-          base_url: 'https://papyrus.liyuanstudio.com/v1',
-          models: ['deepseek-v4-flash'],
-        },
-        custom: {
-          api_key: '',
-          base_url: '',
-          models: [],
-        },
-      },
+      providers: {},
       current_provider: 'openai',
       current_model: 'gpt-4o',
       parameters: {
@@ -251,8 +210,14 @@ export class AIConfig {
       const providersRaw = dict.providers;
       const providersDict = providersRaw !== null && typeof providersRaw === 'object' ? (providersRaw as Record<string, unknown>) : {};
       const normalizedProviders: Record<string, ProviderConfig> = {};
-      for (const [providerName, providerConfig] of Object.entries(defaultConfig.providers)) {
-        normalizedProviders[providerName] = this.normalizeProviderConfig(providersDict[providerName], providerConfig);
+      // 只加载配置文件中实际存在的 provider，不再用硬编码默认值恢复
+      for (const [providerName, providerConfig] of Object.entries(providersDict)) {
+        const fallback: ProviderConfig = {
+          api_key: '',
+          base_url: '',
+          models: [],
+        };
+        normalizedProviders[providerName] = this.normalizeProviderConfig(providerConfig, fallback);
       }
 
       let currentProvider = toStr(dict.current_provider, defaultConfig.current_provider);
@@ -262,7 +227,7 @@ export class AIConfig {
 
       let currentModel = toStr(dict.current_model, defaultConfig.current_model);
       const providerModels = normalizedProviders[currentProvider]?.models ?? [];
-      if (providerModels.length > 0 && !providerModels.includes(currentModel)) {
+      if (!providerModels.includes(currentModel)) {
         currentModel = providerModels[0] ?? defaultConfig.current_model;
       }
 

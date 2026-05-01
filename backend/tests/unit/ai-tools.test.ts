@@ -276,3 +276,62 @@ describe('AIResponseParser extended', () => {
     expect(result.tool_call).toBeNull();
   });
 });
+
+describe('getToolsForOpenAI', () => {
+  let tools: CardToolsInstance;
+
+  beforeAll(async () => {
+    const toolsModule = await import('../../src/ai/tools.js');
+    tools = new toolsModule.CardTools();
+  });
+
+  it('should return 6 tool definitions', () => {
+    const schema = tools.getToolsForOpenAI();
+    expect(schema.length).toBe(6);
+  });
+
+  it('should have correct structure for each tool', () => {
+    const schema = tools.getToolsForOpenAI();
+    for (const def of schema) {
+      expect(def.type).toBe('function');
+      expect(typeof def.function.name).toBe('string');
+      expect(typeof def.function.description).toBe('string');
+      expect(def.function.parameters.type).toBe('object');
+    }
+  });
+
+  it('should cover all known tools', () => {
+    const schema = tools.getToolsForOpenAI();
+    const names = schema.map((d) => d.function.name);
+    expect(names).toContain('create_card');
+    expect(names).toContain('update_card');
+    expect(names).toContain('delete_card');
+    expect(names).toContain('search_cards');
+    expect(names).toContain('get_card_stats');
+    expect(names).toContain('generate_practice_set');
+  });
+
+  it('should have required fields matching dispatcher', () => {
+    const schema = tools.getToolsForOpenAI();
+    const create = schema.find((d) => d.function.name === 'create_card');
+    expect(create?.function.parameters.required).toContain('question');
+    expect(create?.function.parameters.required).toContain('answer');
+
+    const update = schema.find((d) => d.function.name === 'update_card');
+    expect(update?.function.parameters.required).toContain('card_index');
+
+    const stats = schema.find((d) => d.function.name === 'get_card_stats');
+    expect(stats?.function.parameters.required).toEqual([]);
+  });
+
+  it('should roundtrip through executeTool for every tool', () => {
+    const schema = tools.getToolsForOpenAI();
+    for (const def of schema) {
+      const result = tools.executeTool(def.function.name, {});
+      // empty params may fail validation, but it should not be "unknown tool"
+      if (result.error) {
+        expect(result.error).not.toMatch(/未知工具/);
+      }
+    }
+  });
+});

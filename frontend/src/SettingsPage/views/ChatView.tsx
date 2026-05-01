@@ -43,7 +43,6 @@ import { api } from '../../api';
 const FormItem = Form.Item;
 const { Title, Text, Paragraph } = Typography;
 const Option = Select.Option;
-const OptGroup = Select.OptGroup;
 
 const PORT_OPTIONS = [
   { label: 'OpenAI', value: 'openai' },
@@ -219,7 +218,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
   const [modelForm] = Form.useForm();
   const [modelFormProviderId, setModelFormProviderId] = useState<string>('');
 
-  const selected = providers.find(p => p.id === '1');
+  const selected = providers.find(p => p.enabled);
   
   const getCurrentModel = () => {
     for (const p of providers) {
@@ -233,8 +232,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
   const currentModelSupportTools = currentModel?.capabilities.includes('tools') ?? false;
 
   useEffect(() => {
-    fetch('/api/completion/config')
-      .then(res => res.json())
+    api.getCompletionConfig()
       .then(data => {
         if (data.success && data.config) {
           setCompletionEnabled(data.config.enabled);
@@ -247,8 +245,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
   }, []);
 
   useEffect(() => {
-    fetch('/api/config/ai')
-      .then(res => res.json())
+    api.getAIConfig()
       .then(data => {
         if (data.success && data.config) {
           const backendCurrentModel = data.config.current_model;
@@ -444,29 +441,51 @@ const ChatView = ({ onBack }: ChatViewProps) => {
       cap_vision?: boolean;
       cap_reasoning?: boolean;
     }) => {
-      const targetProviderId = values.providerId || '1';
-      
+      const targetProviderId = values.providerId || '';
+      const trimmedModelId = values.modelId.trim();
+
+      // 验证 providerId 有效
+      const targetProvider = providers.find(p => p.id === targetProviderId);
+      if (!targetProvider) {
+        Message.error('所选供应商不存在，请刷新页面后重试');
+        return;
+      }
+
+      // 验证 modelId 非空
+      if (!trimmedModelId) {
+        Message.error('模型 ID 不能为空');
+        return;
+      }
+
       const capabilities: string[] = [];
       if (values.cap_tools) capabilities.push('tools');
       if (values.cap_vision) capabilities.push('vision');
       if (values.cap_reasoning) capabilities.push('reasoning');
-      
+
       const modelData = {
-        id: values.modelId.trim(),
+        id: trimmedModelId,
         name: values.name.trim(),
-        modelId: values.modelId.trim(),
+        modelId: trimmedModelId,
         port: values.port,
         capabilities,
         apiKeyId: values.apiKeyId,
         enabled: true,
       };
-      
+
+      const closeModal = () => {
+        setModelModalVisible(false);
+        modelForm.resetFields();
+        setEditingModel(null);
+        setModelFormProviderId('');
+      };
+
       if (editingModel) {
         api.updateModel(targetProviderId, editingModel.id, modelData)
           .then(data => {
             if (data.success) {
               Message.success('模型已更新');
               loadProviders();
+              closeModal();
             } else {
               Message.error(data.error || data.message || '更新失败');
             }
@@ -481,6 +500,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
             if (data.success) {
               Message.success('模型已添加');
               loadProviders();
+              closeModal();
             } else {
               Message.error(data.error || data.message || '添加失败');
             }
@@ -490,11 +510,6 @@ const ChatView = ({ onBack }: ChatViewProps) => {
             Message.error('添加模型失败');
           });
       }
-      
-      setModelModalVisible(false);
-      modelForm.resetFields();
-      setEditingModel(null);
-      setModelFormProviderId('');
     });
   };
 
@@ -537,69 +552,52 @@ const ChatView = ({ onBack }: ChatViewProps) => {
     Message.success('已恢复默认头像');
   };
   
-  const setAgentModeEnabled = (enabled: boolean) => {
+  const setAgentModeEnabled = async (enabled: boolean) => {
     setAgentModeEnabledState(enabled);
     saveAgentSettings({ agentModeEnabled: enabled });
-    fetch('/api/config/ai')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && data.config) {
-          const updatedConfig = {
-            ...data.config,
-            features: {
-              ...data.config.features,
-              agent_enabled: enabled,
-            },
-          };
-          return fetch('/api/config/ai', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updatedConfig),
-          }).then(() => notifyAIConfigChanged());
-        }
-      })
-      .catch(console.error);
+    try {
+      const data = await api.getAIConfig() as unknown as { success: boolean; config: import('../../api').AIConfig };
+      if (data.success && data.config) {
+        const updatedConfig = {
+          ...data.config,
+          features: {
+            ...data.config.features,
+            agent_enabled: enabled,
+          },
+        };
+        await api.saveAIConfig(updatedConfig);
+        notifyAIConfigChanged();
+      }
+    } catch (err) {
+      console.error('保存 Agent 模式配置失败:', err);
+    }
   };
 
   const notifyAIConfigChanged = () => {
     window.dispatchEvent(new CustomEvent('papyrus_ai_config_changed'));
   };
 
-  const handleModelChange = async (modelId: string) => {
+  const saveDefaultModel = async (modelId: string) => {
     setCurrentModelId(modelId);
     try {
-      const res = await fetch('/api/config/ai');
-      const data = await res.json();
+      const data = await api.getAIConfig() as unknown as { success: boolean; config: import('../../api').AIConfig };
       if (data.success && data.config) {
         const provider = providers.find(p => p.models.some(m => m.id === modelId));
         const model = provider?.models.find(m => m.id === modelId);
+        // 只同步 current_provider / current_model，不再同步 providers（数据库为唯一来源）
         const updated = {
           ...data.config,
           current_model: model?.modelId || modelId,
         };
         if (provider) {
           updated.current_provider = provider.type;
-          // 同步 provider 的 API key 到 AI config
-          const firstKey = provider.apiKeys.find(k => k.key.trim() !== '');
-          if (firstKey) {
-            updated.providers = {
-              ...data.config.providers,
-              [provider.type]: {
-                ...data.config.providers[provider.type],
-                api_key: firstKey.key,
-              },
-            };
-          }
         }
-        await fetch('/api/config/ai', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updated),
-        });
+        await api.saveAIConfig(updated);
         notifyAIConfigChanged();
       }
     } catch (err) {
       console.error('同步模型配置到后端失败:', err);
+      Message.error('同步模型配置到后端失败');
     }
   };
 
@@ -607,15 +605,11 @@ const ChatView = ({ onBack }: ChatViewProps) => {
     if (completionSaving) return;
     setCompletionSaving(true);
     try {
-      await fetch('/api/completion/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          enabled: updates.enabled ?? completionEnabled,
-          require_confirm: updates.require_confirm ?? completionRequireConfirm,
-          trigger_delay: updates.trigger_delay ?? completionTriggerDelay,
-          max_tokens: updates.max_tokens ?? completionMaxTokens,
-        }),
+      await api.saveCompletionConfig({
+        enabled: updates.enabled ?? completionEnabled,
+        require_confirm: updates.require_confirm ?? completionRequireConfirm,
+        trigger_delay: updates.trigger_delay ?? completionTriggerDelay,
+        max_tokens: updates.max_tokens ?? completionMaxTokens,
       });
     } catch (err) {
       console.error('保存补全配置失败:', err);
@@ -624,37 +618,10 @@ const ChatView = ({ onBack }: ChatViewProps) => {
     }
   };
 
-  const syncKeyToAIConfig = (providerType: string, apiKey: string) => {
-    fetch('/api/config/ai')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && data.config) {
-          const updatedProviders = { ...data.config.providers };
-          if (updatedProviders[providerType]) {
-            updatedProviders[providerType] = {
-              ...updatedProviders[providerType],
-              api_key: apiKey,
-            };
-          }
-          return fetch('/api/config/ai', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              ...data.config,
-              providers: updatedProviders,
-            }),
-          }).then(res => res.json()).then(data => {
-            if (!data.success) {
-              Message.warning('AI 配置同步失败，请刷新页面后重试');
-            } else {
-              notifyAIConfigChanged();
-            }
-          });
-        }
-      })
-      .catch(() => {
-        Message.warning('AI 配置同步失败，请检查网络连接');
-      });
+  const syncKeyToAIConfig = async (_providerType: string, _apiKey: string) => {
+    // Phase 1: provider 配置由数据库独立维护，不再同步到 aiConfig
+    // api_key 已通过 saveProviderChanges() 中的 api.updateProvider() 保存到数据库
+    notifyAIConfigChanged();
   };
 
   return (
@@ -896,6 +863,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
               onClick={() => {
                 const enabledProvider = providers.find(p => p.enabled);
                 if (!enabledProvider) {
+                  Message.warning('请先启用至少一个供应商');
                   return;
                 }
                 openModelModal(enabledProvider.id);
@@ -912,11 +880,11 @@ const ChatView = ({ onBack }: ChatViewProps) => {
             padding: '16px 20px',
             marginBottom: 24,
           }}>
-            <ModelsSection 
-              providers={providers} 
-              currentModelId={currentModelId} 
-              setCurrentModelId={setCurrentModelId} 
-              deleteModel={deleteModel} 
+            <ModelsSection
+              providers={providers}
+              currentModelId={currentModelId}
+              saveDefaultModel={saveDefaultModel}
+              deleteModel={deleteModel}
               openModelModal={openModelModal}
               renderCapabilityIcons={renderCapabilityIcons}
             />
@@ -991,35 +959,6 @@ const ChatView = ({ onBack }: ChatViewProps) => {
         <div id="parameters-section" style={{ marginBottom: 48, scrollMarginTop: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
             <Title heading={4} style={{ margin: 0, fontSize: 20 }}>模型参数</Title>
-          </div>
-
-          <div className="settings-section" style={{ 
-            background: 'var(--color-bg-2)', 
-            borderRadius: 8, 
-            padding: '16px 20px',
-            marginBottom: 24,
-          }}>
-            <SettingItem title="当前模型" desc="选择要使用的 AI 模型" divider={false}>
-              <Select value={currentModelId} onChange={handleModelChange} style={{ width: 280 }}>
-                {providers.filter(p => p.enabled).map(p => (
-                  <OptGroup key={p.id} label={
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <ProviderLogo type={p.type} name={p.name} size={14} />
-                      <span>{p.name}</span>
-                    </div>
-                  }>
-                    {p.models.filter(m => m.enabled).map(m => (
-                      <Option key={m.id} value={m.id}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <ModelLogo model={m.name} modelId={m.modelId || m.id} size={14} />
-                          <span>{m.name}</span>
-                        </div>
-                      </Option>
-                    ))}
-                  </OptGroup>
-                ))}
-              </Select>
-            </SettingItem>
           </div>
 
           <div className="settings-section" style={{ 
@@ -1421,22 +1360,25 @@ const ProvidersSection = ({ providers, loadProviders, deleteProvider, setDefault
   );
 };
 
-const ModelsSection = ({ providers, currentModelId, setCurrentModelId, deleteModel, openModelModal, renderCapabilityIcons }: { 
-  providers: Provider[]; 
+const ModelsSection = ({ providers, currentModelId, saveDefaultModel, deleteModel, openModelModal, renderCapabilityIcons }: {
+  providers: Provider[];
   currentModelId: string;
-  setCurrentModelId: (id: string) => void;
+  saveDefaultModel: (id: string) => void;
   deleteModel: (providerId: string, modelId: string) => void;
   openModelModal: (providerId?: string, model?: Model) => void;
   renderCapabilityIcons: (capabilities: string[]) => React.ReactNode;
 }) => {
-  const enabledProviders = providers.filter(p => p.enabled);
-  
+  const enabledProviders = providers.filter(p => p.enabled && p.models.length > 0);
+
   if (enabledProviders.length === 0) {
+    const hasEnabledProviders = providers.some(p => p.enabled);
     return (
       <div style={{ textAlign: 'center', padding: '48px 0' }}>
         <IconSafe style={{ fontSize: 48, color: 'var(--color-text-4)', marginBottom: 16 }} />
         <Paragraph type="secondary" style={{ fontSize: 14 }}>
-          暂无启用的供应商，请先启用供应商后再添加模型
+          {hasEnabledProviders
+            ? '暂无模型，请点击右上角"添加模型"按钮添加'
+            : '暂无启用的供应商，请先启用供应商后再添加模型'}
         </Paragraph>
       </div>
     );
@@ -1467,7 +1409,7 @@ const ModelsSection = ({ providers, currentModelId, setCurrentModelId, deleteMod
                     </Paragraph>
                   </div>
                   <Space size={4}>
-                    <Button type="text" size="mini" icon={<IconSafe />} onClick={() => setCurrentModelId(model.id)} disabled={currentModelId === model.id} title="设为默认" />
+                    <Button type="text" size="mini" icon={<IconSafe />} onClick={() => saveDefaultModel(model.id)} disabled={currentModelId === model.id} title="设为默认" />
                     <Button type="text" size="mini" icon={<IconEdit />} onClick={() => openModelModal(provider.id, model)} title="编辑" />
                     <Popconfirm title="删除模型？" onOk={() => deleteModel(provider.id, model.id)}>
                       <Button type="text" size="mini" icon={<IconDelete />} status="danger" />
@@ -1477,11 +1419,6 @@ const ModelsSection = ({ providers, currentModelId, setCurrentModelId, deleteMod
               </Card>
             );
           })}
-          {provider.models.length === 0 && (
-            <Paragraph type="secondary" style={{ fontSize: 13, margin: '8px 0' }}>
-              暂无模型，点击右上角"添加模型"按钮添加
-            </Paragraph>
-          )}
         </div>
       ))}
     </>

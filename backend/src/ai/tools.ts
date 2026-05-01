@@ -34,6 +34,23 @@ export interface ToolCall {
   params: Record<string, unknown>;
 }
 
+export interface OpenAIToolDef {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: 'object';
+      properties: Record<string, {
+        type: 'string' | 'integer' | 'number' | 'boolean' | 'array' | 'object';
+        description?: string;
+        items?: { type: 'string' | 'integer' | 'number' | 'boolean' };
+      }>;
+      required?: string[];
+    };
+  };
+}
+
 export interface ParsedAIResponse {
   content: string;
   reasoning: string | null;
@@ -114,6 +131,98 @@ export class CardTools {
 
 注意：所有修改操作会立即执行并保存。
 `;
+  }
+
+  getToolsForOpenAI(): OpenAIToolDef[] {
+    return [
+      {
+        type: 'function',
+        function: {
+          name: 'create_card',
+          description: '创建一张新的学习卡片并立即保存。用于用户希望记录知识点、问答对或复习内容时',
+          parameters: {
+            type: 'object',
+            properties: {
+              question: { type: 'string', description: '题目内容' },
+              answer: { type: 'string', description: '答案内容' },
+              tags: { type: 'array', description: '标签列表', items: { type: 'string' } },
+            },
+            required: ['question', 'answer'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'update_card',
+          description: '根据卡片索引更新已存在的卡片。仅传入需要修改的字段',
+          parameters: {
+            type: 'object',
+            properties: {
+              card_index: { type: 'integer', description: '卡片在列表中的索引（从 0 开始）' },
+              question: { type: 'string', description: '新的题目（可选）' },
+              answer: { type: 'string', description: '新的答案（可选）' },
+            },
+            required: ['card_index'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'delete_card',
+          description: '根据索引删除一张卡片',
+          parameters: {
+            type: 'object',
+            properties: {
+              card_index: { type: 'integer', description: '卡片在列表中的索引（从 0 开始）' },
+            },
+            required: ['card_index'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'search_cards',
+          description: '在题目、答案、标签中搜索关键词，返回匹配的卡片列表',
+          parameters: {
+            type: 'object',
+            properties: {
+              keyword: { type: 'string', description: '搜索关键词' },
+            },
+            required: ['keyword'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'get_card_stats',
+          description: '获取卡片库的整体统计：总数、到期数、平均熟练度、最高复习次数、已掌握卡片数',
+          parameters: {
+            type: 'object',
+            properties: {},
+            required: [],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'generate_practice_set',
+          description: '基于主题生成一组练习卡片',
+          parameters: {
+            type: 'object',
+            properties: {
+              topic: { type: 'string', description: '主题' },
+              count: { type: 'integer', description: '题目数量，默认 5' },
+            },
+            required: ['topic'],
+          },
+        },
+      },
+    ];
   }
 
   createCard(question: string, answer: string, tags?: string[]): ToolResult {

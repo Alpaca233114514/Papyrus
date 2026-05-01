@@ -497,8 +497,95 @@ body[arco-theme="dark"] .chat-file-tag .arco-tag-icon {
   .chat-file-list-clear {
     transition: none;
   }
-  
+
   .chat-message-action-btn:hover {
     transform: none;
   }
+}
+
+/* Markdown 渲染紧凑样式 */
+.chat-markdown p {
+  margin: 4px 0;
+}
+
+.chat-markdown p:first-child {
+  margin-top: 0;
+}
+
+.chat-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.chat-markdown pre {
+  margin: 6px 0;
+  padding: 8px 12px;
+  background: var(--color-fill-3);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.chat-markdown code {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  background: var(--color-fill-3);
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.chat-markdown pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.chat-markdown ul,
+.chat-markdown ol {
+  padding-left: 1.4em;
+  margin: 4px 0;
+}
+
+.chat-markdown li {
+  margin: 2px 0;
+}
+
+.chat-markdown h1,
+.chat-markdown h2,
+.chat-markdown h3,
+.chat-markdown h4 {
+  margin: 8px 0 4px;
+  font-weight: 600;
+}
+
+.chat-markdown a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.chat-markdown a:hover {
+  text-decoration: underline;
+}
+
+.chat-markdown blockquote {
+  margin: 6px 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--color-border-2);
+  color: var(--color-text-2);
+}
+
+.chat-markdown-compact p {
+  margin: 2px 0;
+}
+
+.chat-markdown-compact pre {
+  margin: 4px 0;
+}
+
+/* 工具按钮禁用态 */
+.chat-toolbar-btn-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chat-toolbar-btn-disabled:hover {
+  background: none;
+  color: var(--color-text-3);
 }

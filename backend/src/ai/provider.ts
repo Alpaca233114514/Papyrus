@@ -6,6 +6,9 @@ import OpenAI from 'openai';
 import type { AIConfig } from './config.js';
 import { isPrivateUrl } from './config.js';
 import { LLMCache } from './llm-cache.js';
+import { getProviderConfigFromDB } from './db-sync.js';
+import { CardTools } from './tools.js';
+import type { OpenAIToolDef } from './tools.js';
 
 type OpenAIFetchParam = NonNullable<
   NonNullable<ConstructorParameters<typeof OpenAI>[0]>['fetch']
@@ -16,6 +19,77 @@ export type StreamEventType = 'content' | 'reasoning' | 'tool_start' | 'tool_res
 export interface StreamChunk {
   type: StreamEventType;
   data: string | Record<string, unknown>;
+}
+
+export type ReasoningEffort = 'low' | 'medium' | 'high';
+export type ReasoningKind = false | 'reasoning_effort' | 'thinking' | 'thinking_config';
+export type ProviderModality = 'openai-compat' | 'ollama' | 'text-only';
+
+interface ProviderMessage {
+  role: string;
+  content: string | Array<Record<string, unknown>>;
+  images?: string[];
+}
+
+type RequestParamsWithReasoning = OpenAI.Chat.ChatCompletionCreateParamsStreaming & {
+  thinking?: { type: 'enabled'; budget_tokens: number };
+  thinking_config?: { thinking_budget: number };
+};
+
+const REASONING_BUDGET: Record<ReasoningEffort, number> = {
+  low: 1024,
+  medium: 4096,
+  high: 8192,
+};
+
+export function getProviderModality(providerName: string): ProviderModality {
+  if (providerName === 'ollama') return 'ollama';
+  const compat = new Set([
+    'openai',
+    'anthropic',
+    'gemini',
+    'deepseek',
+    'moonshot',
+    'liyuan-deepseek',
+    'siliconflow',
+    'custom',
+  ]);
+  if (compat.has(providerName)) return 'openai-compat';
+  return 'text-only';
+}
+
+export function modelSupportsReasoning(providerName: string, model: string): ReasoningKind {
+  const lower = model.toLowerCase();
+  if (
+    providerName === 'openai' ||
+    providerName === 'deepseek' ||
+    providerName === 'moonshot' ||
+    providerName === 'liyuan-deepseek' ||
+    providerName === 'siliconflow'
+  ) {
+    if (/^o[1-9]|^gpt-5|r1|reasoner|thinking/i.test(lower)) return 'reasoning_effort';
+    return false;
+  }
+  if (providerName === 'anthropic') {
+    if (/claude-(opus|sonnet)-[4-9]|claude-mythos/i.test(lower)) return 'thinking';
+    return false;
+  }
+  if (providerName === 'gemini') {
+    if (/gemini-[2-9]\.\d|gemini-[3-9]/i.test(lower)) return 'thinking_config';
+    return false;
+  }
+  return false;
+}
+
+function normalizeReasoning(reasoning: unknown): ReasoningEffort | false {
+  if (typeof reasoning === 'boolean') return reasoning ? 'medium' : false;
+  if (typeof reasoning === 'string') {
+    const s = reasoning.trim().toLowerCase();
+    if (s === 'low' || s === 'medium' || s === 'high') return s;
+    if (s === 'true') return 'medium';
+    return false;
+  }
+  return false;
 }
 
 export interface AttachmentMeta {
@@ -132,6 +206,17 @@ export class AIManager {
     }
   }
 
+  reset(): void {
+    this.sessions = {};
+    this.activeSessionId = null;
+    try {
+      fs.unlinkSync(this.sessionsFile);
+    } catch {
+      // ignore
+    }
+    this.createSession('新对话', true);
+  }
+
   private normalizeMessage(m: unknown): SessionMessage {
     if (m === null || typeof m !== 'object') return { role: 'user', content: '' };
     const msg = m as Record<string, unknown>;
@@ -164,6 +249,10 @@ export class AIManager {
       return this.createSession('新对话', true);
     }
     return this.sessions[this.activeSessionId]!;
+  }
+
+  getSession(sessionId: string): SessionData | null {
+    return this.sessions[sessionId] ?? null;
   }
 
   listSessions(): SessionSummary[] {
@@ -252,25 +341,39 @@ export class AIManager {
     for (const item of attachments) {
       const itemPath = typeof item === 'string' ? item : (item.path ?? '');
       if (!itemPath) continue;
+
+      // 尝试直接作为文件路径解析；如果不存在，尝试作为 fileId 在 vault 目录查找
+      let resolvedPath = itemPath;
       if (!fs.existsSync(itemPath)) {
+        const vaultDir = path.join(this.dataDir, 'vault');
+        if (fs.existsSync(vaultDir)) {
+          const files = fs.readdirSync(vaultDir);
+          const matched = files.find((f) => f.startsWith(itemPath + '_'));
+          if (matched) {
+            resolvedPath = path.join(vaultDir, matched);
+          }
+        }
+      }
+
+      if (!fs.existsSync(resolvedPath)) {
         throw new Error(`文件不存在: ${itemPath}`);
       }
       if (this.config.config.current_provider === 'liyuan-deepseek') {
-        const resolved = path.resolve(itemPath);
+        const resolved = path.resolve(resolvedPath);
         const dataDir = path.resolve(this.dataDir);
         if (!resolved.startsWith(dataDir + path.sep) && resolved !== dataDir) {
           throw new Error('LiYuan 免费额度仅支持处理 Papyrus 工作区内的文件');
         }
       }
-      const ext = path.extname(itemPath).toLowerCase();
+      const ext = path.extname(resolvedPath).toLowerCase();
       if (!IMAGE_EXTENSIONS.has(ext) && !DOCUMENT_EXTENSIONS.has(ext)) {
-        throw new Error(`不支持的文件类型: ${path.basename(itemPath)}`);
+        throw new Error(`不支持的文件类型: ${path.basename(resolvedPath)}`);
       }
-      const size = fs.statSync(itemPath).size;
+      const size = fs.statSync(resolvedPath).size;
       if (size > MAX_ATTACHMENT_SIZE) {
-        throw new Error(`文件超过大小限制(10MB): ${path.basename(itemPath)}`);
+        throw new Error(`文件超过大小限制(10MB): ${path.basename(resolvedPath)}`);
       }
-      normalized.push(itemPath);
+      normalized.push(resolvedPath);
     }
     return normalized;
   }
@@ -339,12 +442,14 @@ export class AIManager {
     providerName: string,
     userMessage: string,
     attachmentsMeta: AttachmentMeta[],
-  ): { role: string; content: string | Array<Record<string, unknown>> } {
+  ): ProviderMessage {
     if (!attachmentsMeta.length) {
       return { role: 'user', content: userMessage };
     }
 
-    if (providerName === 'openai') {
+    const modality = getProviderModality(providerName);
+
+    if (modality === 'openai-compat') {
       const blocks: Array<Record<string, unknown>> = [{ type: 'text', text: userMessage }];
       const docChunks: string[] = [];
       const unresolvedDocs: string[] = [];
@@ -392,6 +497,50 @@ export class AIManager {
       return { role: 'user', content: blocks };
     }
 
+    if (modality === 'ollama') {
+      const images: string[] = [];
+      const docChunks: string[] = [];
+      const unresolvedDocs: string[] = [];
+
+      for (const item of attachmentsMeta) {
+        const absPath = this.resolveAttachmentPath(item);
+        if (!absPath) {
+          unresolvedDocs.push(item.name);
+          continue;
+        }
+        if (item.type === 'image') {
+          try {
+            images.push(fs.readFileSync(absPath, 'base64'));
+          } catch {
+            unresolvedDocs.push(item.name);
+          }
+        } else {
+          const ext = path.extname(item.name).toLowerCase();
+          if (ext === '.txt' || ext === '.md') {
+            const snippet = this.safeReadTextFile(absPath);
+            if (snippet) {
+              docChunks.push(`[文件:${item.name}]\n${snippet}`);
+            } else {
+              unresolvedDocs.push(item.name);
+            }
+          } else {
+            unresolvedDocs.push(item.name);
+          }
+        }
+      }
+
+      const lines: string[] = [userMessage];
+      if (docChunks.length) {
+        lines.push('', docChunks.join('\n\n'));
+      }
+      if (unresolvedDocs.length) {
+        lines.push('', `以下文件已上传但当前未做文本解析: ${unresolvedDocs.join(', ')}`);
+      }
+      const message: ProviderMessage = { role: 'user', content: lines.join('\n') };
+      if (images.length) message.images = images;
+      return message;
+    }
+
     const lines: string[] = [userMessage, '', '附件信息:'];
     for (const item of attachmentsMeta) {
       const itemAbsPath = this.resolveAttachmentPath(item);
@@ -409,10 +558,11 @@ export class AIManager {
         lines.push(`- ${item.name} (${item.type})`);
       }
     }
+    console.warn(`[provider] 未知 provider ${providerName}，附件以纯文本描述形式注入`);
     return { role: 'user', content: lines.join('\n') };
   }
 
-  private messageToProviderFormat(providerName: string, message: SessionMessage): { role: string; content: string | Array<Record<string, unknown>> } {
+  private messageToProviderFormat(providerName: string, message: SessionMessage): ProviderMessage {
     const role = message.role;
     const content = message.content;
     const attachments = message.attachments ?? [];
@@ -428,16 +578,16 @@ export class AIManager {
     attachments?: Array<{ path?: string } | string>,
     overrideModel?: string,
     mode?: string,
-    reasoning?: boolean,
+    reasoning?: unknown,
   ): AsyncGenerator<StreamChunk> {
     const providerName = this.config.config.current_provider;
-    const providerConfig = this.config.config.providers[providerName];
+    const providerConfig = getProviderConfigFromDB(providerName);
     if (!providerConfig) {
       yield { type: 'error', data: `未知 provider: ${providerName}` };
       return;
     }
 
-    const messages: Array<{ role: string; content: string | Array<Record<string, unknown>> }> = [];
+    const messages: ProviderMessage[] = [];
     const effectiveSystemPrompt = systemPrompt || (
       mode === 'agent'
         ? '你是一个智能学习助手。你可以使用工具来完成用户的请求，包括创建卡片、搜索笔记、获取统计数据等。请根据用户的需求，自主决定使用哪些工具，并逐步完成任务。'
@@ -460,6 +610,7 @@ export class AIManager {
 
     const params = this.config.config.parameters;
     const model = overrideModel || this.config.config.current_model;
+    const normalizedReasoning = normalizeReasoning(reasoning);
 
     const cacheKey = this.llmCache.buildCacheKey(providerName, model, messages, params, systemPrompt);
     const cached = this.llmCache.get(cacheKey);
@@ -476,7 +627,6 @@ export class AIManager {
         });
         activeSession.updated_at = Date.now() / 1000;
         this.saveSessions();
-        yield { type: 'done', data: '' };
       } catch (e) {
         yield { type: 'error', data: e instanceof Error ? e.message : String(e) };
       }
@@ -496,8 +646,8 @@ export class AIManager {
     const collectedChunks: StreamChunk[] = [];
     try {
       const stream = providerName === 'ollama'
-        ? this.chatStreamOllama(messages, model, params, providerConfig)
-        : this.chatStreamOpenAI(messages, model, params, providerConfig, providerName);
+        ? this.chatStreamOllama(messages, model, params, providerConfig, mode)
+        : this.chatStreamOpenAI(messages, model, params, providerConfig, providerName, mode, normalizedReasoning);
 
       for await (const chunk of stream) {
         collectedChunks.push(chunk);
@@ -512,16 +662,19 @@ export class AIManager {
   }
 
   private async *chatStreamOpenAI(
-    messages: Array<{ role: string; content: string | Array<Record<string, unknown>> }>,
+    messages: ProviderMessage[],
     model: string,
     params: { temperature?: number; max_tokens?: number; top_p?: number; presence_penalty?: number; frequency_penalty?: number },
     providerConfig: { base_url: string; api_key: string },
     providerName: string,
+    mode?: string,
+    reasoning: ReasoningEffort | false = false,
   ): AsyncGenerator<StreamChunk> {
-    const baseUrl = (providerConfig.base_url || '').replace(/\/$/, '');
+    const rawBaseUrl = (providerConfig.base_url || '').replace(/\/$/, '');
+    const baseUrl = providerName === 'gemini' ? `${rawBaseUrl}/openai` : rawBaseUrl;
     const apiKey = providerConfig.api_key || '';
 
-    if (isPrivateUrl(baseUrl)) {
+    if (isPrivateUrl(rawBaseUrl)) {
       throw new Error('SSRF: 禁止通过非本地 provider 访问私有地址');
     }
 
@@ -532,7 +685,7 @@ export class AIManager {
         const reqUrl = url as string;
         const reqInit = init as RequestInit | undefined;
         const headers = new Headers(reqInit?.headers);
-        if (providerName === 'liyuan-deepseek' && !apiKey) {
+        if (!apiKey) {
           headers.delete('Authorization');
         }
         // url 运行时恒为 string；node-fetch v2 与 undici 类型声明不兼容但运行时一致
@@ -540,18 +693,46 @@ export class AIManager {
       }) as unknown as OpenAIFetchParam,
     });
 
-    const requestParams: OpenAI.Chat.ChatCompletionCreateParams = {
+    const baseParams: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
       model,
       messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
       stream: true,
       temperature: params.temperature ?? 0.7,
       max_tokens: params.max_tokens ?? 2000,
     };
-    if (params.top_p !== undefined) requestParams.top_p = params.top_p;
-    if (params.presence_penalty !== undefined) requestParams.presence_penalty = params.presence_penalty;
-    if (params.frequency_penalty !== undefined) requestParams.frequency_penalty = params.frequency_penalty;
+    if (params.top_p !== undefined) baseParams.top_p = params.top_p;
+    if (params.presence_penalty !== undefined) baseParams.presence_penalty = params.presence_penalty;
+    if (params.frequency_penalty !== undefined) baseParams.frequency_penalty = params.frequency_penalty;
+
+    const requestParams: RequestParamsWithReasoning = baseParams;
+
+    if (mode === 'agent') {
+      const cardTools = new CardTools();
+      const tools: OpenAIToolDef[] = cardTools.getToolsForOpenAI();
+      requestParams.tools = tools as unknown as OpenAI.Chat.ChatCompletionTool[];
+      requestParams.tool_choice = 'auto';
+    }
+
+    if (reasoning) {
+      const kind = modelSupportsReasoning(providerName, model);
+      if (kind === 'reasoning_effort') {
+        requestParams.reasoning_effort = reasoning;
+      } else if (kind === 'thinking') {
+        requestParams.thinking = { type: 'enabled', budget_tokens: REASONING_BUDGET[reasoning] };
+      } else if (kind === 'thinking_config') {
+        requestParams.thinking_config = { thinking_budget: REASONING_BUDGET[reasoning] };
+      }
+    }
 
     const stream = await client.chat.completions.create(requestParams);
+
+    interface PendingToolCall {
+      id: string;
+      name: string;
+      args: string;
+    }
+    const pending = new Map<number, PendingToolCall>();
+    let finishedToolCalls = false;
 
     for await (const chunk of stream) {
       const choice = chunk.choices[0];
@@ -566,20 +747,64 @@ export class AIManager {
         yield { type: 'content', data: delta.content };
       }
       if (delta.tool_calls) {
-        for (const toolCall of delta.tool_calls) {
-          yield { type: 'tool_start', data: toolCall as unknown as Record<string, unknown> };
+        for (const tc of delta.tool_calls) {
+          const idx = typeof tc.index === 'number' ? tc.index : 0;
+          const entry = pending.get(idx) ?? { id: '', name: '', args: '' };
+          if (typeof tc.id === 'string') entry.id = tc.id;
+          if (tc.function) {
+            if (typeof tc.function.name === 'string') entry.name = tc.function.name;
+            if (typeof tc.function.arguments === 'string') entry.args += tc.function.arguments;
+          }
+          pending.set(idx, entry);
         }
+      }
+      if (choice.finish_reason === 'tool_calls') {
+        finishedToolCalls = true;
+      }
+    }
+
+    if (pending.size > 0 || finishedToolCalls) {
+      const indices = [...pending.keys()].sort((a, b) => a - b);
+      for (const idx of indices) {
+        const entry = pending.get(idx);
+        if (!entry || !entry.name) continue;
+        let parsedArgs: Record<string, unknown> = {};
+        if (entry.args.trim()) {
+          try {
+            const parsed = JSON.parse(entry.args) as unknown;
+            if (parsed !== null && typeof parsed === 'object') {
+              parsedArgs = parsed as Record<string, unknown>;
+            }
+          } catch {
+            yield { type: 'error', data: `工具参数 JSON 解析失败: ${entry.name}` };
+            continue;
+          }
+        }
+        yield {
+          type: 'tool_start',
+          data: {
+            id: entry.id,
+            type: 'function',
+            function: { name: entry.name, arguments: entry.args },
+            args: parsedArgs,
+          },
+        };
       }
     }
   }
 
   private async *chatStreamOllama(
-    messages: Array<{ role: string; content: string | Array<Record<string, unknown>> }>,
+    messages: ProviderMessage[],
     model: string,
     params: { temperature?: number },
     providerConfig: { base_url: string },
+    mode?: string,
   ): AsyncGenerator<StreamChunk> {
     const baseUrl = providerConfig.base_url.replace(/\/$/, '');
+
+    const enrichedMessages = mode === 'agent'
+      ? this.injectOllamaToolPrompt(messages)
+      : messages;
 
     const response = await fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
@@ -587,7 +812,7 @@ export class AIManager {
       signal: AbortSignal.timeout(60000),
       body: JSON.stringify({
         model,
-        messages,
+        messages: enrichedMessages,
         stream: true,
         options: { temperature: params.temperature ?? 0.7 },
       }),
@@ -640,6 +865,23 @@ export class AIManager {
         }
       }
     }
+  }
+
+  private injectOllamaToolPrompt(messages: ProviderMessage[]): ProviderMessage[] {
+    const cardTools = new CardTools();
+    const toolHint = cardTools.getToolsDefinition();
+    const out = [...messages];
+    const sysIdx = out.findIndex(m => m.role === 'system');
+    if (sysIdx >= 0) {
+      const existing = out[sysIdx];
+      if (existing) {
+        const existingContent = typeof existing.content === 'string' ? existing.content : '';
+        out[sysIdx] = { ...existing, content: `${existingContent}\n\n${toolHint}` };
+      }
+    } else {
+      out.unshift({ role: 'system', content: toolHint });
+    }
+    return out;
   }
 
   getHint(question: string): Promise<string> {

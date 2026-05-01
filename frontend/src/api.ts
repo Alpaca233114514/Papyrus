@@ -316,8 +316,8 @@ export const api = {
     request<SearchRes>(`/search?query=${encodeURIComponent(query)}`),
 
   // AI Config
-  getAIConfig: () => 
-    request<AIConfig>('/config/ai'),
+  getAIConfig: () =>
+    request<AIConfigRes>('/config/ai'),
   saveAIConfig: (config: AIConfig) => 
     request<{ success: boolean }>('/config/ai', { 
       method: 'POST', 

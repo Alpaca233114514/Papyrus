@@ -1,6 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
+import { resetDb, closeDb } from '../../src/db/database.js';
 
 describe('Server Auth Hook', () => {
   const testDir = path.join(os.tmpdir(), `papyrus-server-auth-test-${Date.now()}`);
@@ -12,6 +13,7 @@ describe('Server Auth Hook', () => {
     fs.mkdirSync(testDir, { recursive: true });
     originalEnv = process.env.PAPYRUS_DATA_DIR;
     process.env.PAPYRUS_DATA_DIR = testDir;
+    resetDb();
     authToken = 'test-auth-token-' + 'x'.repeat(32);
     process.env.PAPYRUS_AUTH_TOKEN = authToken;
 
@@ -26,6 +28,7 @@ describe('Server Auth Hook', () => {
     } catch {
       // ignore cleanup errors on Windows
     }
+    closeDb();
     if (originalEnv !== undefined) {
       process.env.PAPYRUS_DATA_DIR = originalEnv;
     } else {

@@ -54,6 +54,8 @@ describe('AIManager', () => {
   let AIManager: new (config: ConfigLike) => ManagerLike;
   let AIConfig: new (dataDir: string) => ConfigLike;
   let isPrivateUrl: (url: string) => boolean;
+  let getProviderModality: (name: string) => string;
+  let modelSupportsReasoning: (provider: string, model: string) => string | false;
 
   beforeAll(async () => {
     fs.mkdirSync(testDir, { recursive: true });
@@ -64,6 +66,8 @@ describe('AIManager', () => {
     AIManager = aiModule.AIManager as unknown as new (config: ConfigLike) => ManagerLike;
     AIConfig = configModule.AIConfig as unknown as new (dataDir: string) => ConfigLike;
     isPrivateUrl = configModule.isPrivateUrl;
+    getProviderModality = aiModule.getProviderModality;
+    modelSupportsReasoning = aiModule.modelSupportsReasoning;
   });
 
   afterAll(() => {
@@ -767,6 +771,7 @@ describe('AIManager', () => {
 
     it('should validate config with invalid ascii', () => {
       const config = new AIConfig(testDir);
+      config.config.providers.openai = { api_key: '', base_url: '', models: [] };
       // @ts-expect-error - testing provider config access
       config.config.providers.openai.api_key = '中文';
       expect(() => config.validateConfig()).toThrow('非法字符');
@@ -774,6 +779,7 @@ describe('AIManager', () => {
 
     it('should validate config with invalid base url', () => {
       const config = new AIConfig(testDir);
+      config.config.providers.openai = { api_key: '', base_url: '', models: [] };
       // @ts-expect-error - testing provider config access
       config.config.providers.openai.base_url = '中文';
       expect(() => config.validateConfig()).toThrow('非法字符');
@@ -781,6 +787,7 @@ describe('AIManager', () => {
 
     it('should validate config with private url for non-local provider', () => {
       const config = new AIConfig(testDir);
+      config.config.providers.openai = { api_key: '', base_url: '', models: [] };
       // @ts-expect-error - testing provider config access
       config.config.providers.openai.base_url = 'http://192.168.1.1';
       expect(() => config.validateConfig()).toThrow('SSRF');
@@ -810,6 +817,7 @@ describe('AIManager', () => {
 
     it('should mask short api key', () => {
       const config = new AIConfig(testDir);
+      config.config.providers.openai = { api_key: '', base_url: '', models: [] };
       // @ts-expect-error - testing provider config access
       config.config.providers.openai.api_key = 'abc';
       const masked = config.getMaskedConfig();
@@ -1072,6 +1080,117 @@ describe('AIManager', () => {
 
       const history2 = manager.conversationHistory as Array<{ role: string; content: string }>;
       expect(history2.some(m => m.role === 'user' && m.content === 'persist me')).toBe(true);
+    });
+  });
+
+  describe('getProviderModality', () => {
+    it('should return openai-compat for openai', () => {
+      expect(getProviderModality('openai')).toBe('openai-compat');
+    });
+
+    it('should return openai-compat for anthropic', () => {
+      expect(getProviderModality('anthropic')).toBe('openai-compat');
+    });
+
+    it('should return openai-compat for gemini', () => {
+      expect(getProviderModality('gemini')).toBe('openai-compat');
+    });
+
+    it('should return ollama for ollama', () => {
+      expect(getProviderModality('ollama')).toBe('ollama');
+    });
+
+    it('should return text-only for unknown provider', () => {
+      expect(getProviderModality('unknown')).toBe('text-only');
+    });
+  });
+
+  describe('modelSupportsReasoning', () => {
+    it('should return reasoning_effort for openai o1', () => {
+      expect(modelSupportsReasoning('openai', 'o1-preview')).toBe('reasoning_effort');
+    });
+
+    it('should return reasoning_effort for openai gpt-5', () => {
+      expect(modelSupportsReasoning('openai', 'gpt-5-pro')).toBe('reasoning_effort');
+    });
+
+    it('should return false for openai gpt-4o', () => {
+      expect(modelSupportsReasoning('openai', 'gpt-4o')).toBe(false);
+    });
+
+    it('should return thinking for anthropic claude-mythos', () => {
+      expect(modelSupportsReasoning('anthropic', 'claude-mythos')).toBe('thinking');
+    });
+
+    it('should return thinking for anthropic claude-opus-4.7', () => {
+      expect(modelSupportsReasoning('anthropic', 'claude-opus-4.7')).toBe('thinking');
+    });
+
+    it('should return false for anthropic claude-3-haiku', () => {
+      expect(modelSupportsReasoning('anthropic', 'claude-3-haiku')).toBe(false);
+    });
+
+    it('should return thinking_config for gemini 3.x', () => {
+      expect(modelSupportsReasoning('gemini', 'gemini-3-flash-preview')).toBe('thinking_config');
+    });
+
+    it('should return false for gemini 1.5', () => {
+      expect(modelSupportsReasoning('gemini', 'gemini-1.5-pro')).toBe(false);
+    });
+
+    it('should return false for ollama', () => {
+      expect(modelSupportsReasoning('ollama', 'llama2')).toBe(false);
+    });
+
+    it('should return reasoning_effort for deepseek r1', () => {
+      expect(modelSupportsReasoning('deepseek', 'deepseek-r1')).toBe('reasoning_effort');
+    });
+  });
+
+  describe('multimodal message building', () => {
+    it('should build ollama message with images array', () => {
+      const manager = createManager();
+      const tmpFile = path.join(testDir, 'ollama-img.png');
+      fs.writeFileSync(tmpFile, 'fake-image');
+      const stored = manager.storeAttachments([{ path: tmpFile }]) as Array<Record<string, unknown>>;
+      const result = manager.buildUserMessageForProvider('ollama', 'describe', stored) as { role: string; content: string; images?: string[] };
+      expect(result.role).toBe('user');
+      expect(typeof result.content).toBe('string');
+      expect(result.images).toBeDefined();
+      expect(result.images?.length).toBe(1);
+    });
+
+    it('should build gemini message with image_url blocks', () => {
+      const manager = createManager();
+      const tmpFile = path.join(testDir, 'gemini-img.png');
+      fs.writeFileSync(tmpFile, 'fake-image');
+      const stored = manager.storeAttachments([{ path: tmpFile }]) as Array<Record<string, unknown>>;
+      const result = manager.buildUserMessageForProvider('gemini', 'describe', stored) as { role: string; content: Array<Record<string, unknown>> };
+      expect(result.role).toBe('user');
+      expect(Array.isArray(result.content)).toBe(true);
+      expect(result.content[1]?.type).toBe('image_url');
+    });
+
+    it('should build anthropic message with image_url blocks', () => {
+      const manager = createManager();
+      const tmpFile = path.join(testDir, 'anthropic-img.png');
+      fs.writeFileSync(tmpFile, 'fake-image');
+      const stored = manager.storeAttachments([{ path: tmpFile }]) as Array<Record<string, unknown>>;
+      const result = manager.buildUserMessageForProvider('anthropic', 'describe', stored) as { role: string; content: Array<Record<string, unknown>> };
+      expect(result.role).toBe('user');
+      expect(Array.isArray(result.content)).toBe(true);
+      expect(result.content[1]?.type).toBe('image_url');
+    });
+
+    it('should fallback to text-only for unknown provider', () => {
+      const manager = createManager();
+      const tmpFile = path.join(testDir, 'unknown-img.png');
+      fs.writeFileSync(tmpFile, 'fake-image');
+      const stored = manager.storeAttachments([{ path: tmpFile }]) as Array<Record<string, unknown>>;
+      const result = manager.buildUserMessageForProvider('unknown', 'describe', stored) as { role: string; content: string };
+      expect(result.role).toBe('user');
+      expect(typeof result.content).toBe('string');
+      expect(result.content).toContain('附件信息');
     });
   });
 });

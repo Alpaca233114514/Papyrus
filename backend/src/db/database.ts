@@ -34,6 +34,26 @@ function closeDb(): void {
   }
 }
 
+function resetDb(): void {
+  closeDb();
+}
+
+/** 使用 VACUUM INTO 创建数据库快照（包含 schema + seed 数据的干净副本，无 WAL） */
+export function createDbSnapshot(snapshotPath: string): void {
+  const database = getDb();
+  database.exec(`VACUUM INTO '${snapshotPath}'`);
+}
+
+/** 关闭数据库，从快照恢复，删除 WAL/SHM，重新打开 */
+export function restoreDbSnapshot(snapshotPath: string): void {
+  const dbPath = paths.dbFile;
+  closeDb();
+  fs.copyFileSync(snapshotPath, dbPath);
+  try { fs.unlinkSync(dbPath + '-wal'); } catch { /* ignore */ }
+  try { fs.unlinkSync(dbPath + '-shm'); } catch { /* ignore */ }
+  getDb();
+}
+
 function initSchema(database: DatabaseSync): void {
   const tableCheck = database.prepare(
     "SELECT name FROM sqlite_master WHERE type='table' AND name='cards'"
@@ -225,7 +245,7 @@ function seedDefaults(database: DatabaseSync): void {
     ['m-deepseek-1', 'p-deepseek', 'DeepSeek V4 Pro', 'deepseek-v4-pro', 'openai', dsCaps, 'k-deepseek', 1],
     ['m-moonshot-1', 'p-moonshot', 'Kimi K2.6', 'kimi-k2.6', 'openai', allCaps, 'k-moonshot', 1],
     ['m-liyuan-ds-flash', 'p-liyuan-deepseek', 'DeepSeek V4 Flash', 'deepseek-v4-flash', 'openai', allCaps, 'k-liyuan-deepseek', 1],
-    ['m-liyuan-ds-pro', 'p-liyuan-deepseek', 'DeepSeek V4 Pro', 'deepseek-v4-pro', 'openai', dsCaps, 'k-liyuan-deepseek', 0],
+    ['m-liyuan-ds-pro', 'p-liyuan-deepseek', 'DeepSeek V4 Pro', 'liyuan-deepseek-v4-pro', 'openai', dsCaps, 'k-liyuan-deepseek', 0],
   ];
 
   const insertModel = database.prepare(
@@ -1330,4 +1350,4 @@ export function clearAllData(): void {
   database.exec('DELETE FROM notes;');
 }
 
-export { closeDb, getDb };
+export { closeDb, getDb, resetDb };

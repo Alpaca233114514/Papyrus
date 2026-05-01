@@ -1,11 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Dropdown, Menu, Avatar, Tooltip, Empty, Message as ArcoMessage, Tag, Button } from '@arco-design/web-react';
+import { Dropdown, Menu, Avatar, Tooltip, Empty, Message as ArcoMessage, Tag, Button, Trigger } from '@arco-design/web-react';
 import { IconArrowUp, IconAt, IconFile, IconMessage, IconDown, IconBulb, IconRecordStop, IconTool, IconRefresh, IconEdit, IconCopy, IconDelete, IconTranslate, IconSave, IconPlus, IconHistory, IconClose, IconImage, IconFilePdf } from '@arco-design/web-react/icon';
 import IconAgentMode from './icons/IconAgentMode';
 import { ReasoningChain } from './components/ReasoningChain';
 import { ToolCallCard } from './components/ToolCallCard';
 import type { AIConfig, ProviderModel } from './types/ai';
-import { getAuthToken } from './api';
+import { getAuthToken, BASE, api } from './api';
+import type { ChatSession } from './api';
+import { MarkdownView } from './components/MarkdownView';
+import { ToolsCatalogPopover } from './components/ToolsCatalogPopover';
 import './ChatPanel.css';
 
 interface ChatPanelProps {
@@ -98,9 +101,17 @@ const loadUserProfile = (): UserProfile => {
   return { userId: '', avatarUrl: null };
 };
 
+function stripMdTitle(source: string): string {
+  return source
+    .replace(/^[#\>\-*\s]+/gm, '')
+    .replace(/[*_`~]+/g, '')
+    .split('\n')[0]
+    .trim();
+}
+
 async function authFetch(url: string, init?: RequestInit): Promise<Response> {
   const token = await getAuthToken();
-  return fetch(url, {
+  return fetch(`${BASE}${url}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -125,6 +136,11 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   const [agentModeEnabled, setAgentModeEnabled] = useState<boolean>(loadAgentModeEnabled());
   const [availableModels, setAvailableModels] = useState<ProviderModel[]>([]);
   const [providerApiKeys, setProviderApiKeys] = useState<Record<string, string>>({});
+  const [providerBaseUrls, setProviderBaseUrls] = useState<Record<string, string>>({});
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingDraft, setEditingDraft] = useState('');
   const dragStartY = useRef<number>(0);
   const dragStartHeight = useRef<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -132,7 +148,18 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textOverrideRef = useRef<string | null>(null);
-  
+  const availableModelsRef = useRef<ProviderModel[]>([]);
+  const modelRef = useRef<string>('');
+
+  // 保持 ref 与 state 同步，避免 useCallback 依赖循环
+  useEffect(() => {
+    availableModelsRef.current = availableModels;
+  }, [availableModels]);
+
+  useEffect(() => {
+    modelRef.current = model;
+  }, [model]);
+
   // 监听 localStorage 变化（用于设置页面修改后实时更新）
   useEffect(() => {
     const handleStorageChange = () => {
@@ -192,8 +219,9 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
     // 先加载 providers，确保 availableModels 就绪
     let models: ProviderModel[] = [];
     const apiKeys: Record<string, string> = {};
+    const baseUrls: Record<string, string> = {};
     try {
-      const response = await authFetch('/api/providers');
+      const response = await authFetch('/providers');
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.providers) {
@@ -204,10 +232,14 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
             if (firstKey) {
               apiKeys[provider.type] = firstKey.key;
             }
+            // 保存 provider 的 baseUrl，用于后续配置保存
+            if (provider.baseUrl) {
+              baseUrls[provider.type] = provider.baseUrl;
+            }
             for (const m of provider.models) {
               if (!m.enabled) continue;
               models.push({
-                key: m.modelId,
+                key: `${provider.type}:${m.modelId}`,
                 label: m.name,
                 providerId: provider.id,
                 providerType: provider.type,
@@ -221,27 +253,39 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
       ArcoMessage.warning('无法加载模型列表，请检查后端连接');
     }
 
+    // 使用 ref 获取最新值，避免 stale closure
+    const prevModels = availableModelsRef.current;
+
     // 如果新加载的 models 为空但旧值非空，保留旧值（防止选择框"消失"）
-    if (models.length === 0 && availableModels.length > 0) {
+    if (models.length === 0 && prevModels.length > 0) {
       console.warn('Provider 列表返回为空，保留之前的模型列表');
-    } else {
+    } else if (models.length > 0) {
       setAvailableModels(models);
       setProviderApiKeys(apiKeys);
+      setProviderBaseUrls(baseUrls);
+    } else if (prevModels.length === 0) {
+      setAvailableModels([]);
+      setProviderApiKeys({});
+      setProviderBaseUrls({});
     }
 
     // 再加载 AI config，此时可用 models 已就绪
     try {
-      const response = await authFetch('/api/config/ai');
+      const response = await authFetch('/config/ai');
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.config) {
           setAiConfig(data.config);
           const configuredModel = data.config.current_model;
           // 只在配置的 model 存在于可用列表中时才更新，避免覆盖当前选择
-          const currentModels = models.length > 0 ? models : availableModels;
-          if (configuredModel && currentModels.some((m) => m.key === configuredModel)) {
-            setModel(configuredModel);
-          } else if (currentModels.length > 0 && !model) {
+          const currentModels = models.length > 0 ? models : prevModels;
+          const currentModelRef = modelRef.current;
+          const configuredCompositeKey = configuredModel
+            ? currentModels.find((m) => m.key.endsWith(`:${configuredModel}`))?.key
+            : undefined;
+          if (configuredCompositeKey && currentModels.some((m) => m.key === configuredCompositeKey)) {
+            setModel(configuredCompositeKey);
+          } else if (currentModels.length > 0 && !currentModelRef) {
             setModel(currentModels[0].key);
           }
         }
@@ -251,7 +295,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
     } finally {
       setConfigChecked(true);
     }
-  }, [availableModels, model]);
+  }, []);
 
   // 组件挂载时加载配置和模型列表
   useEffect(() => {
@@ -521,7 +565,32 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
                   }
 
                   case 'done': {
-                    // 流正常结束，无需额外操作
+                    const toolPattern = /```json\s*(\{[\s\S]*?"tool"[\s\S]*?\})\s*```/g;
+                    let match = toolPattern.exec(newContent);
+                    while (match !== null) {
+                      try {
+                        const parsed = JSON.parse(match[1]) as unknown;
+                        if (parsed !== null && typeof parsed === 'object') {
+                          const obj = parsed as Record<string, unknown>;
+                          if (typeof obj.tool === 'string' && typeof obj.params === 'object' && obj.params !== null) {
+                            newBlocks = [
+                              ...newBlocks,
+                              {
+                                type: 'tool_call' as const,
+                                toolCallId: '',
+                                toolName: obj.tool,
+                                toolStatus: 'pending' as const,
+                                toolParams: obj.params as Record<string, unknown>,
+                              },
+                            ];
+                            newContent = newContent.replace(match[0], '');
+                          }
+                        }
+                      } catch {
+                        // ignore malformed JSON
+                      }
+                      match = toolPattern.exec(newContent);
+                    }
                     break;
                   }
 
@@ -602,7 +671,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
           uploadFiles.push({ name: sf.name, content: base64, mimeType: sf.file.type });
         }
 
-        const uploadRes = await authFetch('/api/files/upload', {
+        const uploadRes = await authFetch('/files/upload', {
           method: 'POST',
           body: JSON.stringify({ files: uploadFiles }),
         });
@@ -642,9 +711,11 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
     abortControllerRef.current = new AbortController();
 
     try {
+      // 从 composite key 中提取真实的 modelId
+      const actualModelId = model.includes(':') ? model.split(':').slice(1).join(':') : model;
       const chatBody: Record<string, unknown> = {
         message: messageText,
-        model,
+        model: actualModelId,
         mode,
         reasoning,
       };
@@ -652,7 +723,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
         chatBody.attachments = attachments;
       }
 
-      const response = await authFetch('/api/chat', {
+      const response = await authFetch('/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -742,7 +813,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   // 处理工具批准
   const handleToolApprove = useCallback((messageId: string, toolName: string, callId?: string) => {
     const cid = callId || `${messageId}-${toolName}`;
-    authFetch(`/api/tools/approve/${encodeURIComponent(cid)}`, {
+    authFetch(`/tools/approve/${encodeURIComponent(cid)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     }).catch((error) => {
@@ -789,7 +860,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   // 处理工具拒绝
   const handleToolReject = useCallback((messageId: string, toolName: string, callId?: string) => {
     const cid = callId || `${messageId}-${toolName}`;
-    authFetch(`/api/tools/reject/${encodeURIComponent(cid)}`, {
+    authFetch(`/tools/reject/${encodeURIComponent(cid)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reason: '用户拒绝执行' }),
@@ -903,6 +974,55 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
 
   const currentMode = modes.find((m) => m.key === mode) ?? modes[0]!;
   
+  // 加载会话列表
+  const loadSessions = useCallback(async () => {
+    setSessionsLoading(true);
+    try {
+      const res = await authFetch('/sessions');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.sessions) {
+          setSessions(data.sessions);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load sessions:', err);
+    } finally {
+      setSessionsLoading(false);
+    }
+  }, []);
+
+  // 切换会话并加载历史消息
+  const switchSession = useCallback(async (sessionId: string) => {
+    try {
+      const res = await authFetch(`/sessions/${sessionId}/switch`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        ArcoMessage.error(data.error || '切换会话失败');
+        return;
+      }
+      // 加载会话消息
+      const msgRes = await authFetch(`/sessions/${sessionId}/messages`);
+      if (msgRes.ok) {
+        const data = await msgRes.json();
+        if (data.success && data.session) {
+          const loadedMessages: Message[] = data.session.messages.map((m: { role: string; content: string }, index: number) => ({
+            id: `${sessionId}-${index}`,
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+            model: m.role === 'assistant' ? model : undefined,
+          }));
+          setMessages(loadedMessages);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to switch session:', err);
+      ArcoMessage.error('切换会话失败');
+    }
+  }, [model]);
+
   // 处理模式切换，检查 Agent 是否被禁用
   const handleModeChange = (newMode: string) => {
     if (newMode === 'agent' && !agentModeEnabled) {
@@ -919,30 +1039,44 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
       setIsGenerating(false);
     }
     const selected = availableModels.find((m) => m.key === key);
-    if (!selected || !aiConfig) return;
+    if (!selected) return;
 
-    // 从 providerApiKeys 获取对应 provider 的实际 API key
+    // 如果 aiConfig 尚未加载，只更新本地状态，跳过保存
+    if (!aiConfig) {
+      console.warn('AI 配置尚未加载，模型选择仅在本地生效');
+      return;
+    }
+
+    // 从 composite key 中提取真实 modelId
+    const actualModelId = key.includes(':') ? key.split(':').slice(1).join(':') : key;
+
+    // 从 providerApiKeys 获取对应 provider 的实际 API key，从 providerBaseUrls 获取 base_url
     const actualKey = providerApiKeys[selected.providerType] ?? '';
+    const baseUrl = providerBaseUrls[selected.providerType] ?? '';
+    const existingProvider = aiConfig.providers[selected.providerType];
+    const providerConfig = Object.assign(
+      { api_key: '', base_url: '', models: [] as string[] },
+      existingProvider,
+    );
+    providerConfig.api_key = actualKey;
+    providerConfig.base_url = baseUrl || existingProvider?.base_url || '';
     const updatedConfig = {
       ...aiConfig,
       current_provider: selected.providerType,
-      current_model: key,
+      current_model: actualModelId,
       providers: {
         ...aiConfig.providers,
-        [selected.providerType]: {
-          ...aiConfig.providers[selected.providerType],
-          api_key: actualKey,
-        },
+        [selected.providerType]: providerConfig,
       },
     };
 
     try {
-      await authFetch('/api/config/ai', {
+      await authFetch('/config/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedConfig),
       });
-      await initializeChatConfig();
+      window.dispatchEvent(new CustomEvent('papyrus_ai_config_changed'));
     } catch (error) {
       console.error('Failed to update AI config:', error);
     }
@@ -953,23 +1087,59 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
       <div className="chat-panel-header">
         <Dropdown
           trigger="click"
-          getPopupContainer={(node) => node.parentElement || document.body}
+          disabled={availableModels.length === 0}
           droplist={
             <Menu style={{ maxHeight: 320, overflow: 'auto' }} onClickMenuItem={(key) => handleModelSelect(key)}>
-              {availableModels.map((m) => (
-                <Menu.Item key={m.key}>{m.label}</Menu.Item>
-              ))}
+              {availableModels.length === 0 ? (
+                <Menu.Item key="_empty" disabled>
+                  {configChecked ? '暂无可用模型' : '正在加载模型...'}
+                </Menu.Item>
+              ) : (
+                availableModels.map((m) => (
+                  <Menu.Item key={m.key}>{m.label}</Menu.Item>
+                ))
+              )}
             </Menu>
           }
         >
-          <button className="chat-model-btn">
-            <span>{(availableModels.find((m) => m.key === model)?.label ?? model) || '选择模型'}</span>
+          <button className="chat-model-btn" disabled={availableModels.length === 0}>
+            <span>{(availableModels.find((m) => m.key === model)?.label ?? (model?.includes(':') ? model.split(':').slice(1).join(':') : model)) || '选择模型'}</span>
             <IconDown className="tw-text-xs" />
           </button>
         </Dropdown>
         <div className="chat-panel-header-actions">
-          <Tooltip content="新建对话" mini><button className="chat-panel-header-btn" onClick={() => { setMessages([]); authFetch('/api/sessions', { method: 'POST' }).catch(() => {}); }}><IconPlus /></button></Tooltip>
-          <Tooltip content="历史记录" mini><button className="chat-panel-header-btn" onClick={() => {}}><IconHistory /></button></Tooltip>
+          <Tooltip content="新建对话" mini><button className="chat-panel-header-btn" onClick={() => { setMessages([]); authFetch('/sessions', { method: 'POST' }).catch(() => {}); }}><IconPlus /></button></Tooltip>
+          <Dropdown
+            trigger="click"
+            droplist={
+              sessionsLoading ? (
+                <Menu>
+                  <Menu.Item key="loading">加载中...</Menu.Item>
+                </Menu>
+              ) : sessions.length === 0 ? (
+                <Menu>
+                  <Menu.Item key="empty">暂无历史会话</Menu.Item>
+                </Menu>
+              ) : (
+                <Menu style={{ maxHeight: 320, overflow: 'auto' }}>
+                  {sessions.map((session) => (
+                    <Menu.Item key={session.id} onClick={() => switchSession(session.id)}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <span style={{ fontSize: 13, fontWeight: 500 }}>{session.title}</span>
+                        <span style={{ fontSize: 11, color: 'var(--color-text-3)' }}>
+                          {new Date(session.updated_at * 1000).toLocaleString('zh-CN')} · {session.message_count} 条消息
+                        </span>
+                      </div>
+                    </Menu.Item>
+                  ))}
+                </Menu>
+              )
+            }
+          >
+            <Tooltip content="历史记录" mini>
+              <button className="chat-panel-header-btn" onClick={() => { if (sessions.length === 0) loadSessions(); }}><IconHistory /></button>
+            </Tooltip>
+          </Dropdown>
           <Tooltip content="关闭" mini><button className="chat-panel-header-btn" onClick={onClose}><IconClose /></button></Tooltip>
         </div>
       </div>
@@ -984,45 +1154,95 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
               <div key={msg.id} className={`chat-message chat-message-${msg.role}`}>
                 {msg.role === 'user' && (
                   <div className="chat-message-with-avatar">
-                    <Avatar 
-                      size={28} 
+                    <Avatar
+                      size={28}
                       className="tw-flex-shrink-0"
-                      style={{ 
-                        backgroundColor: userProfile.avatarUrl ? 'transparent' : '#206CCF', 
+                      style={{
+                        backgroundColor: userProfile.avatarUrl ? 'transparent' : '#206CCF',
                         fontSize: 12,
                         overflow: 'hidden',
                       }}
                     >
                       {userProfile.avatarUrl ? (
-                        <img 
-                          src={userProfile.avatarUrl} 
-                          alt="avatar" 
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                        <img
+                          src={userProfile.avatarUrl}
+                          alt="avatar"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
                       ) : (
                         userProfile.userId?.charAt(0)?.toUpperCase() || '?'
                       )}
                     </Avatar>
-                    <div className="chat-message-bubble">{msg.content}</div>
+                    {editingMessageId === msg.id ? (
+                      <div className="chat-message-bubble" style={{ padding: 8, flex: 1 }}>
+                        <textarea
+                          className="chat-textarea"
+                          value={editingDraft}
+                          onChange={(e) => setEditingDraft(e.target.value)}
+                          autoFocus
+                          rows={3}
+                          style={{ minHeight: 60 }}
+                        />
+                        <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
+                          <Button size="mini" onClick={() => setEditingMessageId(null)}>取消</Button>
+                          <Button size="mini" type="primary" onClick={() => {
+                            const msgIndex = messages.findIndex((m) => m.id === msg.id);
+                            setMessages((prev) => prev.slice(0, msgIndex));
+                            textOverrideRef.current = editingDraft;
+                            setEditingMessageId(null);
+                            sendMessage();
+                          }}>保存</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="chat-message-bubble"><MarkdownView source={msg.content} compact /></div>
+                    )}
                     <div className="chat-message-actions">
-                      <Tooltip content="重新生成" mini><button className="chat-message-action-btn"><IconRefresh /></button></Tooltip>
-                      <Tooltip content="编辑" mini><button className="chat-message-action-btn"><IconEdit /></button></Tooltip>
-                      <Tooltip content="复制" mini><button className="chat-message-action-btn"><IconCopy /></button></Tooltip>
-                      <Tooltip content="删除" mini><button className="chat-message-action-btn"><IconDelete /></button></Tooltip>
+                      <Tooltip content="重新生成" mini><button className="chat-message-action-btn" disabled={isGenerating} onClick={() => {
+                        const msgIndex = messages.findIndex((m) => m.id === msg.id);
+                        if (msgIndex < messages.length - 1 && messages[msgIndex + 1]?.role === 'assistant') {
+                          setMessages((prev) => prev.slice(0, msgIndex + 1));
+                        }
+                        textOverrideRef.current = msg.content;
+                        sendMessage();
+                      }}><IconRefresh /></button></Tooltip>
+                      <Tooltip content="编辑" mini><button className="chat-message-action-btn" disabled={isGenerating} onClick={() => { setEditingMessageId(msg.id); setEditingDraft(msg.content); }}><IconEdit /></button></Tooltip>
+                      <Tooltip content="复制" mini><button className="chat-message-action-btn" disabled={isGenerating} onClick={() => {
+                        navigator.clipboard.writeText(msg.content).then(() => ArcoMessage.success('已复制'), () => ArcoMessage.error('复制失败'));
+                      }}><IconCopy /></button></Tooltip>
+                      <Tooltip content="删除" mini><button className="chat-message-action-btn" disabled={isGenerating} onClick={() => setMessages((prev) => prev.filter((m) => m.id !== msg.id))}><IconDelete /></button></Tooltip>
                     </div>
                   </div>
                 )}
                 {msg.role === 'assistant' && (
                   <div className="chat-message-with-avatar tw-items-start">
-                    <span className="chat-message-model-label">{availableModels.find((m) => m.key === msg.model)?.label ?? msg.model ?? model}</span>
+                    <span className="chat-message-model-label">{availableModels.find((m) => m.key === msg.model)?.label ?? (msg.model?.includes(':') ? msg.model.split(':').slice(1).join(':') : msg.model) ?? (model?.includes(':') ? model.split(':').slice(1).join(':') : model)}</span>
                     <div className="chat-message-blocks">
                       {msg.blocks?.map((block) => renderMessageBlock(block, msg.id))}
                     </div>
-                    {msg.content && (
-                      <div className="chat-message-bubble">{msg.content}</div>
+                    {editingMessageId === msg.id ? (
+                      <div className="chat-message-bubble" style={{ padding: 8, flex: 1 }}>
+                        <textarea
+                          className="chat-textarea"
+                          value={editingDraft}
+                          onChange={(e) => setEditingDraft(e.target.value)}
+                          autoFocus
+                          rows={5}
+                          style={{ minHeight: 100 }}
+                        />
+                        <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
+                          <Button size="mini" onClick={() => setEditingMessageId(null)}>取消</Button>
+                          <Button size="mini" type="primary" onClick={() => {
+                            setMessages((prev) => prev.map((m) => m.id === msg.id ? { ...m, content: editingDraft } : m));
+                            setEditingMessageId(null);
+                          }}>保存</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      msg.content && <div className="chat-message-bubble"><MarkdownView source={msg.content} compact /></div>
                     )}
                     <div className="chat-message-actions">
-                      <Tooltip content="重新生成" mini><button className="chat-message-action-btn" onClick={() => {
+                      <Tooltip content="重新生成" mini><button className="chat-message-action-btn" disabled={isGenerating} onClick={() => {
                         const msgIndex = messages.findIndex((m) => m.id === msg.id);
                         if (msgIndex > 0 && messages[msgIndex - 1].role === 'user') {
                           setMessages((prev) => prev.slice(0, msgIndex));
@@ -1030,11 +1250,19 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
                           sendMessage();
                         }
                       }}><IconRefresh /></button></Tooltip>
-                      <Tooltip content="编辑" mini><button className="chat-message-action-btn"><IconEdit /></button></Tooltip>
-                      <Tooltip content="复制" mini><button className="chat-message-action-btn"><IconCopy /></button></Tooltip>
-                      <Tooltip content="翻译" mini><button className="chat-message-action-btn"><IconTranslate /></button></Tooltip>
-                      <Tooltip content="保存到笔记" mini><button className="chat-message-action-btn"><IconSave /></button></Tooltip>
-                      <Tooltip content="删除" mini><button className="chat-message-action-btn"><IconDelete /></button></Tooltip>
+                      <Tooltip content="编辑" mini><button className="chat-message-action-btn" disabled={isGenerating} onClick={() => { setEditingMessageId(msg.id); setEditingDraft(msg.content); }}><IconEdit /></button></Tooltip>
+                      <Tooltip content="复制" mini><button className="chat-message-action-btn" disabled={isGenerating} onClick={() => {
+                        navigator.clipboard.writeText(msg.content).then(() => ArcoMessage.success('已复制'), () => ArcoMessage.error('复制失败'));
+                      }}><IconCopy /></button></Tooltip>
+                      <Tooltip content="翻译" mini><button className="chat-message-action-btn" disabled={isGenerating} onClick={() => {
+                        textOverrideRef.current = '请翻译以下内容为简体中文（如已是中文则翻译为英文），保留原 markdown 结构：\n\n' + msg.content;
+                        sendMessage();
+                      }}><IconTranslate /></button></Tooltip>
+                      <Tooltip content="保存到笔记" mini><button className="chat-message-action-btn" disabled={isGenerating} onClick={() => {
+                        const title = stripMdTitle(msg.content).slice(0, 30) || '未命名 AI 回复';
+                        api.createNote(title, 'AI 对话', msg.content, ['ai-chat']).then(() => ArcoMessage.success('已保存到笔记'), () => ArcoMessage.error('保存失败'));
+                      }}><IconSave /></button></Tooltip>
+                      <Tooltip content="删除" mini><button className="chat-message-action-btn" disabled={isGenerating} onClick={() => setMessages((prev) => prev.filter((m) => m.id !== msg.id))}><IconDelete /></button></Tooltip>
                     </div>
                   </div>
                 )}
@@ -1045,7 +1273,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
         )}
       </div>
       <div className="chat-input-resize-handle" onMouseDown={onDragStart} />
-      <div className="chat-input-area" style={{ height: inputHeight }}>
+      <div className="chat-input-area" style={{ minHeight: inputHeight, height: 'auto' }}>
         {/* 已选文件列表 */}
         {selectedFiles.length > 0 && (
           <div className="chat-file-list">
@@ -1150,9 +1378,22 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
             >
               <IconBulb aria-hidden="true" />
             </button>
-            <button className="chat-toolbar-btn" title="工具" aria-label="工具">
-              <IconTool aria-hidden="true" />
-            </button>
+            <Trigger
+              trigger="click"
+              popup={() => <ToolsCatalogPopover />}
+              disabled={mode !== 'agent'}
+            >
+              <Tooltip content={mode === 'agent' ? '工具列表' : '切换到 Agent 模式以查看工具'} mini>
+                <button
+                  className={`chat-toolbar-btn${mode !== 'agent' ? ' chat-toolbar-btn-disabled' : ''}`}
+                  title="工具"
+                  aria-label="工具"
+                  disabled={mode !== 'agent'}
+                >
+                  <IconTool aria-hidden="true" />
+                </button>
+              </Tooltip>
+            </Trigger>
             <button
               className={`chat-send-btn${isGenerating ? ' chat-send-btn-stop' : (!text.trim() && selectedFiles.length === 0 ? ' chat-send-btn-disabled' : '')}`}
               onClick={() => isGenerating ? stopGeneration() : sendMessage()}

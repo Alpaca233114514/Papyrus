@@ -32,6 +32,8 @@ interface UseWebSocketOptions {
   autoReconnect?: boolean;
   /** 重连间隔(ms) */
   reconnectInterval?: number;
+  /** 最大重连次数 */
+  maxReconnectAttempts?: number;
   /** 是否显示连接状态提示 */
   showToast?: boolean;
 }
@@ -63,6 +65,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     onFileChange,
     autoReconnect = true,
     reconnectInterval = 3000,
+    maxReconnectAttempts = 3,
     showToast = false,
   } = options;
 
@@ -70,6 +73,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
   const [lastFileChange, setLastFileChange] = useState<FileChangeEvent | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
+  const reconnectAttemptsRef = useRef(0);
   const shouldReconnectRef = useRef(true);
 
   const clearReconnectTimer = useCallback(() => {
@@ -100,6 +104,12 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
       return;
     }
 
+    if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+      setStatus('disconnected');
+      console.warn(`[WebSocket] 已达到最大重连次数 (${maxReconnectAttempts})，停止重连`);
+      return;
+    }
+
     shouldReconnectRef.current = true;
     setStatus('connecting');
 
@@ -108,6 +118,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
       wsRef.current = ws;
 
       ws.onopen = () => {
+        reconnectAttemptsRef.current = 0;
         setStatus('connected');
         if (showToast) {
           Message.success('已连接到实时同步服务');
@@ -159,9 +170,15 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
       ws.onclose = () => {
         setStatus('disconnected');
         wsRef.current = null;
-        
+
         // 自动重连
         if (shouldReconnectRef.current && autoReconnect) {
+          reconnectAttemptsRef.current += 1;
+          if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+            console.warn(`[WebSocket] 已达到最大重连次数 (${maxReconnectAttempts})，停止重连`);
+            onDisconnect?.();
+            return;
+          }
           clearReconnectTimer();
           reconnectTimerRef.current = window.setTimeout(() => {
             connect();

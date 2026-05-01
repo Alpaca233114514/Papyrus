@@ -161,3 +161,7 @@ export function getToolManager(): ToolManager {
   }
   return globalToolManager;
 }
+
+export function resetToolManager(): void {
+  globalToolManager = new ToolManager();
+}

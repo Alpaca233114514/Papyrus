@@ -39,18 +39,32 @@
   padding: 0 16px 16px;
 }
 
+/* 隐藏 Arco Collapse 默认的展开图标占位区域，避免重复显示 */
+.reasoning-collapse .arco-collapse-item-icon-left,
+.reasoning-collapse .arco-collapse-item-icon-right {
+  display: none !important;
+}
+
 /* 头部样式 */
 .reasoning-header {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  flex: 1;
+  width: 100%;
 }
 
 .reasoning-title-wrapper {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
+}
+
+.reasoning-title-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .reasoning-icon {
@@ -84,18 +98,19 @@
   padding-left: 24px;
 }
 
-/* 展开图标 */
-.reasoning-expand-icon {
+/* 展开/折叠指示器 */
+.reasoning-expand-indicator {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 24px;
   height: 24px;
+  flex-shrink: 0;
   color: var(--color-text-3);
-  transition: transform 0.2s, color 0.2s;
+  transition: color 0.2s;
 }
 
-.reasoning-expand-icon:hover {
+.reasoning-expand-indicator:hover {
   color: var(--color-text-1);
 }
 
@@ -155,7 +170,7 @@ body[arco-theme='dark'] .reasoning-code-pre {
 
 /* 减少动画 - 无障碍支持 */
 @media (prefers-reduced-motion: reduce) {
-  .reasoning-expand-icon,
+  .reasoning-expand-indicator,
   .reasoning-collapse > .arco-collapse-item > .arco-collapse-item-header {
     transition: none;
   }

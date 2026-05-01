@@ -18,16 +18,18 @@ describe('AIConfig', () => {
     const config = new AIConfig(tempDir);
     expect(config.config.current_provider).toBe('openai');
     expect(config.config.current_model).toBe('gpt-4o');
-
-    const openai = config.config.providers['openai'];
-    if (!openai) throw new Error('expected openai provider to exist');
-    expect(openai.base_url).toBe('https://api.openai.com/v1');
-    expect(Array.isArray(openai.models)).toBe(true);
-    expect(openai.models.length).toBeGreaterThan(0);
+    // providers are no longer hardcoded; database is the source of truth
+    expect(config.config.providers).toEqual({});
   });
 
   it('should persist and reload config', () => {
     const config1 = new AIConfig(tempDir);
+    // add provider manually so current_provider survives reload validation
+    config1.config.providers['moonshot'] = {
+      api_key: '',
+      base_url: 'https://api.moonshot.cn/v1',
+      models: ['kimi-k2.5'],
+    };
     config1.config.current_provider = 'moonshot';
     config1.config.current_model = 'kimi-k2.5';
     config1.saveConfig();
@@ -39,9 +41,8 @@ describe('AIConfig', () => {
 
   it('should mask API keys in getMaskedConfig', () => {
     const config = new AIConfig(tempDir);
-    const openai = config.config.providers['openai'];
-    if (!openai) throw new Error('expected openai provider to exist');
-    openai.api_key = 'sk-test12345';
+    config.config.providers['openai'] = { api_key: '', base_url: '', models: [] };
+    config.config.providers['openai'].api_key = 'sk-test12345';
 
     const masked = config.getMaskedConfig();
     const maskedOpenai = masked.providers['openai'];
@@ -52,9 +53,8 @@ describe('AIConfig', () => {
 
   it('should mask short API keys completely', () => {
     const config = new AIConfig(tempDir);
-    const openai = config.config.providers['openai'];
-    if (!openai) throw new Error('expected openai provider to exist');
-    openai.api_key = 'abc';
+    config.config.providers['openai'] = { api_key: '', base_url: '', models: [] };
+    config.config.providers['openai'].api_key = 'abc';
 
     const masked = config.getMaskedConfig();
     const maskedOpenai = masked.providers['openai'];
@@ -64,38 +64,34 @@ describe('AIConfig', () => {
 
   it('should mask long API keys by preserving last 4 chars', () => {
     const config = new AIConfig(tempDir);
-    const openai = config.config.providers['openai'];
-    if (!openai) throw new Error('expected openai provider to exist');
-    openai.api_key = 'sk-very-long-key-1234';
+    config.config.providers['openai'] = { api_key: '', base_url: '', models: [] };
+    config.config.providers['openai'].api_key = 'sk-very-long-key-1234';
 
     const masked = config.getMaskedConfig();
     const maskedOpenai = masked.providers['openai'];
     if (!maskedOpenai) throw new Error('expected masked openai provider to exist');
     expect(maskedOpenai.api_key).toMatch(/\*+1234$/);
-    expect(maskedOpenai.api_key.length).toBe(openai.api_key.length);
+    expect(maskedOpenai.api_key.length).toBe('sk-very-long-key-1234'.length);
   });
 
   it('should validate SSRF for cloud providers', () => {
     const config = new AIConfig(tempDir);
-    const openai = config.config.providers['openai'];
-    if (!openai) throw new Error('expected openai provider to exist');
-    openai.base_url = 'http://localhost:8080';
+    config.config.providers['openai'] = { api_key: '', base_url: '', models: [] };
+    config.config.providers['openai'].base_url = 'http://localhost:8080';
     expect(() => config.validateConfig()).toThrow('SSRF');
   });
 
   it('should allow localhost for ollama', () => {
     const config = new AIConfig(tempDir);
-    const ollama = config.config.providers['ollama'];
-    if (!ollama) throw new Error('expected ollama provider to exist');
-    ollama.base_url = 'http://localhost:11434';
+    config.config.providers['ollama'] = { api_key: '', base_url: '', models: [] };
+    config.config.providers['ollama'].base_url = 'http://localhost:11434';
     expect(() => config.validateConfig()).not.toThrow();
   });
 
   it('should encrypt and decrypt API keys on save/load', () => {
     const config = new AIConfig(tempDir);
-    const openai = config.config.providers['openai'];
-    if (!openai) throw new Error('expected openai provider to exist');
-    openai.api_key = 'secret-key-123';
+    config.config.providers['openai'] = { api_key: '', base_url: '', models: [] };
+    config.config.providers['openai'].api_key = 'secret-key-123';
     config.saveConfig();
 
     const raw = fs.readFileSync(path.join(tempDir, 'ai_config.json'), 'utf8');
@@ -125,17 +121,14 @@ describe('AIConfig', () => {
 
   it('should handle empty api_key gracefully', () => {
     const config = new AIConfig(tempDir);
-    const openai = config.config.providers['openai'];
-    if (!openai) throw new Error('expected openai provider to exist');
-    openai.api_key = '';
+    config.config.providers['openai'] = { api_key: '', base_url: '', models: [] };
     expect(() => config.validateConfig()).not.toThrow();
   });
 
   it('should reject private IP for non-local providers', () => {
     const config = new AIConfig(tempDir);
-    const openai = config.config.providers['openai'];
-    if (!openai) throw new Error('expected openai provider to exist');
-    openai.base_url = 'http://192.168.1.100:8080';
+    config.config.providers['openai'] = { api_key: '', base_url: '', models: [] };
+    config.config.providers['openai'].base_url = 'http://192.168.1.100:8080';
     expect(() => config.validateConfig()).toThrow('SSRF');
   });
 

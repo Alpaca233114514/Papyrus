@@ -558,147 +558,165 @@ describe('API Integration Tests', () => {
   });
 
   it('GET /api/update/check should handle failed fetch', async () => {
-    const originalFetch = global.fetch;
-    global.fetch = () => Promise.resolve({ ok: false, status: 500 } as Response);
+    const savedFetch = global.fetch;
+    try {
+      global.fetch = () => Promise.resolve({ ok: false, status: 500 } as Response);
 
-    const response = await app.inject({
-      method: 'GET',
-      url: '/api/update/check',
-    });
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/update/check',
+      });
 
-    expect(response.statusCode).toBe(200);
-    const body = JSON.parse(response.body);
-    expect(body.success).toBe(false);
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(false);
 
-    global.fetch = originalFetch;
+    } finally {
+      global.fetch = savedFetch;
+    }
   });
 
   it('GET /api/update/check should handle fetch error', async () => {
-    const originalFetch = global.fetch;
-    global.fetch = () => Promise.reject(new Error('network error'));
+    const savedFetch = global.fetch;
+    try {
+      global.fetch = () => Promise.reject(new Error('network error'));
 
-    const response = await app.inject({
-      method: 'GET',
-      url: '/api/update/check',
-    });
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/update/check',
+      });
 
-    expect(response.statusCode).toBe(200);
-    const body = JSON.parse(response.body);
-    expect(body.success).toBe(false);
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(false);
 
-    global.fetch = originalFetch;
+    } finally {
+      global.fetch = savedFetch;
+    }
   });
 
   it('GET /api/update/check should parse successful response', async () => {
-    const originalFetch = global.fetch;
-    global.fetch = () => Promise.resolve({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve({ tag_name: 'v999.0.0', html_url: 'https://example.com', assets: [] }),
-    } as unknown as Response);
+    const savedFetch = global.fetch;
+    try {
+      global.fetch = () => Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ tag_name: 'v999.0.0', html_url: 'https://example.com', assets: [] }),
+      } as unknown as Response);
 
-    const response = await app.inject({
-      method: 'GET',
-      url: '/api/update/check',
-    });
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/update/check',
+      });
 
-    expect(response.statusCode).toBe(200);
-    const body = JSON.parse(response.body);
-    expect(body.success).toBe(true);
-    expect(body.data.has_update).toBe(true);
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.data.has_update).toBe(true);
 
-    global.fetch = originalFetch;
+    } finally {
+      global.fetch = savedFetch;
+    }
   });
 
   it('POST /api/config/ai/test should test ollama connection', async () => {
-    const originalFetch = global.fetch;
-    global.fetch = () => Promise.resolve({ ok: true, status: 200 } as Response);
+    const savedFetch = global.fetch;
+    try {
+      global.fetch = () => Promise.resolve({ ok: true, status: 200 } as Response);
 
-    await app.inject({
-      method: 'POST',
-      url: '/api/config/ai',
-      payload: {
-        current_provider: 'ollama',
-        current_model: 'llama2',
-        providers: {
-          ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
+      await app.inject({
+        method: 'POST',
+        url: '/api/config/ai',
+        payload: {
+          current_provider: 'ollama',
+          current_model: 'llama2',
+          providers: {
+            ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
+          },
+          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
         },
-        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-      },
-    });
+      });
 
-    const response = await app.inject({
-      method: 'POST',
-      url: '/api/config/ai/test',
-    });
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/config/ai/test',
+      });
 
-    expect(response.statusCode).toBe(200);
-    const body = JSON.parse(response.body);
-    expect(typeof body.success).toBe('boolean');
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(typeof body.success).toBe('boolean');
 
-    global.fetch = originalFetch;
+    } finally {
+      global.fetch = savedFetch;
+    }
   });
 
   it('POST /api/config/ai/test should handle ollama non-ok', async () => {
-    const originalFetch = global.fetch;
-    global.fetch = () => Promise.resolve({ ok: false, status: 503 } as Response);
+    const savedFetch = global.fetch;
+    try {
+      global.fetch = () => Promise.resolve({ ok: false, status: 503 } as Response);
 
-    await app.inject({
-      method: 'POST',
-      url: '/api/config/ai',
-      payload: {
-        current_provider: 'ollama',
-        current_model: 'llama2',
-        providers: {
-          ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
+      await app.inject({
+        method: 'POST',
+        url: '/api/config/ai',
+        payload: {
+          current_provider: 'ollama',
+          current_model: 'llama2',
+          providers: {
+            ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
+          },
+          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
         },
-        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-      },
-    });
+      });
 
-    const response = await app.inject({
-      method: 'POST',
-      url: '/api/config/ai/test',
-    });
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/config/ai/test',
+      });
 
-    expect(response.statusCode).toBe(200);
-    const body = JSON.parse(response.body);
-    expect(body.success).toBe(false);
-    expect(body.message).toContain('503');
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(false);
+      expect(body.message).toContain('503');
 
-    global.fetch = originalFetch;
+    } finally {
+      global.fetch = savedFetch;
+    }
   });
 
   it('POST /api/config/ai/test should succeed for non-ollama', async () => {
-    const originalFetch = global.fetch;
-    global.fetch = () => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ data: [] }) } as unknown as Response);
+    const savedFetch = global.fetch;
+    try {
+      global.fetch = () => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ data: [] }) } as unknown as Response);
 
-    await app.inject({
-      method: 'POST',
-      url: '/api/config/ai',
-      payload: {
-        current_provider: 'openai',
-        current_model: 'gpt-4',
-        providers: {
-          openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+      await app.inject({
+        method: 'POST',
+        url: '/api/config/ai',
+        payload: {
+          current_provider: 'openai',
+          current_model: 'gpt-4',
+          providers: {
+            openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+          },
+          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
         },
-        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-      },
-    });
+      });
 
-    const response = await app.inject({
-      method: 'POST',
-      url: '/api/config/ai/test',
-    });
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/config/ai/test',
+      });
 
-    expect(response.statusCode).toBe(200);
-    const body = JSON.parse(response.body);
-    expect(body.success).toBe(true);
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
 
-    global.fetch = originalFetch;
+    } finally {
+      global.fetch = savedFetch;
+    }
   });
 
   it('POST /api/config/ai/test should reject private url', async () => {
@@ -780,308 +798,333 @@ describe('API Integration Tests', () => {
   });
 
   it('POST /api/config/ai/test should handle 401 response', async () => {
-    const originalFetch = global.fetch;
-    global.fetch = () => Promise.resolve({ ok: false, status: 401 } as Response);
+    const savedFetch = global.fetch;
+    try {
+      global.fetch = () => Promise.resolve({ ok: false, status: 401 } as Response);
 
-    await app.inject({
-      method: 'POST',
-      url: '/api/config/ai',
-      payload: {
-        current_provider: 'openai',
-        current_model: 'gpt-4',
-        providers: {
-          openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+      await app.inject({
+        method: 'POST',
+        url: '/api/config/ai',
+        payload: {
+          current_provider: 'openai',
+          current_model: 'gpt-4',
+          providers: {
+            openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+          },
+          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
         },
-        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-      },
-    });
+      });
 
-    const response = await app.inject({
-      method: 'POST',
-      url: '/api/config/ai/test',
-    });
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/config/ai/test',
+      });
 
-    expect(response.statusCode).toBe(200);
-    const body = JSON.parse(response.body);
-    expect(body.success).toBe(false);
-    expect(body.message).toContain('无效');
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(false);
+      expect(body.message).toContain('无效');
 
-    global.fetch = originalFetch;
+    } finally {
+      global.fetch = savedFetch;
+    }
   });
 
   it('POST /api/config/ai/test should handle 404 response', async () => {
-    const originalFetch = global.fetch;
-    global.fetch = () => Promise.resolve({ ok: false, status: 404 } as Response);
+    const savedFetch = global.fetch;
+    try {
+      global.fetch = () => Promise.resolve({ ok: false, status: 404 } as Response);
 
-    await app.inject({
-      method: 'POST',
-      url: '/api/config/ai',
-      payload: {
-        current_provider: 'openai',
-        current_model: 'gpt-4',
-        providers: {
-          openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+      await app.inject({
+        method: 'POST',
+        url: '/api/config/ai',
+        payload: {
+          current_provider: 'openai',
+          current_model: 'gpt-4',
+          providers: {
+            openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+          },
+          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
         },
-        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-      },
-    });
+      });
 
-    const response = await app.inject({
-      method: 'POST',
-      url: '/api/config/ai/test',
-    });
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/config/ai/test',
+      });
 
-    expect(response.statusCode).toBe(200);
-    const body = JSON.parse(response.body);
-    expect(body.success).toBe(true);
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
 
-    global.fetch = originalFetch;
+    } finally {
+      global.fetch = savedFetch;
+    }
   });
 
   it('POST /api/config/ai/test should handle other error response', async () => {
-    const originalFetch = global.fetch;
-    global.fetch = () => Promise.resolve({ ok: false, status: 503 } as Response);
+    const savedFetch = global.fetch;
+    try {
+      global.fetch = () => Promise.resolve({ ok: false, status: 503 } as Response);
 
-    await app.inject({
-      method: 'POST',
-      url: '/api/config/ai',
-      payload: {
-        current_provider: 'openai',
-        current_model: 'gpt-4',
-        providers: {
-          openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+      await app.inject({
+        method: 'POST',
+        url: '/api/config/ai',
+        payload: {
+          current_provider: 'openai',
+          current_model: 'gpt-4',
+          providers: {
+            openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+          },
+          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
         },
-        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-      },
-    });
+      });
 
-    const response = await app.inject({
-      method: 'POST',
-      url: '/api/config/ai/test',
-    });
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/config/ai/test',
+      });
 
-    expect(response.statusCode).toBe(200);
-    const body = JSON.parse(response.body);
-    expect(body.success).toBe(false);
-    expect(body.message).toContain('503');
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(false);
+      expect(body.message).toContain('503');
 
-    global.fetch = originalFetch;
+    } finally {
+      global.fetch = savedFetch;
+    }
   });
 
   it('POST /api/config/ai/test should handle fetch exception', async () => {
-    const originalFetch = global.fetch;
-    global.fetch = () => Promise.reject(new Error('timeout'));
+    const savedFetch = global.fetch;
+    try {
+      global.fetch = () => Promise.reject(new Error('timeout'));
 
-    await app.inject({
-      method: 'POST',
-      url: '/api/config/ai',
-      payload: {
-        current_provider: 'openai',
-        current_model: 'gpt-4',
-        providers: {
-          openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+      await app.inject({
+        method: 'POST',
+        url: '/api/config/ai',
+        payload: {
+          current_provider: 'openai',
+          current_model: 'gpt-4',
+          providers: {
+            openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+          },
+          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
         },
-        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-      },
-    });
+      });
 
-    const response = await app.inject({
-      method: 'POST',
-      url: '/api/config/ai/test',
-    });
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/config/ai/test',
+      });
 
-    expect(response.statusCode).toBe(200);
-    const body = JSON.parse(response.body);
-    expect(body.success).toBe(false);
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(false);
 
-    global.fetch = originalFetch;
+    } finally {
+      global.fetch = savedFetch;
+    }
   });
 
   it('POST /api/config/ai/test should handle ollama fetch error', async () => {
-    const originalFetch = global.fetch;
-    global.fetch = () => Promise.reject(new Error('ollama down'));
+    const savedFetch = global.fetch;
+    try {
+      global.fetch = () => Promise.reject(new Error('ollama down'));
 
-    await app.inject({
-      method: 'POST',
-      url: '/api/config/ai',
-      payload: {
-        current_provider: 'ollama',
-        current_model: 'llama2',
-        providers: {
-          ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
+      await app.inject({
+        method: 'POST',
+        url: '/api/config/ai',
+        payload: {
+          current_provider: 'ollama',
+          current_model: 'llama2',
+          providers: {
+            ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
+          },
+          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
         },
-        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-      },
-    });
+      });
 
-    const response = await app.inject({
-      method: 'POST',
-      url: '/api/config/ai/test',
-    });
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/config/ai/test',
+      });
 
-    expect(response.statusCode).toBe(200);
-    const body = JSON.parse(response.body);
-    expect(body.success).toBe(false);
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(false);
 
-    global.fetch = originalFetch;
+    } finally {
+      global.fetch = savedFetch;
+    }
   });
 
   it('POST /api/completion should stream ollama response', async () => {
-    const originalFetch = global.fetch;
+    const savedFetch = global.fetch;
     const streamData = [
       '{"message":{"content":"hello"}}',
       '{"message":{"content":" world"}}',
     ];
 
-    global.fetch = () => {
-      let index = 0;
-      const readable = new ReadableStream({
-        pull(controller) {
-          if (index < streamData.length) {
-            controller.enqueue(new TextEncoder().encode(streamData[index] + '\n'));
-            index++;
-          } else {
-            controller.close();
-          }
+    try {
+      global.fetch = () => {
+        let index = 0;
+        const readable = new ReadableStream({
+          pull(controller) {
+            if (index < streamData.length) {
+              controller.enqueue(new TextEncoder().encode(streamData[index] + '\n'));
+              index++;
+            } else {
+              controller.close();
+            }
+          },
+        });
+        return Promise.resolve({ ok: true, body: readable } as unknown as Response);
+      };
+
+      await app.inject({
+        method: 'POST',
+        url: '/api/config/ai',
+        payload: {
+          current_provider: 'ollama',
+          current_model: 'llama2',
+          providers: {
+            ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
+          },
+          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
         },
       });
-      return Promise.resolve({ ok: true, body: readable } as unknown as Response);
-    };
 
-    await app.inject({
-      method: 'POST',
-      url: '/api/config/ai',
-      payload: {
-        current_provider: 'ollama',
-        current_model: 'llama2',
-        providers: {
-          ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
-        },
-        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-      },
-    });
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/completion',
+        payload: { prefix: 'hello' },
+      });
 
-    const response = await app.inject({
-      method: 'POST',
-      url: '/api/completion',
-      payload: { prefix: 'hello' },
-    });
-
-    expect(response.statusCode).toBe(200);
-
-    global.fetch = originalFetch;
+      expect(response.statusCode).toBe(200);
+    } finally {
+      global.fetch = savedFetch;
+    }
   });
 
   it('POST /api/completion should handle ollama error', async () => {
-    const originalFetch = global.fetch;
-    global.fetch = () => Promise.resolve({ ok: false, status: 500 } as Response);
+    const savedFetch = global.fetch;
+    try {
+      global.fetch = () => Promise.resolve({ ok: false, status: 500 } as Response);
 
-    await app.inject({
-      method: 'POST',
-      url: '/api/config/ai',
-      payload: {
-        current_provider: 'ollama',
-        current_model: 'llama2',
-        providers: {
-          ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
+      await app.inject({
+        method: 'POST',
+        url: '/api/config/ai',
+        payload: {
+          current_provider: 'ollama',
+          current_model: 'llama2',
+          providers: {
+            ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
+          },
+          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
         },
-        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-      },
-    });
+      });
 
-    const response = await app.inject({
-      method: 'POST',
-      url: '/api/completion',
-      payload: { prefix: 'hello' },
-    });
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/completion',
+        payload: { prefix: 'hello' },
+      });
 
-    expect(response.statusCode).toBe(200);
+      expect(response.statusCode).toBe(200);
 
-    global.fetch = originalFetch;
+    } finally {
+      global.fetch = savedFetch;
+    }
   });
 
   it('POST /api/completion should stream openai-style response', async () => {
-    const originalFetch = global.fetch;
+    const savedFetch = global.fetch;
     const streamData = [
       'data: {"choices":[{"delta":{"content":"hello"}}]}',
       'data: {"choices":[{"delta":{"content":" world"}}]}',
       'data: [DONE]',
     ];
 
-    global.fetch = () => {
-      let index = 0;
-      const readable = new ReadableStream({
-        pull(controller) {
-          if (index < streamData.length) {
-            controller.enqueue(new TextEncoder().encode(streamData[index] + '\n\n'));
-            index++;
-          } else {
-            controller.close();
-          }
+    try {
+      global.fetch = () => {
+        let index = 0;
+        const readable = new ReadableStream({
+          pull(controller) {
+            if (index < streamData.length) {
+              controller.enqueue(new TextEncoder().encode(streamData[index] + '\n\n'));
+              index++;
+            } else {
+              controller.close();
+            }
+          },
+        });
+        return Promise.resolve({ ok: true, body: readable } as unknown as Response);
+      };
+
+      await app.inject({
+        method: 'POST',
+        url: '/api/config/ai',
+        payload: {
+          current_provider: 'openai',
+          current_model: 'gpt-4',
+          providers: {
+            openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+          },
+          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
         },
       });
-      return Promise.resolve({ ok: true, body: readable } as unknown as Response);
-    };
 
-    await app.inject({
-      method: 'POST',
-      url: '/api/config/ai',
-      payload: {
-        current_provider: 'openai',
-        current_model: 'gpt-4',
-        providers: {
-          openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
-        },
-        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-      },
-    });
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/completion',
+        payload: { prefix: 'hello' },
+      });
 
-    const response = await app.inject({
-      method: 'POST',
-      url: '/api/completion',
-      payload: { prefix: 'hello' },
-    });
-
-    expect(response.statusCode).toBe(200);
-
-    global.fetch = originalFetch;
+      expect(response.statusCode).toBe(200);
+    } finally {
+      global.fetch = savedFetch;
+    }
   });
 
   it('POST /api/completion should handle openai error', async () => {
-    const originalFetch = global.fetch;
-    global.fetch = () => Promise.resolve({ ok: false, status: 503 } as Response);
+    const savedFetch = global.fetch;
+    try {
+      global.fetch = () => Promise.resolve({ ok: false, status: 503 } as Response);
 
-    await app.inject({
-      method: 'POST',
-      url: '/api/config/ai',
-      payload: {
-        current_provider: 'openai',
-        current_model: 'gpt-4',
-        providers: {
-          openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+      await app.inject({
+        method: 'POST',
+        url: '/api/config/ai',
+        payload: {
+          current_provider: 'openai',
+          current_model: 'gpt-4',
+          providers: {
+            openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
+          },
+          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
         },
-        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-      },
-    });
+      });
 
-    const response = await app.inject({
-      method: 'POST',
-      url: '/api/completion',
-      payload: { prefix: 'hello' },
-    });
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/completion',
+        payload: { prefix: 'hello' },
+      });
 
-    expect(response.statusCode).toBe(200);
+      expect(response.statusCode).toBe(200);
 
-    global.fetch = originalFetch;
+    } finally {
+      global.fetch = savedFetch;
+    }
   });
 
   it('POST /api/completion should reject missing api_key for non-ollama', async () => {
@@ -1112,79 +1155,84 @@ describe('API Integration Tests', () => {
   });
 
   it('POST /api/chat should stream ollama response', async () => {
-    const originalFetch = global.fetch;
+    const savedFetch = global.fetch;
     const streamData = [
       '{"message":{"content":"hi"}}',
       '{"message":{"content":" there"}}',
     ];
 
-    global.fetch = () => {
-      let index = 0;
-      const readable = new ReadableStream({
-        pull(controller) {
-          if (index < streamData.length) {
-            controller.enqueue(new TextEncoder().encode(streamData[index] + '\n'));
-            index++;
-          } else {
-            controller.close();
-          }
+    try {
+      global.fetch = () => {
+        let index = 0;
+        const readable = new ReadableStream({
+          pull(controller) {
+            if (index < streamData.length) {
+              controller.enqueue(new TextEncoder().encode(streamData[index] + '\n'));
+              index++;
+            } else {
+              controller.close();
+            }
+          },
+        });
+        return Promise.resolve({ ok: true, body: readable } as unknown as Response);
+      };
+
+      await app.inject({
+        method: 'POST',
+        url: '/api/config/ai',
+        payload: {
+          current_provider: 'ollama',
+          current_model: 'llama2',
+          providers: {
+            ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
+          },
+          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
         },
       });
-      return Promise.resolve({ ok: true, body: readable } as unknown as Response);
-    };
 
-    await app.inject({
-      method: 'POST',
-      url: '/api/config/ai',
-      payload: {
-        current_provider: 'ollama',
-        current_model: 'llama2',
-        providers: {
-          ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
-        },
-        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-      },
-    });
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/chat',
+        payload: { message: 'hello' },
+      });
 
-    const response = await app.inject({
-      method: 'POST',
-      url: '/api/chat',
-      payload: { message: 'hello' },
-    });
-
-    expect(response.statusCode).toBe(200);
-
-    global.fetch = originalFetch;
+      expect(response.statusCode).toBe(200);
+    } finally {
+      global.fetch = savedFetch;
+    }
   });
 
   it('POST /api/chat should handle stream error', async () => {
-    const originalFetch = global.fetch;
-    global.fetch = () => Promise.reject(new Error('stream failed'));
+    const savedFetch = global.fetch;
+    try {
+      global.fetch = () => Promise.reject(new Error('stream failed'));
 
-    await app.inject({
-      method: 'POST',
-      url: '/api/config/ai',
-      payload: {
-        current_provider: 'ollama',
-        current_model: 'llama2',
-        providers: {
-          ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
+      await app.inject({
+        method: 'POST',
+        url: '/api/config/ai',
+        payload: {
+          current_provider: 'ollama',
+          current_model: 'llama2',
+          providers: {
+            ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
+          },
+          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
+          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
         },
-        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-      },
-    });
+      });
 
-    const response = await app.inject({
-      method: 'POST',
-      url: '/api/chat',
-      payload: { message: 'hello' },
-    });
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/chat',
+        payload: { message: 'hello' },
+      });
 
-    expect(response.statusCode).toBe(200);
+      expect(response.statusCode).toBe(200);
 
-    global.fetch = originalFetch;
+    } finally {
+      global.fetch = savedFetch;
+    }
   });
 
   it('GET /api/providers should list providers', async () => {
@@ -2545,8 +2593,6 @@ describe('API Integration Tests', () => {
   });
 
   describe('Files API', () => {
-    let folderId: string;
-
     it('GET /api/files should return empty list initially', async () => {
       const response = await app.inject({ method: 'GET', url: '/api/files' });
 
@@ -2569,7 +2615,6 @@ describe('API Integration Tests', () => {
       expect(body.success).toBe(true);
       expect(body.file.name).toBe('Test Folder');
       expect(body.file.is_folder).toBe(1);
-      folderId = body.file.id;
     });
 
     it('POST /api/files/folder should reject empty name', async () => {
@@ -2583,16 +2628,23 @@ describe('API Integration Tests', () => {
     });
 
     it('POST /api/files/folder should create subfolder', async () => {
+      const parent = await app.inject({
+        method: 'POST',
+        url: '/api/files/folder',
+        payload: { name: 'Parent Folder' },
+      });
+      const parentId = JSON.parse(parent.body).file.id;
+
       const response = await app.inject({
         method: 'POST',
         url: '/api/files/folder',
-        payload: { name: 'Sub Folder', parentId: folderId },
+        payload: { name: 'Sub Folder', parentId },
       });
 
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
       expect(body.success).toBe(true);
-      expect(body.file.parent_id).toBe(folderId);
+      expect(body.file.parent_id).toBe(parentId);
     });
 
     it('POST /api/files/upload should upload files', async () => {
@@ -2624,12 +2676,27 @@ describe('API Integration Tests', () => {
     });
 
     it('GET /api/files should return all files', async () => {
+      const folder = await app.inject({
+        method: 'POST',
+        url: '/api/files/folder',
+        payload: { name: 'List Folder' },
+      });
+
+      const content = Buffer.from('Hello API').toString('base64');
+      await app.inject({
+        method: 'POST',
+        url: '/api/files/upload',
+        payload: {
+          files: [{ name: 'list-test.txt', content, mimeType: 'text/plain' }],
+        },
+      });
+
       const response = await app.inject({ method: 'GET', url: '/api/files' });
 
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
       expect(body.success).toBe(true);
-      expect(body.files.length).toBeGreaterThanOrEqual(3);
+      expect(body.files.length).toBeGreaterThanOrEqual(2);
       // Folders should come before files
       const types = body.files.map((f: { is_folder: number }) => f.is_folder);
       for (let i = 1; i < types.length; i++) {
@@ -2638,24 +2705,26 @@ describe('API Integration Tests', () => {
     });
 
     it('GET /api/files/:id should return single file', async () => {
-      const list = await app.inject({ method: 'GET', url: '/api/files' });
-      const files = JSON.parse(list.body).files;
-      const firstFile = files.find((f: { is_folder: number }) => !f.is_folder);
-      if (!firstFile) return;
+      const content = Buffer.from('single file').toString('base64');
+      const upload = await app.inject({
+        method: 'POST',
+        url: '/api/files/upload',
+        payload: { files: [{ name: 'single.txt', content, mimeType: 'text/plain' }] },
+      });
+      const fileId = JSON.parse(upload.body).files[0].id;
 
       const response = await app.inject({
         method: 'GET',
-        url: `/api/files/${firstFile.id}`,
+        url: `/api/files/${fileId}`,
       });
 
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
       expect(body.success).toBe(true);
-      expect(body.file.id).toBe(firstFile.id);
+      expect(body.file.id).toBe(fileId);
     });
 
     it('GET /api/files/:id/download should return file headers', async () => {
-      // Upload a file first
       const content = Buffer.from('download content').toString('base64');
       const upload = await app.inject({
         method: 'POST',
@@ -2743,7 +2812,6 @@ describe('API Integration Tests', () => {
     });
 
     it('DELETE /api/files/:id should recursively delete folder', async () => {
-      // Create folder with files
       const folder = await app.inject({
         method: 'POST',
         url: '/api/files/folder',
@@ -2772,7 +2840,6 @@ describe('API Integration Tests', () => {
       expect(deleteRes.statusCode).toBe(200);
       expect(JSON.parse(deleteRes.body).deleted).toBe(3);
 
-      // Verify folder is gone
       const getRes = await app.inject({ method: 'GET', url: '/api/files' });
       const files = JSON.parse(getRes.body).files;
       expect(files.some((f: { id: string }) => f.id === folderId)).toBe(false);
