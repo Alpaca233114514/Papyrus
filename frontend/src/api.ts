@@ -1,11 +1,15 @@
 export const BACKEND_URL = 'http://127.0.0.1:8000';
-const BASE = window.location.protocol === 'file:'
+export const BASE = window.location.protocol === 'file:'
   ? `${BACKEND_URL}/api`
   : '/api';
 
+export function getFileUrl(fileId: string, action: 'preview' | 'download'): string {
+  return `${BASE}/files/${fileId}/${action}`;
+}
+
 let cachedToken: string | null | undefined;
 
-async function getAuthToken(): Promise<string | null> {
+export async function getAuthToken(): Promise<string | null> {
   if (cachedToken) {
     return cachedToken;
   }
@@ -152,6 +156,8 @@ export type FeaturesConfig = {
   auto_hint: boolean;
   auto_explain: boolean;
   context_length: number;
+  agent_enabled: boolean;
+  cache_enabled: boolean;
 };
 
 export type AIConfig = {
@@ -368,18 +374,18 @@ export const api = {
 
   // Chat Sessions
   listChatSessions: () =>
-    request<ListChatSessionsRes>('/ai/sessions'),
+    request<ListChatSessionsRes>('/sessions'),
   createChatSession: () =>
-    request<CreateChatSessionRes>('/ai/sessions', { method: 'POST' }),
+    request<CreateChatSessionRes>('/sessions', { method: 'POST' }),
   switchChatSession: (id: string) =>
-    request<SwitchChatSessionRes>(`/ai/sessions/${id}/switch`, { method: 'POST' }),
+    request<SwitchChatSessionRes>(`/sessions/${id}/switch`, { method: 'POST' }),
   renameChatSession: (id: string, title: string) =>
-    request<RenameChatSessionRes>(`/ai/sessions/${id}`, {
-      method: 'PUT',
+    request<RenameChatSessionRes>(`/sessions/${id}`, {
+      method: 'PATCH',
       body: JSON.stringify({ title })
     }),
   deleteChatSession: (id: string) =>
-    request<DeleteChatSessionRes>(`/ai/sessions/${id}`, { method: 'DELETE' }),
+    request<DeleteChatSessionRes>(`/sessions/${id}`, { method: 'DELETE' }),
 
   // Providers
   listProviders: () => request<ListProvidersRes>('/providers'),
@@ -405,6 +411,7 @@ export const api = {
   addModel: (
     providerId: string,
     data: {
+      id: string;
       name: string;
       modelId: string;
       port?: string;

@@ -15,14 +15,20 @@ function safeNumber(value: unknown, defaultValue: number): number {
 }
 
 export default async function dataRoutes(fastify: FastifyInstance): Promise<void> {
-  fastify.post('/backup', async (_request, reply) => {
-    const timestamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
-    const uniqueSuffix = `${Date.now() % 1000}`;
-    const backupPath = path.join(paths.backupDir, `papyrus_backup_${timestamp}_${uniqueSuffix}.db`);
-    fs.mkdirSync(paths.backupDir, { recursive: true });
-    checkpointDb();
-    fs.copyFileSync(paths.dbFile, backupPath);
-    reply.send({ success: true, path: backupPath });
+  fastify.post('/backup', async (request, reply) => {
+    try {
+      const timestamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
+      const uniqueSuffix = `${Date.now() % 1000}`;
+      const backupPath = path.join(paths.backupDir, `papyrus_backup_${timestamp}_${uniqueSuffix}.db`);
+      fs.mkdirSync(paths.backupDir, { recursive: true });
+      checkpointDb();
+      fs.copyFileSync(paths.dbFile, backupPath);
+      reply.send({ success: true, path: backupPath });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '服务器内部错误';
+      request.log.error({ err }, message);
+      reply.status(500).send({ success: false, error: message });
+    }
   });
 
   fastify.post('/data/reset', async (_request, reply) => {
@@ -38,15 +44,21 @@ export default async function dataRoutes(fastify: FastifyInstance): Promise<void
     }
   });
 
-  fastify.get('/export', async (_request, reply) => {
-    const cards = loadAllCards();
-    const notes = loadAllNotes();
-    reply.send({
-      success: true,
-      cards,
-      notes,
-      config: {},
-    });
+  fastify.get('/export', async (request, reply) => {
+    try {
+      const cards = loadAllCards();
+      const notes = loadAllNotes();
+      reply.send({
+        success: true,
+        cards,
+        notes,
+        config: {},
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '服务器内部错误';
+      request.log.error({ err }, message);
+      reply.status(500).send({ success: false, error: message });
+    }
   });
 
   fastify.post('/import', async (request, reply) => {

@@ -441,6 +441,41 @@ const ChartsPage = () => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    const handleRefresh = () => {
+      setLoading(true);
+      const fetchData = async () => {
+        try {
+          const [cardsRes, streakRes, heatmapRes] = await Promise.all([
+            api.listCards(),
+            fetch('/api/progress/streak').then(r => r.json()),
+            fetch('/api/progress/heatmap').then(r => r.json()),
+          ]);
+          if (cardsRes.success) {
+            setCards(cardsRes.cards);
+          }
+          if (streakRes.success) {
+            setStreakData(streakRes);
+          }
+          if (heatmapRes.success) {
+            setHeatmapData(heatmapRes.data);
+          }
+        } catch (err) {
+          console.error('获取数据失败:', err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchData();
+    };
+    window.addEventListener('papyrus_cards_changed', handleRefresh);
+    window.addEventListener('papyrus_notes_changed', handleRefresh);
+    return () => {
+      window.removeEventListener('papyrus_cards_changed', handleRefresh);
+      window.removeEventListener('papyrus_notes_changed', handleRefresh);
+    };
+  }, []);
+
   const stats = useMemo(() => calculateStats(cards, streakData), [cards, streakData]);
 
   // 分组统计

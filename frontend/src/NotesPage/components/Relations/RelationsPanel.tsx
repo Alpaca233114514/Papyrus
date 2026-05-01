@@ -57,6 +57,7 @@ export const RelationsPanel: React.FC<RelationsPanelProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchableNote[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState(false);
   const [selectedNote, setSelectedNote] = useState<SearchableNote | null>(null);
   const [newRelationType, setNewRelationType] = useState<RelationType>('reference');
   const [newRelationDesc, setNewRelationDesc] = useState('');
@@ -92,9 +93,13 @@ export const RelationsPanel: React.FC<RelationsPanelProps> = ({
 
   // 搜索可关联的笔记
   const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
-    
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
     setSearching(true);
+    setSearchError(false);
     try {
       const response = await fetch(
         `/api/notes/search-for-relation?query=${encodeURIComponent(searchQuery)}&exclude_note_id=${noteId}&limit=10`
@@ -102,13 +107,30 @@ export const RelationsPanel: React.FC<RelationsPanelProps> = ({
       const data = await response.json();
       if (data.success) {
         setSearchResults(data.results);
+      } else {
+        setSearchError(true);
       }
     } catch {
-      Message.error('搜索失败');
+      setSearchError(true);
     } finally {
       setSearching(false);
     }
   };
+
+  // 防抖自动搜索
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      setSearchResults([]);
+      setSearchError(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      handleSearch();
+    }, 300);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, noteId]);
 
   // 创建关联
   const handleCreateRelation = async () => {
@@ -357,6 +379,7 @@ export const RelationsPanel: React.FC<RelationsPanelProps> = ({
           setSelectedNote(null);
           setSearchQuery('');
           setSearchResults([]);
+          setSearchError(false);
         }}
         okText="创建"
         cancelText="取消"
@@ -373,6 +396,12 @@ export const RelationsPanel: React.FC<RelationsPanelProps> = ({
             style={{ marginBottom: '12px' }}
           />
           
+          {searchError && (
+            <div style={{ color: 'var(--color-danger)', fontSize: '13px', marginBottom: '12px' }}>
+              搜索失败，请稍后重试
+            </div>
+          )}
+
           {searchResults.length > 0 && (
             <div
               style={{

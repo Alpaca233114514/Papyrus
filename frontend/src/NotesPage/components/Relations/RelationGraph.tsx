@@ -90,6 +90,22 @@ export const RelationGraph: React.FC<RelationGraphProps> = ({
     };
   }, [loadGraphData]);
 
+  // 监听无障碍设置变化，禁用动画时停止物理模拟
+  useEffect(() => {
+    const handleAccessibilityChange = (e: CustomEvent) => {
+      if (e.detail?.noAnimation) {
+        if (simulationRef.current.animationId) {
+          cancelAnimationFrame(simulationRef.current.animationId);
+          simulationRef.current.animationId = null;
+        }
+      } else if (!simulationRef.current.animationId && simulationRef.current.nodes.length > 0) {
+        startSimulation();
+      }
+    };
+    window.addEventListener('papyrus_accessibility_changed', handleAccessibilityChange as EventListener);
+    return () => window.removeEventListener('papyrus_accessibility_changed', handleAccessibilityChange as EventListener);
+  }, []);
+
   // 力导向图模拟
   const startSimulation = () => {
     const sim = simulationRef.current;

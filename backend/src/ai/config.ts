@@ -117,7 +117,7 @@ export class AIConfig {
         openai: {
           api_key: '',
           base_url: 'https://api.openai.com/v1',
-          models: ['gpt-4', 'gpt-3.5-turbo', 'gpt-4-turbo'],
+          models: ['gpt-4o', 'gpt-4', 'gpt-3.5-turbo', 'gpt-4-turbo'],
         },
         'openai-response': {
           api_key: '',
@@ -156,7 +156,7 @@ export class AIConfig {
         },
       },
       current_provider: 'openai',
-      current_model: 'gpt-3.5-turbo',
+      current_model: 'gpt-4o',
       parameters: {
         temperature: 0.7,
         top_p: 0.9,

@@ -74,10 +74,12 @@ export const SmartTextArea = forwardRef<SmartTextAreaRef, SmartTextAreaProps>(
       onChange(newValue);
 
       if (enableCompletion && config.enabled) {
-        const prefix = getPrefix();
+        const textarea = textareaRef.current?.dom;
+        const cursorPos = textarea?.selectionStart ?? newValue.length;
+        const prefix = newValue.slice(0, cursorPos);
         triggerCompletion(prefix, newValue);
       }
-    }, [enableCompletion, config.enabled, onChange, triggerCompletion, getPrefix]);
+    }, [enableCompletion, config.enabled, onChange, triggerCompletion]);
 
     // 处理按键
     const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -136,8 +138,8 @@ export const SmartTextArea = forwardRef<SmartTextAreaRef, SmartTextAreaProps>(
         return;
       }
 
-      // 其他按键隐藏补全
-      if (state.isVisible && !['Tab', 'Enter', 'Escape'].includes(e.key)) {
+      // 其他按键隐藏补全（仅在非 Tab 触发模式下，Tab 触发模式下仅 Escape 可关闭）
+      if (state.isVisible && !config.require_confirm && !['Tab', 'Enter', 'Escape'].includes(e.key)) {
         dismissCompletion();
       }
 

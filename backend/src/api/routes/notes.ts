@@ -10,14 +10,20 @@ export default async function notesRoutes(fastify: FastifyInstance): Promise<voi
   });
 
   fastify.post('/', async (request, reply) => {
-    const body = request.body as { title: string; folder?: string; content?: string; tags?: string[] };
-    if (!body.title) {
-      reply.status(400).send({ success: false, error: 'Title is required' });
-      return;
+    try {
+      const body = request.body as { title: string; folder?: string; content?: string; tags?: string[] };
+      if (!body.title) {
+        reply.status(400).send({ success: false, error: 'Title is required' });
+        return;
+      }
+      const note = createNote(body.title, body.content ?? '', body.folder, body.tags ?? []);
+      recordNoteCreated();
+      reply.send({ success: true, note });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '服务器内部错误';
+      request.log.error({ err }, message);
+      reply.status(500).send({ success: false, error: message });
     }
-    const note = createNote(body.title, body.content ?? '', body.folder, body.tags ?? []);
-    recordNoteCreated();
-    reply.send({ success: true, note });
   });
 
   fastify.get('/:noteId', async (request, reply) => {
@@ -31,14 +37,20 @@ export default async function notesRoutes(fastify: FastifyInstance): Promise<voi
   });
 
   fastify.patch('/:noteId', async (request, reply) => {
-    const { noteId } = request.params as { noteId: string };
-    const body = request.body as { title?: string; folder?: string; content?: string; tags?: string[] };
-    const note = updateNote(noteId, body);
-    if (!note) {
-      reply.status(404).send({ success: false, error: 'Note not found' });
-      return;
+    try {
+      const { noteId } = request.params as { noteId: string };
+      const body = request.body as { title?: string; folder?: string; content?: string; tags?: string[] };
+      const note = updateNote(noteId, body);
+      if (!note) {
+        reply.status(404).send({ success: false, error: 'Note not found' });
+        return;
+      }
+      reply.send({ success: true, note });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '服务器内部错误';
+      request.log.error({ err }, message);
+      reply.status(500).send({ success: false, error: message });
     }
-    reply.send({ success: true, note });
   });
 
   fastify.delete('/:noteId', async (request, reply) => {

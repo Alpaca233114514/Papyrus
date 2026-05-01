@@ -142,14 +142,21 @@ export class AIManager {
     };
   }
 
+  private saving = false;
   private saveSessions(): void {
-    const payload = {
-      active_session_id: this.activeSessionId,
-      sessions: Object.values(this.sessions),
-    };
-    const tempFile = `${this.sessionsFile}.tmp`;
-    fs.writeFileSync(tempFile, JSON.stringify(payload, null, 2), 'utf8');
-    fs.renameSync(tempFile, this.sessionsFile);
+    if (this.saving) return; // 已在保存中，跳过避免竞态
+    this.saving = true;
+    try {
+      const payload = {
+        active_session_id: this.activeSessionId,
+        sessions: Object.values(this.sessions),
+      };
+      const tempFile = `${this.sessionsFile}.tmp`;
+      fs.writeFileSync(tempFile, JSON.stringify(payload, null, 2), 'utf8');
+      fs.renameSync(tempFile, this.sessionsFile);
+    } finally {
+      this.saving = false;
+    }
   }
 
   getActiveSession(): SessionData {
@@ -420,6 +427,8 @@ export class AIManager {
     systemPrompt?: string,
     attachments?: Array<{ path?: string } | string>,
     overrideModel?: string,
+    mode?: string,
+    reasoning?: boolean,
   ): AsyncGenerator<StreamChunk> {
     const providerName = this.config.config.current_provider;
     const providerConfig = this.config.config.providers[providerName];
@@ -429,8 +438,13 @@ export class AIManager {
     }
 
     const messages: Array<{ role: string; content: string | Array<Record<string, unknown>> }> = [];
-    if (systemPrompt) {
-      messages.push({ role: 'system', content: systemPrompt });
+    const effectiveSystemPrompt = systemPrompt || (
+      mode === 'agent'
+        ? '你是一个智能学习助手。你可以使用工具来完成用户的请求，包括创建卡片、搜索笔记、获取统计数据等。请根据用户的需求，自主决定使用哪些工具，并逐步完成任务。'
+        : undefined
+    );
+    if (effectiveSystemPrompt) {
+      messages.push({ role: 'system', content: effectiveSystemPrompt });
     }
 
     const contextLength = this.config.config.features.context_length;
@@ -469,6 +483,16 @@ export class AIManager {
       return;
     }
 
+    // Save user message BEFORE streaming to avoid data loss on API failure
+    const activeSession = this.getActiveSession();
+    activeSession.messages.push({
+      role: 'user',
+      content: userMessage,
+      attachments: attachmentsMeta,
+    });
+    activeSession.updated_at = Date.now() / 1000;
+    this.saveSessions();
+
     const collectedChunks: StreamChunk[] = [];
     try {
       const stream = providerName === 'ollama'
@@ -479,15 +503,6 @@ export class AIManager {
         collectedChunks.push(chunk);
         yield chunk;
       }
-
-      const activeSession = this.getActiveSession();
-      activeSession.messages.push({
-        role: 'user',
-        content: userMessage,
-        attachments: attachmentsMeta,
-      });
-      activeSession.updated_at = Date.now() / 1000;
-      this.saveSessions();
 
       this.llmCache.set(cacheKey, collectedChunks);
       yield { type: 'done', data: '' };
@@ -503,8 +518,8 @@ export class AIManager {
     providerConfig: { base_url: string; api_key: string },
     providerName: string,
   ): AsyncGenerator<StreamChunk> {
-    const baseUrl = providerConfig.base_url.replace(/\/$/, '');
-    const apiKey = providerConfig.api_key;
+    const baseUrl = (providerConfig.base_url || '').replace(/\/$/, '');
+    const apiKey = providerConfig.api_key || '';
 
     if (isPrivateUrl(baseUrl)) {
       throw new Error('SSRF: 禁止通过非本地 provider 访问私有地址');

@@ -1,10 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Dropdown, Menu, Avatar, Tooltip, Empty, Message as ArcoMessage, Tag, Button } from '@arco-design/web-react';
-import { IconArrowUp, IconAt, IconFile, IconMessage, IconDown, IconBulb, IconRecordStop, IconTool, IconRefresh, IconEdit, IconCopy, IconDelete, IconTranslate, IconSave, IconPlus, IconHistory, IconClose, IconImage, IconFilePdf, IconSettings } from '@arco-design/web-react/icon';
+import { IconArrowUp, IconAt, IconFile, IconMessage, IconDown, IconBulb, IconRecordStop, IconTool, IconRefresh, IconEdit, IconCopy, IconDelete, IconTranslate, IconSave, IconPlus, IconHistory, IconClose, IconImage, IconFilePdf } from '@arco-design/web-react/icon';
 import IconAgentMode from './icons/IconAgentMode';
 import { ReasoningChain } from './components/ReasoningChain';
 import { ToolCallCard } from './components/ToolCallCard';
 import type { AIConfig, ProviderModel } from './types/ai';
+import { getAuthToken } from './api';
 import './ChatPanel.css';
 
 interface ChatPanelProps {
@@ -40,6 +41,7 @@ interface MessageBlock {
   type: MessageBlockType;
   content?: string;
   toolName?: string;
+  toolCallId?: string;
   toolStatus?: 'pending' | 'executing' | 'success' | 'failed';
   toolParams?: Record<string, any>;
   toolResult?: any;
@@ -52,6 +54,7 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   blocks?: MessageBlock[];
+  model?: string;
 }
 
 /** 已选文件 */
@@ -95,11 +98,23 @@ const loadUserProfile = (): UserProfile => {
   return { userId: '', avatarUrl: null };
 };
 
+async function authFetch(url: string, init?: RequestInit): Promise<Response> {
+  const token = await getAuthToken();
+  return fetch(url, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'X-Papyrus-Token': token } : {}),
+      ...(init?.headers as Record<string, string> || {}),
+    },
+  });
+}
+
 const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   const [text, setText] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [mode, setMode] = useState('agent');
-  const [model, setModel] = useState('claude-sonnet-4');
+  const [model, setModel] = useState('');
   const [reasoning, setReasoning] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [inputHeight, setInputHeight] = useState(118);
@@ -109,11 +124,14 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   const [configChecked, setConfigChecked] = useState(false);
   const [agentModeEnabled, setAgentModeEnabled] = useState<boolean>(loadAgentModeEnabled());
   const [availableModels, setAvailableModels] = useState<ProviderModel[]>([]);
+  const [providerApiKeys, setProviderApiKeys] = useState<Record<string, string>>({});
   const dragStartY = useRef<number>(0);
   const dragStartHeight = useRef<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textOverrideRef = useRef<string | null>(null);
   
   // 监听 localStorage 变化（用于设置页面修改后实时更新）
   useEffect(() => {
@@ -169,16 +187,62 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
     };
   }, [mode]);
 
-  // 加载 AI 配置
-  const loadAIConfig = useCallback(async () => {
+  // 串行初始化 AI 配置和模型列表，消除竞态和循环
+  const initializeChatConfig = useCallback(async () => {
+    // 先加载 providers，确保 availableModels 就绪
+    let models: ProviderModel[] = [];
+    const apiKeys: Record<string, string> = {};
     try {
-      const response = await fetch('/api/config/ai');
+      const response = await authFetch('/api/providers');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.providers) {
+          for (const provider of data.providers) {
+            if (!provider.enabled) continue;
+            // 提取 provider 的第一个非空 key
+            const firstKey = provider.apiKeys?.find((k: { key: string }) => k.key.trim() !== '');
+            if (firstKey) {
+              apiKeys[provider.type] = firstKey.key;
+            }
+            for (const m of provider.models) {
+              if (!m.enabled) continue;
+              models.push({
+                key: m.modelId,
+                label: m.name,
+                providerId: provider.id,
+                providerType: provider.type,
+              });
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load providers:', error);
+      ArcoMessage.warning('无法加载模型列表，请检查后端连接');
+    }
+
+    // 如果新加载的 models 为空但旧值非空，保留旧值（防止选择框"消失"）
+    if (models.length === 0 && availableModels.length > 0) {
+      console.warn('Provider 列表返回为空，保留之前的模型列表');
+    } else {
+      setAvailableModels(models);
+      setProviderApiKeys(apiKeys);
+    }
+
+    // 再加载 AI config，此时可用 models 已就绪
+    try {
+      const response = await authFetch('/api/config/ai');
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.config) {
           setAiConfig(data.config);
-          if (data.config.current_model) {
-            setModel(data.config.current_model);
+          const configuredModel = data.config.current_model;
+          // 只在配置的 model 存在于可用列表中时才更新，避免覆盖当前选择
+          const currentModels = models.length > 0 ? models : availableModels;
+          if (configuredModel && currentModels.some((m) => m.key === configuredModel)) {
+            setModel(configuredModel);
+          } else if (currentModels.length > 0 && !model) {
+            setModel(currentModels[0].key);
           }
         }
       }
@@ -187,110 +251,46 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
     } finally {
       setConfigChecked(true);
     }
-  }, []);
-
-  // 加载供应商模型列表
-  const loadProviders = useCallback(async () => {
-    try {
-      const response = await fetch('/api/providers');
-      if (!response.ok) {
-        console.error('Failed to load providers:', response.status, response.statusText);
-        return;
-      }
-      const data = await response.json();
-      if (data.success && data.providers) {
-        const models: ProviderModel[] = [];
-        for (const provider of data.providers) {
-          if (!provider.enabled) continue;
-          for (const m of provider.models) {
-            if (!m.enabled) continue;
-            models.push({
-              key: m.modelId,
-              label: m.name,
-              providerId: provider.id,
-              providerType: provider.type,
-            });
-          }
-        }
-        setAvailableModels(models);
-      }
-    } catch (error) {
-      console.error('Failed to load providers:', error);
-    }
-  }, []);
+  }, [availableModels, model]);
 
   // 组件挂载时加载配置和模型列表
   useEffect(() => {
     if (open) {
-      loadAIConfig();
-      loadProviders();
+      initializeChatConfig();
     }
-  }, [open, loadAIConfig, loadProviders]);
+  }, [open, initializeChatConfig]);
 
   // 监听设置页 AI 配置变化，实时刷新
   useEffect(() => {
     const handleConfigChange = () => {
-      loadAIConfig();
-      loadProviders();
+      initializeChatConfig();
     };
     window.addEventListener('papyrus_ai_config_changed', handleConfigChange);
     return () => window.removeEventListener('papyrus_ai_config_changed', handleConfigChange);
-  }, [loadAIConfig, loadProviders]);
+  }, [initializeChatConfig]);
 
-  // 检查 AI 配置是否有效
-  const checkAIConfig = useCallback((): { valid: boolean; message?: string } => {
-    if (!aiConfig) {
-      return { valid: false, message: '正在加载配置，请稍候...' };
-    }
-
-    // 检查是否有配置的 provider
-    if (!aiConfig.current_provider) {
-      return { valid: false, message: '请先配置 AI 供应商' };
-    }
-
-    const provider = aiConfig.providers[aiConfig.current_provider];
-    if (!provider) {
-      return { valid: false, message: '当前供应商配置无效，请前往设置页面重新配置' };
-    }
-
-    // 检查 API key
-    if (!provider.api_key || provider.api_key.trim() === '') {
-      return { valid: false, message: `请先配置 ${aiConfig.current_provider} 的 API Key` };
-    }
-
-    // 检查是否有可用的模型
-    if (!aiConfig.current_model) {
-      return { valid: false, message: '请先选择 AI 模型' };
-    }
-
-    if (!provider.models || provider.models.length === 0) {
-      return { valid: false, message: '当前供应商没有可用的模型，请前往设置页面添加' };
-    }
-
-    const modelInProviders = provider.models.includes(aiConfig.current_model);
-    const modelInDb = availableModels.some((m) => m.key === aiConfig.current_model);
-    if (!modelInProviders && !modelInDb) {
-      return { valid: false, message: '当前选择的模型不可用，请前往设置页面重新选择' };
-    }
-
-    return { valid: true };
-  }, [aiConfig, availableModels]);
-
-  // 跳转到设置页面
-  const goToSettings = useCallback(() => {
-    // 触发自定义事件，让主应用切换到设置页面
-    window.dispatchEvent(new CustomEvent('papyrus_open_settings', { detail: { section: 'chat' } }));
-  }, []);
-
-  // 滚动到底部
+  // 滚动到底部（仅当用户在底部附近时自动滚动，避免打断阅读）
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = messagesContainerRef.current;
+    if (container) {
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+      if (isNearBottom) {
+        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+      }
+    }
   }, []);
 
   // 消息更新时滚动到底部
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
+
+  // 组件卸载时中止进行中的 SSE 流
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   // 获取文件扩展名
   const getFileExtension = (filename: string): string => {
@@ -429,6 +429,11 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
 
     try {
       while (true) {
+        // 检查是否已取消，避免继续解析已缓冲的数据
+        if (abortControllerRef.current?.signal.aborted) {
+          break;
+        }
+
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -443,7 +448,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
               if (jsonStr === '[DONE]') continue;
 
               const event: SSEEvent = JSON.parse(jsonStr);
-              
+
               setMessages((prev) => {
                 const msgIndex = prev.findIndex((m) => m.id === messageId);
                 if (msgIndex === -1) return prev;
@@ -481,9 +486,12 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
                       ...newBlocks,
                       {
                         type: 'tool_call' as const,
-                        toolName: event.data.name,
+                        toolCallId: event.data.id || event.data.callId || '',
+                        toolName: event.data.function?.name || event.data.name || '',
                         toolStatus: 'pending' as const,
-                        toolParams: event.data.params,
+                        toolParams: event.data.function?.arguments
+                          ? (() => { try { return JSON.parse(event.data.function.arguments); } catch { return {}; } })()
+                          : (event.data.params || {}),
                       },
                     ];
                     break;
@@ -512,6 +520,11 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
                     break;
                   }
 
+                  case 'done': {
+                    // 流正常结束，无需额外操作
+                    break;
+                  }
+
                   case 'error': {
                     const errorData = event.data;
                     const errorMsg =
@@ -519,6 +532,8 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
                         ? errorData
                         : errorData?.message || '发生错误';
                     ArcoMessage.error(errorMsg);
+                    // 兜底：将错误信息写入消息气泡，避免空白
+                    newContent = '❌ ' + errorMsg;
                     break;
                   }
                 }
@@ -544,24 +559,65 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
 
   // 发送消息
   const sendMessage = useCallback(async () => {
-    const trimmedText = text.trim();
+    const messageFromOverride = textOverrideRef.current;
+    if (messageFromOverride !== null) {
+      textOverrideRef.current = null;
+    }
+    const effectiveText = messageFromOverride ?? text;
+    const trimmedText = effectiveText.trim();
     if ((!trimmedText && selectedFiles.length === 0) || isGenerating) return;
 
-    // 检查 AI 配置
-    const configCheck = checkAIConfig();
-    if (!configCheck.valid) {
-      ArcoMessage.error(configCheck.message || 'AI 配置不完整');
+    // 检查 model 是否已选择
+    if (!model) {
+      ArcoMessage.error('请先选择 AI 模型');
       return;
     }
 
-    // 保存当前文件列表并清空（后端暂不支持 multipart，文件名会拼入消息文本）
+    // 保存当前文件列表并清空
     const filesToUpload = [...selectedFiles];
     setSelectedFiles([]);
 
     let messageText = trimmedText;
+    const attachments: Array<{ path?: string } | string> = [];
+
+    // 上传文件到后端
     if (filesToUpload.length > 0) {
       const fileNames = filesToUpload.map((f) => `[附件: ${f.name}]`).join(' ');
       messageText = messageText ? `${messageText}\n${fileNames}` : fileNames;
+
+      try {
+        const uploadFiles: Array<{ name: string; content: string; mimeType?: string }> = [];
+        for (const sf of filesToUpload) {
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const result = reader.result as string;
+              // 提取 base64 部分（去掉 data:xxx;base64, 前缀）
+              const idx = result.indexOf('base64,');
+              resolve(idx >= 0 ? result.slice(idx + 7) : result);
+            };
+            reader.onerror = () => reject(new Error('文件读取失败'));
+            reader.readAsDataURL(sf.file);
+          });
+          uploadFiles.push({ name: sf.name, content: base64, mimeType: sf.file.type });
+        }
+
+        const uploadRes = await authFetch('/api/files/upload', {
+          method: 'POST',
+          body: JSON.stringify({ files: uploadFiles }),
+        });
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          if (uploadData.success && uploadData.files) {
+            for (const f of uploadData.files) {
+              attachments.push({ path: f.id });
+            }
+          }
+        }
+      } catch (uploadErr) {
+        console.error('File upload failed:', uploadErr);
+        // 继续发送消息，文件信息已拼入 messageText
+      }
     }
 
     const userMessage: Message = {
@@ -575,6 +631,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
       role: 'assistant',
       content: '',
       blocks: [],
+      model,
     };
 
     setMessages((prev) => [...prev, userMessage, assistantMessage]);
@@ -585,17 +642,22 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
     abortControllerRef.current = new AbortController();
 
     try {
-      const response = await fetch('/api/chat', {
+      const chatBody: Record<string, unknown> = {
+        message: messageText,
+        model,
+        mode,
+        reasoning,
+      };
+      if (attachments.length > 0) {
+        chatBody.attachments = attachments;
+      }
+
+      const response = await authFetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          message: messageText,
-          model,
-          mode,
-          reasoning,
-        }),
+        body: JSON.stringify(chatBody),
         signal: abortControllerRef.current.signal,
       });
 
@@ -669,7 +731,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
       setIsGenerating(false);
       abortControllerRef.current = null;
     }
-  }, [text, isGenerating, model, mode, reasoning, selectedFiles, handleSSEStream, checkAIConfig]);
+  }, [text, isGenerating, model, mode, reasoning, selectedFiles, handleSSEStream]);
 
   // 停止生成
   const stopGeneration = useCallback(() => {
@@ -678,12 +740,31 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   }, []);
 
   // 处理工具批准
-  const handleToolApprove = useCallback((messageId: string, toolName: string) => {
-    // 发送批准请求到后端
-    fetch('/api/tool/approve', {
+  const handleToolApprove = useCallback((messageId: string, toolName: string, callId?: string) => {
+    const cid = callId || `${messageId}-${toolName}`;
+    authFetch(`/api/tools/approve/${encodeURIComponent(cid)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messageId, toolName, approved: true }),
+    }).catch((error) => {
+      console.error('Tool approve failed:', error);
+      ArcoMessage.error('工具批准请求失败');
+      // 回滚本地状态
+      setMessages((prev) => {
+        const msgIndex = prev.findIndex((m) => m.id === messageId);
+        if (msgIndex === -1) return prev;
+        const msg = prev[msgIndex]!;
+        if (!msg.blocks) return prev;
+        const blockIndex = msg.blocks.findIndex(
+          (b) => b.type === 'tool_call' && b.toolName === toolName && b.toolStatus === 'executing'
+        );
+        if (blockIndex === -1) return prev;
+        const newBlocks = msg.blocks.map((b, idx) =>
+          idx === blockIndex ? { ...b, toolStatus: 'pending' as const } : b
+        );
+        const newMessages = [...prev];
+        newMessages[msgIndex] = { ...msg, blocks: newBlocks };
+        return newMessages;
+      });
     });
 
     // 更新本地状态
@@ -706,12 +787,32 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   }, []);
 
   // 处理工具拒绝
-  const handleToolReject = useCallback((messageId: string, toolName: string) => {
-    // 发送拒绝请求到后端
-    fetch('/api/tool/approve', {
+  const handleToolReject = useCallback((messageId: string, toolName: string, callId?: string) => {
+    const cid = callId || `${messageId}-${toolName}`;
+    authFetch(`/api/tools/reject/${encodeURIComponent(cid)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messageId, toolName, approved: false }),
+      body: JSON.stringify({ reason: '用户拒绝执行' }),
+    }).catch((error) => {
+      console.error('Tool reject failed:', error);
+      ArcoMessage.error('工具拒绝请求失败');
+      // 回滚本地状态
+      setMessages((prev) => {
+        const msgIndex = prev.findIndex((m) => m.id === messageId);
+        if (msgIndex === -1) return prev;
+        const msg = prev[msgIndex]!;
+        if (!msg.blocks) return prev;
+        const blockIndex = msg.blocks.findIndex(
+          (b) => b.type === 'tool_call' && b.toolName === toolName && b.toolStatus === 'failed'
+        );
+        if (blockIndex === -1) return prev;
+        const newBlocks = msg.blocks.map((b, idx) =>
+          idx === blockIndex ? { ...b, toolStatus: 'pending' as const, toolError: undefined } : b
+        );
+        const newMessages = [...prev];
+        newMessages[msgIndex] = { ...msg, blocks: newBlocks };
+        return newMessages;
+      });
     });
 
     // 更新本地状态
@@ -756,8 +857,8 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
             params={block.toolParams}
             result={block.toolResult}
             error={block.toolError}
-            onApprove={() => handleToolApprove(messageId, block.toolName || '')}
-            onReject={() => handleToolReject(messageId, block.toolName || '')}
+            onApprove={() => handleToolApprove(messageId, block.toolName || '', block.toolCallId)}
+            onReject={() => handleToolReject(messageId, block.toolName || '', block.toolCallId)}
             defaultExpanded={block.toolStatus === 'failed'}
           />
         );
@@ -767,20 +868,36 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
     }
   };
 
+  const dragActiveRef = useRef(false);
   const onDragStart = useCallback((e: React.MouseEvent) => {
     dragStartY.current = e.clientY;
     dragStartHeight.current = inputHeight;
+    dragActiveRef.current = true;
+    const cleanup = () => {
+      dragActiveRef.current = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.documentElement.removeEventListener('mouseleave', onLeave);
+    };
     const onMove = (ev: MouseEvent) => {
       const delta = dragStartY.current - ev.clientY;
       setInputHeight(Math.min(400, Math.max(118, dragStartHeight.current + delta)));
     };
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
+    const onUp = () => cleanup();
+    const onLeave = () => cleanup();
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
+    document.documentElement.addEventListener('mouseleave', onLeave);
   }, [inputHeight]);
+
+  // 卸载时清理拖拽监听器
+  useEffect(() => {
+    return () => {
+      if (dragActiveRef.current) {
+        dragActiveRef.current = false;
+      }
+    };
+  }, []);
 
   if (!open) return null;
 
@@ -797,22 +914,35 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
 
   const handleModelSelect = async (key: string) => {
     setModel(key);
+    if (isGenerating) {
+      abortControllerRef.current?.abort();
+      setIsGenerating(false);
+    }
     const selected = availableModels.find((m) => m.key === key);
     if (!selected || !aiConfig) return;
 
+    // 从 providerApiKeys 获取对应 provider 的实际 API key
+    const actualKey = providerApiKeys[selected.providerType] ?? '';
     const updatedConfig = {
       ...aiConfig,
       current_provider: selected.providerType,
       current_model: key,
+      providers: {
+        ...aiConfig.providers,
+        [selected.providerType]: {
+          ...aiConfig.providers[selected.providerType],
+          api_key: actualKey,
+        },
+      },
     };
 
     try {
-      await fetch('/api/config/ai', {
+      await authFetch('/api/config/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedConfig),
       });
-      await loadAIConfig();
+      await initializeChatConfig();
     } catch (error) {
       console.error('Failed to update AI config:', error);
     }
@@ -823,8 +953,9 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
       <div className="chat-panel-header">
         <Dropdown
           trigger="click"
+          getPopupContainer={(node) => node.parentElement || document.body}
           droplist={
-            <Menu onClickMenuItem={(key) => handleModelSelect(key)}>
+            <Menu style={{ maxHeight: 320, overflow: 'auto' }} onClickMenuItem={(key) => handleModelSelect(key)}>
               {availableModels.map((m) => (
                 <Menu.Item key={m.key}>{m.label}</Menu.Item>
               ))}
@@ -832,36 +963,20 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
           }
         >
           <button className="chat-model-btn">
-            <span>{availableModels.find((m) => m.key === model)?.label ?? model}</span>
+            <span>{(availableModels.find((m) => m.key === model)?.label ?? model) || '选择模型'}</span>
             <IconDown className="tw-text-xs" />
           </button>
         </Dropdown>
         <div className="chat-panel-header-actions">
-          <Tooltip content="新建对话" mini><button className="chat-panel-header-btn" onClick={() => setMessages([])}><IconPlus /></button></Tooltip>
+          <Tooltip content="新建对话" mini><button className="chat-panel-header-btn" onClick={() => { setMessages([]); authFetch('/api/sessions', { method: 'POST' }).catch(() => {}); }}><IconPlus /></button></Tooltip>
           <Tooltip content="历史记录" mini><button className="chat-panel-header-btn" onClick={() => {}}><IconHistory /></button></Tooltip>
           <Tooltip content="关闭" mini><button className="chat-panel-header-btn" onClick={onClose}><IconClose /></button></Tooltip>
         </div>
       </div>
-      <div className="chat-panel-body">
+      <div className="chat-panel-body" ref={messagesContainerRef}>
         {messages.length === 0 ? (
           <div className="tw-flex-1 tw-flex tw-flex-col tw-items-center tw-justify-center tw-p-8">
-            {configChecked && aiConfig && !checkAIConfig().valid ? (
-              <div className="chat-config-warning">
-                <IconSettings style={{ fontSize: 48, color: 'var(--color-warning)', marginBottom: 16 }} />
-                <div className="chat-config-warning-title">AI 配置不完整</div>
-                <div className="chat-config-warning-desc">{checkAIConfig().message}</div>
-                <Button 
-                  type="primary" 
-                  icon={<IconSettings />}
-                  onClick={goToSettings}
-                  className="chat-config-warning-btn"
-                >
-                  前往设置
-                </Button>
-              </div>
-            ) : (
-              <Empty description="开始新的对话" />
-            )}
+            <Empty description="开始新的对话" />
           </div>
         ) : (
           <div className="chat-messages">
@@ -899,7 +1014,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
                 )}
                 {msg.role === 'assistant' && (
                   <div className="chat-message-with-avatar tw-items-start">
-                    <span className="chat-message-model-label">{availableModels.find((m) => m.key === model)?.label ?? model}</span>
+                    <span className="chat-message-model-label">{availableModels.find((m) => m.key === msg.model)?.label ?? msg.model ?? model}</span>
                     <div className="chat-message-blocks">
                       {msg.blocks?.map((block) => renderMessageBlock(block, msg.id))}
                     </div>
@@ -907,7 +1022,14 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
                       <div className="chat-message-bubble">{msg.content}</div>
                     )}
                     <div className="chat-message-actions">
-                      <Tooltip content="重新生成" mini><button className="chat-message-action-btn"><IconRefresh /></button></Tooltip>
+                      <Tooltip content="重新生成" mini><button className="chat-message-action-btn" onClick={() => {
+                        const msgIndex = messages.findIndex((m) => m.id === msg.id);
+                        if (msgIndex > 0 && messages[msgIndex - 1].role === 'user') {
+                          setMessages((prev) => prev.slice(0, msgIndex));
+                          textOverrideRef.current = messages[msgIndex - 1].content;
+                          sendMessage();
+                        }
+                      }}><IconRefresh /></button></Tooltip>
                       <Tooltip content="编辑" mini><button className="chat-message-action-btn"><IconEdit /></button></Tooltip>
                       <Tooltip content="复制" mini><button className="chat-message-action-btn"><IconCopy /></button></Tooltip>
                       <Tooltip content="翻译" mini><button className="chat-message-action-btn"><IconTranslate /></button></Tooltip>
@@ -959,7 +1081,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
         )}
         <textarea
           className="chat-textarea"
-          placeholder={selectedFiles.length > 0 ? "添加消息描述（可选）..." : "发送消息..."}
+          placeholder={!configChecked ? "正在加载配置..." : (selectedFiles.length > 0 ? "添加消息描述（可选）..." : "发送消息...")}
           aria-label="消息输入框，按 Enter 发送"
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -969,7 +1091,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
               sendMessage();
             }
           }}
-          disabled={isGenerating}
+          disabled={isGenerating || !configChecked}
         />
         <div className="chat-toolbar">
           <div className="chat-toolbar-left">

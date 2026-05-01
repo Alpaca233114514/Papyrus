@@ -176,7 +176,17 @@ const SinglePageScenerySettings = ({
 
 const AppearanceView = ({ onBack }: AppearanceViewProps) => {
   const { contentRef, activeSection, scrollToSection } = useScrollNavigation(NAV_ITEMS);
-  const [fontSize, setFontSize] = useState('medium');
+  const [fontSize, setFontSize] = useState(() => {
+    try { return localStorage.getItem('papyrus_font_size') ?? 'medium'; }
+    catch { return 'medium'; }
+  });
+
+  const handleFontSizeChange = (value: string) => {
+    setFontSize(value);
+    localStorage.setItem('papyrus_font_size', value);
+    document.body.dataset.fontSize = value;
+    window.dispatchEvent(new CustomEvent('papyrus_font_size_changed'));
+  };
   
   const { allSceneries, addCustomScenery } = useSceneryManager();
   const startPageScenery = useStartPageScenery();
@@ -309,7 +319,7 @@ const AppearanceView = ({ onBack }: AppearanceViewProps) => {
               <RadioGroup
                 type="button"
                 value={fontSize}
-                onChange={setFontSize}
+                onChange={handleFontSizeChange}
                 options={FONT_SIZE_OPTIONS}
               />
             </SettingItem>

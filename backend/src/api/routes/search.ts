@@ -32,7 +32,9 @@ export default async function searchRoutes(fastify: FastifyInstance): Promise<vo
 
     try {
       cards = loadAllCards().filter(
-        c => c.q.toLowerCase().includes(lowerQuery) || c.a.toLowerCase().includes(lowerQuery)
+        c => c.q.toLowerCase().includes(lowerQuery) ||
+             c.a.toLowerCase().includes(lowerQuery) ||
+             c.tags.some(t => t.toLowerCase().includes(lowerQuery))
       );
     } catch (err) {
       request.log.error({ err }, 'Failed to load cards for search');
@@ -48,7 +50,8 @@ export default async function searchRoutes(fastify: FastifyInstance): Promise<vo
         preview: n.preview,
         folder: n.folder,
         tags: n.tags,
-        matched_field: n.title.toLowerCase().includes(lowerQuery) ? 'title' : 'content',
+        matched_field: n.title.toLowerCase().includes(lowerQuery) ? 'title' :
+                       n.content.toLowerCase().includes(lowerQuery) ? 'content' : 'tags',
         updated_at: n.updated_at,
       })),
       ...cards.map(c => ({
@@ -58,7 +61,8 @@ export default async function searchRoutes(fastify: FastifyInstance): Promise<vo
         preview: c.a,
         folder: '',
         tags: c.tags,
-        matched_field: c.q.toLowerCase().includes(lowerQuery) ? 'question' : 'answer',
+        matched_field: c.q.toLowerCase().includes(lowerQuery) ? 'question' :
+                       c.a.toLowerCase().includes(lowerQuery) ? 'answer' : 'tags',
         updated_at: 0,
       })),
     ];

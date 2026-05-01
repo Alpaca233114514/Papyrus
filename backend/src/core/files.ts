@@ -115,11 +115,6 @@ export function saveFile(
   const vaultDir = paths.vaultDir;
   fs.mkdirSync(vaultDir, { recursive: true });
 
-  // Decode and write file content
-  const buffer = Buffer.from(base64Content, 'base64');
-  const storagePath = path.join(vaultDir, storageName);
-  fs.writeFileSync(storagePath, buffer);
-
   const mime = mimeType || getMimeType(ext);
   const fileType = inferType(ext);
 
@@ -127,18 +122,40 @@ export function saveFile(
     id,
     name: name.trim(),
     type: fileType,
-    size: buffer.length,
+    size: 0,
     mime_type: mime,
     parent_id: parentId ?? null,
-    file_storage_path: storagePath,
+    file_storage_path: null,
     is_folder: 0,
     created_at: now,
     updated_at: now,
   };
 
+  // 先写数据库，保证元数据持久化
   insertFile(record, logger);
-  logger?.info(`保存文件: ${record.id} -> ${name} (${buffer.length} bytes)`);
-  return record;
+
+  try {
+    // Decode and write file content
+    const buffer = Buffer.from(base64Content, 'base64');
+    const storagePath = path.join(vaultDir, storageName);
+    fs.writeFileSync(storagePath, buffer);
+
+    // 更新数据库中的文件路径和大小
+    record.file_storage_path = storagePath;
+    record.size = buffer.length;
+    insertFile(record, logger); // 重新插入以更新（或替换现有记录）
+
+    logger?.info(`保存文件: ${record.id} -> ${name} (${buffer.length} bytes)`);
+    return record;
+  } catch (err) {
+    // 磁盘写入失败，删除数据库记录避免孤儿文件
+    try {
+      deleteFileById(id, logger);
+    } catch (cleanupErr) {
+      logger?.error(`清理失败的数据库记录时出错: ${id} - ${cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)}`);
+    }
+    throw err;
+  }
 }
 
 export function deleteFileItem(

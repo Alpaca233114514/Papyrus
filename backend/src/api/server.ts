@@ -9,9 +9,8 @@ import { startFileWatching, stopFileWatching } from '../integrations/file-watche
 import { setGlobalLogger } from './routes/logs.js';
 import { isAuthEnabled, validateRequestToken } from '../utils/auth.js';
 import { closeDb } from '../db/database.js';
-import { AIConfig } from '../ai/config.js';
+import { aiConfig } from './routes/ai.js';
 
-const aiConfig = new AIConfig(paths.dataDir);
 const savedLogConfig = aiConfig.getLogConfig();
 const logger = new PapyrusLogger(
   savedLogConfig.log_dir || paths.logDir,

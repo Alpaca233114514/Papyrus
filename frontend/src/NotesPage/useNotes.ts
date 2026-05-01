@@ -120,32 +120,41 @@ export const useNotes = (): UseNotesReturn => {
     params: UpdateNoteParams | CreateNoteParams,
     isCreate: boolean
   ) => {
-    if (isCreate) {
-      const createParams = params as CreateNoteParams;
-      await api.createNote(
-        createParams.title,
-        createParams.folder,
-        createParams.content,
-        createParams.tags
-      );
-    } else {
-      const updateParams = params as UpdateNoteParams;
-      await api.updateNote(updateParams.id, {
-        title: updateParams.title,
-        folder: updateParams.folder,
-        content: updateParams.content,
-        tags: updateParams.tags,
-      });
+    try {
+      if (isCreate) {
+        const createParams = params as CreateNoteParams;
+        await api.createNote(
+          createParams.title,
+          createParams.folder,
+          createParams.content,
+          createParams.tags
+        );
+      } else {
+        const updateParams = params as UpdateNoteParams;
+        await api.updateNote(updateParams.id, {
+          title: updateParams.title,
+          folder: updateParams.folder,
+          content: updateParams.content,
+          tags: updateParams.tags,
+        });
+      }
+      await refreshNotes();
+      window.dispatchEvent(new CustomEvent('papyrus_notes_changed'));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '保存失败';
+      throw new Error(message);
     }
-    await refreshNotes();
-    window.dispatchEvent(new CustomEvent('papyrus_notes_changed'));
   }, [refreshNotes]);
 
   // 删除笔记
   const deleteNote = useCallback(async (id: string) => {
-    await api.deleteNote(id);
-    await refreshNotes();
-    window.dispatchEvent(new CustomEvent('papyrus_notes_changed'));
+    try {
+      await api.deleteNote(id);
+      await refreshNotes();
+      window.dispatchEvent(new CustomEvent('papyrus_notes_changed'));
+    } catch (err) {
+      throw new Error(err instanceof Error ? err.message : '删除笔记失败');
+    }
   }, [refreshNotes]);
 
   // 从 Obsidian 导入

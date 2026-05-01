@@ -20,16 +20,22 @@ export default async function cardsRoutes(fastify: FastifyInstance): Promise<voi
   });
 
   fastify.post('/', async (request, reply) => {
-    const body = request.body as { q?: string; question?: string; a?: string; answer?: string; tags?: string[] };
-    const q = body.q ?? body.question ?? '';
-    const a = body.a ?? body.answer ?? '';
-    if (!q || !a) {
-      reply.status(400).send({ success: false, error: 'Question and answer are required' });
-      return;
+    try {
+      const body = request.body as { q?: string; question?: string; a?: string; answer?: string; tags?: string[] };
+      const q = body.q ?? body.question ?? '';
+      const a = body.a ?? body.answer ?? '';
+      if (!q || !a) {
+        reply.status(400).send({ success: false, error: 'Question and answer are required' });
+        return;
+      }
+      const card = createCard(q, a, body.tags ?? []);
+      recordCardCreated();
+      reply.send({ success: true, card });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '服务器内部错误';
+      request.log.error({ err }, message);
+      reply.status(500).send({ success: false, error: message });
     }
-    const card = createCard(q, a, body.tags ?? []);
-    recordCardCreated();
-    reply.send({ success: true, card });
   });
 
   fastify.delete('/:cardId', async (request, reply) => {
@@ -53,30 +59,42 @@ export default async function cardsRoutes(fastify: FastifyInstance): Promise<voi
   });
 
   fastify.patch('/:cardId', async (request, reply) => {
-    const { cardId } = request.params as { cardId: string };
-    const body = request.body as { q?: string; a?: string; tags?: string[] };
-    const card = await updateCard(cardId, body);
-    if (!card) {
-      reply.status(404).send({ success: false, error: 'Card not found' });
-      return;
+    try {
+      const { cardId } = request.params as { cardId: string };
+      const body = request.body as { q?: string; a?: string; tags?: string[] };
+      const card = await updateCard(cardId, body);
+      if (!card) {
+        reply.status(404).send({ success: false, error: 'Card not found' });
+        return;
+      }
+      reply.send({ success: true, card });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '服务器内部错误';
+      request.log.error({ err }, message);
+      reply.status(500).send({ success: false, error: message });
     }
-    reply.send({ success: true, card });
   });
 
   fastify.post('/import/txt', async (request, reply) => {
-    const body = request.body as { content?: string };
-    if (!body.content) {
-      reply.status(400).send({ success: false, error: 'Content is required' });
-      return;
+    try {
+      const body = request.body as { content?: string };
+      if (!body.content) {
+        reply.status(400).send({ success: false, error: 'Content is required' });
+        return;
+      }
+      const cards = importCardsFromTxt(body.content);
+      for (const _c of cards) {
+        recordCardCreated();
+      }
+      if (cards.length === 0) {
+        reply.status(400).send({ success: false, error: 'No valid cards found' });
+        return;
+      }
+      reply.send({ success: true, count: cards.length });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '服务器内部错误';
+      request.log.error({ err }, message);
+      reply.status(500).send({ success: false, error: message });
     }
-    const cards = importCardsFromTxt(body.content);
-    for (const _c of cards) {
-      recordCardCreated();
-    }
-    if (cards.length === 0) {
-      reply.status(400).send({ success: false, error: 'No valid cards found' });
-      return;
-    }
-    reply.send({ success: true, count: cards.length });
   });
 }

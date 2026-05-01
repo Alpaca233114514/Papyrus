@@ -37,6 +37,12 @@ if (prefersDark) {
   document.body.setAttribute('arco-theme', 'dark');
 }
 
+// 初始化字体大小
+try {
+  const savedFontSize = localStorage.getItem('papyrus_font_size');
+  if (savedFontSize) document.body.dataset.fontSize = savedFontSize;
+} catch { /* ignore */ }
+
 // 监听深色模式变化
 const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
 const handleDarkModeChange = (e: MediaQueryListEvent) => {

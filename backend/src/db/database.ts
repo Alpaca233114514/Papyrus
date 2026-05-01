@@ -505,10 +505,23 @@ export function insertNote(note: Note, logger?: PapyrusLogger): void {
 
 export function deleteNoteById(noteId: string, logger?: PapyrusLogger): boolean {
   const database = getDb();
-  const stmt = database.prepare('DELETE FROM notes WHERE id = ?');
-  const result = stmt.run(noteId);
-  logger?.info(`删除笔记: ${noteId}`);
-  return result.changes > 0;
+  try {
+    database.exec('BEGIN TRANSACTION;');
+    // 更新被该笔记引用的笔记的 incoming_count
+    const updateStmt = database.prepare(
+      'UPDATE notes SET incoming_count = incoming_count - 1 WHERE id IN (SELECT target_id FROM relations WHERE source_id = ?)'
+    );
+    updateStmt.run(noteId);
+    // 删除笔记（relations 会 CASCADE）
+    const deleteStmt = database.prepare('DELETE FROM notes WHERE id = ?');
+    const result = deleteStmt.run(noteId);
+    database.exec('COMMIT;');
+    logger?.info(`删除笔记: ${noteId}`);
+    return result.changes > 0;
+  } catch (e) {
+    database.exec('ROLLBACK;');
+    throw e;
+  }
 }
 
 export function deleteNotesByIds(noteIds: string[], logger?: PapyrusLogger): number {
@@ -653,10 +666,25 @@ export function loadAllProviders(logger?: PapyrusLogger): Provider[] {
   return providers;
 }
 
+function inferProviderType(baseUrl: string | undefined, fallbackType: string | undefined): string {
+  if (fallbackType && fallbackType !== 'custom') return fallbackType;
+  const url = (baseUrl ?? '').toLowerCase();
+  if (url.includes('deepseek.com')) return 'deepseek';
+  if (url.includes('liyuanstudio')) return 'liyuan-deepseek';
+  if (url.includes('openai.com')) return 'openai';
+  if (url.includes('anthropic.com')) return 'anthropic';
+  if (url.includes('google') || url.includes('gemini')) return 'gemini';
+  if (url.includes('moonshot')) return 'moonshot';
+  if (url.includes('siliconflow')) return 'siliconflow';
+  if (url.includes('localhost:11434') || url.includes('ollama')) return 'ollama';
+  return fallbackType ?? 'custom';
+}
+
 export function saveProvider(provider: Partial<Provider> & { id?: string }, logger?: PapyrusLogger): string {
   const database = getDb();
   const providerId = provider.id ?? String(Date.now());
   const now = Date.now() / 1000;
+  const providerType = inferProviderType(provider.baseUrl, provider.type);
 
   const stmt = database.prepare(
     `INSERT OR REPLACE INTO providers (id, type, name, base_url, enabled, is_default, created_at, updated_at)
@@ -664,7 +692,7 @@ export function saveProvider(provider: Partial<Provider> & { id?: string }, logg
   );
   stmt.run(
     providerId,
-    provider.type ?? 'custom',
+    providerType,
     provider.name ?? '',
     provider.baseUrl ?? '',
     provider.enabled ? 1 : 0,
@@ -989,7 +1017,7 @@ function rowToFileRecord(row: Record<string, unknown>): FileRecord {
     type: String(row.type ?? 'unknown'),
     size: Number(row.size ?? 0),
     mime_type: String(row.mime_type ?? ''),
-    parent_id: row.parent_id != null ? String(row.parent_id) : null,
+    parent_id: row.parent_id != null && row.parent_id !== '' ? String(row.parent_id) : null,
     file_storage_path: row.file_storage_path != null ? String(row.file_storage_path) : null,
     is_folder: Number(row.is_folder ?? 0),
     created_at: Number(row.created_at ?? 0),
@@ -1191,12 +1219,12 @@ export function searchNotesForRelation(query: string, excludeNoteId: string, lim
   const database = getDb();
   const stmt = database.prepare(`
     SELECT * FROM notes
-    WHERE id != ? AND (title LIKE ? OR content LIKE ? OR preview LIKE ?)
+    WHERE id != ? AND (title LIKE ? OR content LIKE ? OR preview LIKE ? OR tags LIKE ?)
     ORDER BY updated_at DESC
     LIMIT ?
   `);
   const likeQuery = `%${query}%`;
-  const rows = stmt.all(excludeNoteId, likeQuery, likeQuery, likeQuery, limit) as Array<{
+  const rows = stmt.all(excludeNoteId, likeQuery, likeQuery, likeQuery, likeQuery, limit) as Array<{
     id: string; title: string; folder: string; content: string; preview: string;
     tags: string; created_at: number; updated_at: number; word_count: number;
     hash: string; headings: string; outgoing_links: string; incoming_count: number;

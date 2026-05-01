@@ -112,7 +112,8 @@ export function useCompletion() {
       if (!reader) return;
 
       const decoder = new TextDecoder();
-      
+      let consecutiveParseErrors = 0;
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -123,6 +124,7 @@ export function useCompletion() {
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             try {
+              consecutiveParseErrors = 0;
               const data = JSON.parse(line.slice(6));
               if (data.text) {
                 accumulatedTextRef.current += data.text;
@@ -141,7 +143,12 @@ export function useCompletion() {
                 setState(prev => ({ ...prev, isLoading: false, isVisible: false }));
               }
             } catch (e) {
-              // 忽略解析错误
+              consecutiveParseErrors++;
+              if (consecutiveParseErrors >= 5) {
+                console.error('Completion: too many parse errors, resetting state');
+                setState(prev => ({ ...prev, isLoading: false, isVisible: false }));
+                return;
+              }
             }
           }
         }

@@ -17,7 +17,7 @@ describe('AIConfig', () => {
   it('should create default config when file does not exist', () => {
     const config = new AIConfig(tempDir);
     expect(config.config.current_provider).toBe('openai');
-    expect(config.config.current_model).toBe('gpt-3.5-turbo');
+    expect(config.config.current_model).toBe('gpt-4o');
 
     const openai = config.config.providers['openai'];
     if (!openai) throw new Error('expected openai provider to exist');

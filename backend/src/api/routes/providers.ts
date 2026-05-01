@@ -10,12 +10,19 @@ import {
   saveModel,
   deleteModel,
 } from '../../db/database.js';
+import { getDb } from '../../db/database.js';
 import type { Provider } from '../../core/types.js';
 
 export default async function providersRoutes(fastify: FastifyInstance): Promise<void> {
-  fastify.get('/', async (_request, reply) => {
-    const providers = loadAllProviders();
-    reply.send({ success: true, providers });
+  fastify.get('/', async (request, reply) => {
+    try {
+      const providers = loadAllProviders();
+      reply.send({ success: true, providers });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '服务器内部错误';
+      request.log.error({ err }, message);
+      reply.status(500).send({ success: false, error: message });
+    }
   });
 
   fastify.post('/', async (request, reply) => {
@@ -60,26 +67,44 @@ export default async function providersRoutes(fastify: FastifyInstance): Promise
   });
 
   fastify.delete('/:providerId', async (request, reply) => {
-    const { providerId } = request.params as { providerId: string };
-    const success = deleteProvider(providerId);
-    if (!success) {
-      reply.status(404).send({ success: false, error: 'Provider not found' });
-      return;
+    try {
+      const { providerId } = request.params as { providerId: string };
+      const success = deleteProvider(providerId);
+      if (!success) {
+        reply.status(404).send({ success: false, error: 'Provider not found' });
+        return;
+      }
+      reply.send({ success: true, message: 'Provider deleted' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '服务器内部错误';
+      request.log.error({ err }, message);
+      reply.status(500).send({ success: false, error: message });
     }
-    reply.send({ success: true, message: 'Provider deleted' });
   });
 
   fastify.post('/:providerId/default', async (request, reply) => {
-    const { providerId } = request.params as { providerId: string };
-    setDefaultProvider(providerId);
-    reply.send({ success: true, message: 'Default provider set' });
+    try {
+      const { providerId } = request.params as { providerId: string };
+      setDefaultProvider(providerId);
+      reply.send({ success: true, message: 'Default provider set' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '服务器内部错误';
+      request.log.error({ err }, message);
+      reply.status(500).send({ success: false, error: message });
+    }
   });
 
   fastify.post('/:providerId/enabled', async (request, reply) => {
-    const { providerId } = request.params as { providerId: string };
-    const body = request.body as { enabled?: boolean };
-    updateProviderEnabled(providerId, body.enabled ?? false);
-    reply.send({ success: true, message: 'Provider enabled status updated' });
+    try {
+      const { providerId } = request.params as { providerId: string };
+      const body = request.body as { enabled?: boolean };
+      updateProviderEnabled(providerId, body.enabled ?? false);
+      reply.send({ success: true, message: 'Provider enabled status updated' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '服务器内部错误';
+      request.log.error({ err }, message);
+      reply.status(500).send({ success: false, error: message });
+    }
   });
 
   fastify.post('/:providerId/models', async (request, reply) => {
@@ -115,21 +140,88 @@ export default async function providersRoutes(fastify: FastifyInstance): Promise
   });
 
   fastify.delete('/:providerId/models/:modelId', async (request, reply) => {
-    const { modelId } = request.params as { modelId: string };
-    deleteModel(modelId);
-    reply.send({ success: true, message: 'Model deleted' });
+    try {
+      const { modelId } = request.params as { modelId: string };
+      deleteModel(modelId);
+      reply.send({ success: true, message: 'Model deleted' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '服务器内部错误';
+      request.log.error({ err }, message);
+      reply.status(500).send({ success: false, error: message });
+    }
   });
 
   fastify.post('/:providerId/apikeys', async (request, reply) => {
-    const { providerId } = request.params as { providerId: string };
-    const body = request.body as { id?: string; name: string; key: string };
-    const keyId = saveApiKey(providerId, body);
-    reply.send({ success: true, keyId, message: 'API key added' });
+    try {
+      const { providerId } = request.params as { providerId: string };
+      const body = request.body as { id?: string; name: string; key: string };
+      const keyId = saveApiKey(providerId, body);
+      reply.send({ success: true, keyId, message: 'API key added' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '服务器内部错误';
+      request.log.error({ err }, message);
+      reply.status(500).send({ success: false, error: message });
+    }
   });
 
   fastify.delete('/:providerId/apikeys/:keyId', async (request, reply) => {
-    const { keyId } = request.params as { keyId: string };
-    deleteApiKey(keyId);
-    reply.send({ success: true, message: 'API key deleted' });
+    try {
+      const { keyId } = request.params as { keyId: string };
+      deleteApiKey(keyId);
+      reply.send({ success: true, message: 'API key deleted' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '服务器内部错误';
+      request.log.error({ err }, message);
+      reply.status(500).send({ success: false, error: message });
+    }
+  });
+
+  fastify.post('/cleanup-test', async (request, reply) => {
+    try {
+      const db = getDb();
+      const providerNames = ['FullProvider', 'After'];
+      const modelNames = ['TestModel'];
+      let deletedProviders = 0;
+      let deletedModels = 0;
+
+      for (const name of providerNames) {
+        const keepStmt = db.prepare(
+          "SELECT id FROM providers WHERE name = ? AND is_default = 0 ORDER BY created_at LIMIT 1"
+        );
+        const keep = keepStmt.get(name) as { id: string } | undefined;
+        if (keep) {
+          const delStmt = db.prepare(
+            "DELETE FROM providers WHERE name = ? AND is_default = 0 AND id != ?"
+          );
+          const result = delStmt.run(name, keep.id);
+          deletedProviders += Number(result.changes);
+        }
+      }
+
+      for (const name of modelNames) {
+        const keepStmt = db.prepare(
+          "SELECT id FROM provider_models WHERE name = ? ORDER BY id LIMIT 1"
+        );
+        const keep = keepStmt.get(name) as { id: string } | undefined;
+        if (keep) {
+          const delStmt = db.prepare(
+            "DELETE FROM provider_models WHERE name = ? AND id != ?"
+          );
+          const result = delStmt.run(name, keep.id);
+          deletedModels += Number(result.changes);
+        }
+      }
+
+      reply.send({
+        success: true,
+        deletedProviders,
+        deletedModels,
+        message: `清理完成：删除 ${deletedProviders} 个重复供应商，${deletedModels} 个重复模型`,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '服务器内部错误';
+      request.log.error({ err }, message);
+      reply.status(500).send({ success: false, error: message });
+    }
   });
 }

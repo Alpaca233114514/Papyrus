@@ -35,6 +35,7 @@ const App = () => {
   const dragStartX = useRef<number>(0);
   const dragStartWidth = useRef<number>(0);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [initialScrollTag, setInitialScrollTag] = useState<string | undefined>(undefined);
   const mainContentRef = useRef<HTMLDivElement>(null);
   const prevPageIndexRef = useRef<number>(0);
   const [animationDirection, setAnimationDirection] = useState<'up' | 'down' | null>(null);
@@ -69,6 +70,7 @@ const App = () => {
       Message.success(`打开笔记: ${result.title}`);
     } else if (result.type === 'card') {
       handlePageChange('scroll');
+      setInitialScrollTag(result.tags?.[0]);
       Message.success('跳转到复习页面');
     }
   }, [handlePageChange]);
@@ -84,19 +86,26 @@ const App = () => {
     return () => window.removeEventListener('papyrus_open_settings', handleOpenSettings);
   }, [handlePageChange]);
 
+  const chatDragActiveRef = useRef(false);
   const onChatDragStart = useCallback((e: React.MouseEvent) => {
     dragStartX.current = e.clientX;
     dragStartWidth.current = chatWidth;
+    chatDragActiveRef.current = true;
+    const cleanup = () => {
+      chatDragActiveRef.current = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.documentElement.removeEventListener('mouseleave', onLeave);
+    };
     const onMove = (ev: MouseEvent) => {
       const delta = dragStartX.current - ev.clientX;
       setChatWidth(Math.min(600, Math.max(280, dragStartWidth.current + delta)));
     };
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
+    const onUp = () => cleanup();
+    const onLeave = () => cleanup();
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
+    document.documentElement.addEventListener('mouseleave', onLeave);
   }, [chatWidth]);
 
   // 页面标题映射
@@ -121,7 +130,7 @@ const App = () => {
     
     const pages: Record<string, React.ReactNode> = {
       start: <StartPage onDoneChange={setTodayDone} onNavigate={handlePageChange} />,
-      scroll: <ScrollPage />,
+      scroll: <ScrollPage initialTag={initialScrollTag} onInitialTagUsed={() => setInitialScrollTag(undefined)} />,
       notes: <NotesPage />,
       charts: <ChartsPage />,
       files: <FilesPage />,

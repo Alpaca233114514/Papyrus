@@ -382,7 +382,7 @@ const ScrollCard = ({ scroll, onStudy }: { scroll: Scroll; onStudy?: () => void 
 };
 
 // 添加卡片
-const AddCard = ({ label }: { label: string }) => {
+const AddCard = ({ label, onClick }: { label: string; onClick?: () => void }) => {
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -392,9 +392,11 @@ const AddCard = ({ label }: { label: string }) => {
       aria-label={`${label}，点击创建新项`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onClick={onClick}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
+          onClick?.();
         }
       }}
       style={{
@@ -443,7 +445,12 @@ const ShelfTitle = ({ children }: { children: React.ReactNode }) => (
   </Typography.Title>
 );
 
-const ScrollPage = () => {
+interface ScrollPageProps {
+  initialTag?: string;
+  onInitialTagUsed?: () => void;
+}
+
+const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
   const [isStudying, setIsStudying] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [dueCount, setDueCount] = useState(0);
@@ -460,7 +467,12 @@ const ScrollPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [batchCardModalVisible, setBatchCardModalVisible] = useState(false);
   const [batchSelectedIds, setBatchSelectedIds] = useState<Set<string>>(new Set());
-  
+  const [createCardModalVisible, setCreateCardModalVisible] = useState(false);
+  const [newCardQuestion, setNewCardQuestion] = useState('');
+  const [newCardAnswer, setNewCardAnswer] = useState('');
+  const [newCardTags, setNewCardTags] = useState('');
+  const [isSubmittingCard, setIsSubmittingCard] = useState(false);
+
   const { config: sceneryConfig } = usePageScenery('scroll');
 
   const overallProgress = totalCount > 0 ? Math.round((masteredCount / totalCount) * 100) : 0;
@@ -516,11 +528,29 @@ const ScrollPage = () => {
     return () => window.removeEventListener('papyrus_cards_changed', handleCardsChanged);
   }, [isStudying]);
 
+  // 监听全局新建卡片事件（来自 TitleBar）
+  useEffect(() => {
+    const handleGlobalNewCard = () => {
+      setCreateCardModalVisible(true);
+    };
+    window.addEventListener('papyrus_new_card', handleGlobalNewCard);
+    return () => window.removeEventListener('papyrus_new_card', handleGlobalNewCard);
+  }, []);
+
   const startStudy = (tag?: string) => {
     setFilterTag(tag);
     setIsDemo(false);
     setIsStudying(true);
   };
+
+  // 监听来自搜索的初始标签，自动开始复习
+  useEffect(() => {
+    if (initialTag && !isStudying) {
+      startStudy(initialTag);
+      onInitialTagUsed?.();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTag]);
 
   const startDemo = () => {
     setIsDemo(true);
@@ -698,7 +728,9 @@ const ScrollPage = () => {
                 onStudy={s.dueCount > 0 ? startStudy : undefined}
               />
             ))}
-            <AddCard label='新建卷轴' />
+            <div onClick={() => setCreateCardModalVisible(true)}>
+              <AddCard label='新建卷轴' />
+            </div>
           </div>
         )}
       </section>
@@ -939,6 +971,87 @@ const ScrollPage = () => {
             </div>
           ))}
           {cards.length === 0 && <Empty description="暂无卡片" />}
+        </div>
+      </Modal>
+
+      {/* 新建卡片模态框 */}
+      <Modal
+        title="新建卡片"
+        visible={createCardModalVisible}
+        onOk={async () => {
+          const q = newCardQuestion.trim();
+          const a = newCardAnswer.trim();
+          if (!q) {
+            Message.error('请输入问题');
+            return;
+          }
+          if (!a) {
+            Message.error('请输入答案');
+            return;
+          }
+          setIsSubmittingCard(true);
+          try {
+            const tags = newCardTags.split(',').map(t => t.trim()).filter(Boolean);
+            const res = await api.createCard(q, a, tags.length > 0 ? tags : undefined);
+            if (res.success) {
+              Message.success('卡片创建成功');
+              setCreateCardModalVisible(false);
+              setNewCardQuestion('');
+              setNewCardAnswer('');
+              setNewCardTags('');
+              const cardsRes = await api.listCards();
+              if (cardsRes.success) {
+                setCards(cardsRes.cards);
+                const mastered = cardsRes.cards.filter(c => (c.interval || 0) > 1).length;
+                setMasteredCount(mastered);
+              }
+              const nextDueRes = await api.nextDue();
+              if (nextDueRes.success) {
+                setDueCount(nextDueRes.due_count);
+                setTotalCount(nextDueRes.total_count);
+              }
+            }
+          } catch (err) {
+            Message.error(err instanceof Error ? err.message : '创建卡片失败');
+          } finally {
+            setIsSubmittingCard(false);
+          }
+        }}
+        onCancel={() => {
+          setCreateCardModalVisible(false);
+          setNewCardQuestion('');
+          setNewCardAnswer('');
+          setNewCardTags('');
+        }}
+        confirmLoading={isSubmittingCard}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <Typography.Text style={{ display: 'block', marginBottom: 8 }}>问题（正面）</Typography.Text>
+            <Input.TextArea
+              value={newCardQuestion}
+              onChange={setNewCardQuestion}
+              placeholder="输入卡片问题..."
+              rows={3}
+            />
+          </div>
+          <div>
+            <Typography.Text style={{ display: 'block', marginBottom: 8 }}>答案（背面）</Typography.Text>
+            <Input.TextArea
+              value={newCardAnswer}
+              onChange={setNewCardAnswer}
+              placeholder="输入卡片答案..."
+              rows={3}
+            />
+          </div>
+          <div>
+            <Typography.Text style={{ display: 'block', marginBottom: 8 }}>标签（用逗号分隔）</Typography.Text>
+            <Input
+              value={newCardTags}
+              onChange={setNewCardTags}
+              placeholder="例如：英语, 单词"
+            />
+          </div>
         </div>
       </Modal>
     </div>

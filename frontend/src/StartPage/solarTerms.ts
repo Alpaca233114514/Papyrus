@@ -26,15 +26,27 @@ const TERM_DATES: Record<number, [number, number][]> = {
 /**
  * 节气 API 接口预留。
  * 如需接入在线节气服务，请在应用设置中配置 API URL 和 Key，
- * 并将其存入 localStorage（key: 'solarTermApiUrl', 'solarTermApiKey'）。
+ * 并将其存入 localStorage（key: 'papyrus_solar_term_api_url', 'papyrus_solar_term_api_key'）。
  * 未配置时自动降级到本地查表。
  *
  * 预期接口格式：GET {url}?date=YYYY-MM-DD
  * 预期响应格式：{ solarTerm: string | null }
  */
 export async function fetchSolarTerm(date: Date): Promise<string | null> {
-  const apiUrl = localStorage.getItem('solarTermApiUrl');
-  const apiKey = localStorage.getItem('solarTermApiKey');
+  // 向后兼容：迁移旧 key
+  const oldUrl = localStorage.getItem('solarTermApiUrl');
+  const oldKey = localStorage.getItem('solarTermApiKey');
+  if (oldUrl) {
+    localStorage.setItem('papyrus_solar_term_api_url', oldUrl);
+    localStorage.removeItem('solarTermApiUrl');
+  }
+  if (oldKey) {
+    localStorage.setItem('papyrus_solar_term_api_key', oldKey);
+    localStorage.removeItem('solarTermApiKey');
+  }
+
+  const apiUrl = localStorage.getItem('papyrus_solar_term_api_url');
+  const apiKey = localStorage.getItem('papyrus_solar_term_api_key');
   if (!apiUrl) return null;
   try {
     const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;

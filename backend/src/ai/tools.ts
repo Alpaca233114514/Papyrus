@@ -205,7 +205,9 @@ export class CardTools {
       if (!card) continue;
       const q = card.q;
       const a = card.a;
-      if (q.toLowerCase().includes(keywordLower) || a.toLowerCase().includes(keywordLower)) {
+      if (q.toLowerCase().includes(keywordLower) ||
+          a.toLowerCase().includes(keywordLower) ||
+          card.tags.some(t => t.toLowerCase().includes(keywordLower))) {
         results.push({
           index: i,
           question: q,

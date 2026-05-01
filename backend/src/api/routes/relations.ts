@@ -33,21 +33,29 @@ export default async function relationsRoutes(fastify: FastifyInstance): Promise
 
   // 搜索可关联的笔记
   fastify.get('/notes/search-for-relation', async (request, reply) => {
-    const { query, exclude_note_id, limit } = request.query as {
-      query?: string;
-      exclude_note_id?: string;
-      limit?: string;
-    };
-    if (!query || !query.trim()) {
-      reply.status(400).send({ success: false, error: 'query is required' });
-      return;
+    try {
+      const { query, exclude_note_id, limit } = request.query as {
+        query?: string;
+        exclude_note_id?: string;
+        limit?: string;
+      };
+      if (!query || !query.trim()) {
+        reply.status(400).send({ success: false, error: 'query is required' });
+        return;
+      }
+      const parsedLimit = parseInt(limit ?? '10', 10);
+      const safeLimit = Number.isNaN(parsedLimit) ? 10 : Math.min(20, Math.max(1, parsedLimit));
+      const results = searchForRelation(
+        query.trim(),
+        exclude_note_id ?? '',
+        safeLimit,
+      );
+      reply.send({ success: true, results });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '服务器内部错误';
+      request.log.error({ err }, message);
+      reply.status(500).send({ success: false, error: message });
     }
-    const results = searchForRelation(
-      query.trim(),
-      exclude_note_id ?? '',
-      Math.min(20, Math.max(1, parseInt(limit ?? '10', 10))),
-    );
-    reply.send({ success: true, results });
   });
 
   // 获取笔记关联图谱

@@ -6,10 +6,19 @@ import { getToolManager } from '../../ai/tool-manager.js';
 import type { ToolCallRecord } from '../../ai/tool-manager.js';
 import { isPrivateUrl } from '../../ai/config.js';
 import { paths } from '../../utils/paths.js';
+import { syncDBToAIConfig, syncAIConfigToDB, getProviderApiKeyFromDB } from '../../ai/db-sync.js';
 
 export const aiConfig = new AIConfig(paths.dataDir);
 const aiManager = new AIManager(aiConfig);
 const cardTools = new CardTools();
+
+// 启动时从数据库同步一次配置，确保 ai_config.json 与数据库一致
+try {
+  syncDBToAIConfig(aiConfig);
+  aiConfig.saveConfig();
+} catch (e) {
+  console.warn('启动时同步 AI 配置失败:', e instanceof Error ? e.message : String(e));
+}
 
 const _completionConfig: Record<string, unknown> = {
   enabled: true,
@@ -58,6 +67,7 @@ function convertCallToResponse(call: ToolCallRecord): Record<string, unknown> {
 export default async function aiRoutes(fastify: FastifyInstance): Promise<void> {
   // AI Config
   fastify.get('/config/ai', async (_request, reply) => {
+    syncDBToAIConfig(aiConfig);
     const masked = aiConfig.getMaskedConfig();
     reply.send({
       success: true,
@@ -74,6 +84,10 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
   fastify.post('/config/ai', async (request, reply) => {
     try {
       const payload = request.body as AIConfigPayload;
+      if (!payload.providers || typeof payload.providers !== 'object' || Array.isArray(payload.providers)) {
+        reply.status(400).send({ success: false, error: 'providers 字段必须为对象' });
+        return;
+      }
       aiConfig.config.current_provider = payload.current_provider;
       aiConfig.config.current_model = payload.current_model;
 
@@ -90,23 +104,28 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
         };
       }
 
-      aiConfig.config.parameters = {
-        temperature: payload.parameters.temperature,
-        top_p: payload.parameters.top_p,
-        max_tokens: payload.parameters.max_tokens,
-        presence_penalty: payload.parameters.presence_penalty,
-        frequency_penalty: payload.parameters.frequency_penalty,
-      };
+      if (payload.parameters) {
+        aiConfig.config.parameters = {
+          temperature: payload.parameters.temperature ?? aiConfig.config.parameters.temperature,
+          top_p: payload.parameters.top_p ?? aiConfig.config.parameters.top_p,
+          max_tokens: payload.parameters.max_tokens ?? aiConfig.config.parameters.max_tokens,
+          presence_penalty: payload.parameters.presence_penalty ?? aiConfig.config.parameters.presence_penalty,
+          frequency_penalty: payload.parameters.frequency_penalty ?? aiConfig.config.parameters.frequency_penalty,
+        };
+      }
 
-      aiConfig.config.features = {
-        auto_hint: payload.features.auto_hint,
-        auto_explain: payload.features.auto_explain,
-        context_length: payload.features.context_length,
-        agent_enabled: payload.features.agent_enabled,
-        cache_enabled: payload.features.cache_enabled ?? aiConfig.config.features.cache_enabled,
-      };
+      if (payload.features) {
+        aiConfig.config.features = {
+          auto_hint: payload.features.auto_hint ?? aiConfig.config.features.auto_hint,
+          auto_explain: payload.features.auto_explain ?? aiConfig.config.features.auto_explain,
+          context_length: payload.features.context_length ?? aiConfig.config.features.context_length,
+          agent_enabled: payload.features.agent_enabled ?? aiConfig.config.features.agent_enabled,
+          cache_enabled: payload.features.cache_enabled ?? aiConfig.config.features.cache_enabled,
+        };
+      }
 
       aiConfig.saveConfig();
+      syncAIConfigToDB(aiConfig);
       reply.send({ success: true });
     } catch (e) {
       reply.status(400).send({ success: false, error: e instanceof Error ? e.message : '保存配置失败' });
@@ -117,6 +136,12 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
     try {
       const providerName = aiConfig.config.current_provider;
       const providerConfig = aiConfig.getProviderConfig();
+
+      // 如果 aiConfig 中没有 key，尝试从数据库 fallback
+      if (!providerConfig.api_key && providerName !== 'ollama' && providerName !== 'liyuan-deepseek') {
+        const dbKey = getProviderApiKeyFromDB(providerName);
+        if (dbKey) providerConfig.api_key = dbKey;
+      }
 
       if (providerName === 'ollama') {
         const baseUrl = providerConfig.base_url || 'http://localhost:11434';
@@ -178,6 +203,10 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
 
   fastify.post('/completion/config', async (request, reply) => {
     const payload = request.body as Record<string, unknown>;
+    if ('enabled' in payload && typeof payload.enabled !== 'boolean') {
+      reply.status(400).send({ success: false, error: 'enabled 字段必须为布尔值' });
+      return;
+    }
     Object.assign(_completionConfig, payload);
     reply.send({ success: true });
   });
@@ -187,6 +216,12 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
     const payload = request.body as CompletionPayload;
     const providerName = aiConfig.config.current_provider;
     const providerConfig = aiConfig.getProviderConfig();
+
+    // 如果 aiConfig 中没有 key，尝试从数据库 fallback
+    if (!providerConfig.api_key && providerName !== 'ollama' && providerName !== 'liyuan-deepseek') {
+      const dbKey = getProviderApiKeyFromDB(providerName);
+      if (dbKey) providerConfig.api_key = dbKey;
+    }
 
     if (providerName !== 'ollama' && providerName !== 'liyuan-deepseek' && !providerConfig.api_key) {
       reply.status(400).send({ success: false, error: 'AI API Key 未设置' });
@@ -212,7 +247,8 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
     try {
       if (providerName === 'ollama') {
         const baseUrl = providerConfig.base_url || 'http://localhost:11434';
-        const model = aiConfig.config.current_model || 'llama2';
+        const firstOllamaModel = providerConfig.models?.[0] ?? '';
+        const model = aiConfig.config.current_model || firstOllamaModel;
 
         const resp = await fetch(`${baseUrl}/api/chat`, {
           method: 'POST',
@@ -271,7 +307,8 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
           return;
         }
         const apiKey = providerConfig.api_key;
-        const model = aiConfig.config.current_model || 'gpt-3.5-turbo';
+        const firstModel = providerConfig.models?.[0] ?? '';
+        const model = aiConfig.config.current_model || firstModel;
 
         const messages = [
           { role: 'system', content: systemPrompt },
@@ -400,7 +437,28 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
       system_prompt?: string;
       attachments?: Array<{ path?: string } | string>;
       model?: string;
+      mode?: string;
+      reasoning?: boolean;
     };
+
+    if (!payload.message || typeof payload.message !== 'string') {
+      reply.status(400).send({ success: false, error: 'message 字段必须为非空字符串' });
+      return;
+    }
+
+    const providerName = aiConfig.config.current_provider;
+    const providerConfig = aiConfig.getProviderConfig();
+
+    // 如果 aiConfig 中没有 key，尝试从数据库 fallback
+    if (!providerConfig.api_key && providerName !== 'ollama' && providerName !== 'liyuan-deepseek') {
+      const dbKey = getProviderApiKeyFromDB(providerName);
+      if (dbKey) providerConfig.api_key = dbKey;
+    }
+
+    if (providerName !== 'ollama' && providerName !== 'liyuan-deepseek' && !providerConfig.api_key) {
+      reply.status(400).send({ success: false, error: 'AI API Key 未设置' });
+      return;
+    }
 
     reply.hijack();
     reply.raw.writeHead(200, {
@@ -416,6 +474,8 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
         payload.system_prompt,
         payload.attachments,
         payload.model,
+        payload.mode,
+        payload.reasoning,
       );
 
       let assistantContent = '';

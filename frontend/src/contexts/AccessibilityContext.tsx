@@ -133,18 +133,18 @@ const mergeSettings = (
 /** 应用设置到 DOM */
 const applySettingsToDOM = (settings: AccessibilitySettings): void => {
   const { documentElement } = document;
-  
+
   // AA 级设置
   documentElement.classList.toggle('a11y-focus-indicator', settings.focusIndicator);
   documentElement.classList.toggle('a11y-large-cursor', settings.largeCursor);
   documentElement.classList.toggle('a11y-screen-reader', settings.screenReaderOptimized);
-  
+
   // AAA 级设置
   documentElement.classList.toggle('aaa-high-contrast', settings.highContrast);
   documentElement.classList.toggle('aaa-reading-mode', settings.readingEnhancement);
   documentElement.classList.toggle('aaa-no-animation', settings.noAnimation);
   documentElement.classList.toggle('aaa-section-nav', settings.sectionNavigation);
-  
+
   // 应用大光标样式
   if (settings.largeCursor) {
     // 使用 CSS 类来控制大光标，避免内联样式的 SVG 转义问题
@@ -152,6 +152,43 @@ const applySettingsToDOM = (settings: AccessibilitySettings): void => {
   } else {
     documentElement.classList.remove('a11y-large-cursor-active');
   }
+
+  // 注入高特异性样式覆盖所有动画
+  const styleId = 'a11y-no-animation-override';
+  let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
+  if (settings.noAnimation) {
+    if (!styleEl) {
+      styleEl = document.createElement('style');
+      styleEl.id = styleId;
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = `
+      html.aaa-no-animation, html.aaa-no-animation *,
+      html.aaa-no-animation *::before, html.aaa-no-animation *::after {
+        animation: none !important;
+        transition: none !important;
+        scroll-behavior: auto !important;
+      }
+      html.aaa-no-animation .arco-modal-zoom,
+      html.aaa-no-animation .arco-menu-collapse,
+      html.aaa-no-animation .arco-message-wrapper,
+      html.aaa-no-animation .arco-notification-wrapper {
+        animation: none !important;
+        transition: none !important;
+      }
+      html.aaa-no-animation .page-transition-up,
+      html.aaa-no-animation .page-transition-down {
+        animation: none !important;
+      }
+    `;
+  } else {
+    styleEl?.remove();
+  }
+
+  // 广播无障碍设置变化事件
+  window.dispatchEvent(new CustomEvent('papyrus_accessibility_changed', {
+    detail: { noAnimation: settings.noAnimation },
+  }));
 };
 
 // ============================================

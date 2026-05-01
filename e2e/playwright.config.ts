@@ -32,7 +32,7 @@ export default defineConfig({
   webServer: {
     command: 'npx --prefix ../backend tsx ../backend/src/api/server.ts',
     url: 'http://127.0.0.1:8000/api/health',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 30000,
   },
 

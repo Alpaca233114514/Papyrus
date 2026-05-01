@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import { Message } from '@arco-design/web-react';
 import { NoteListView } from './views/NoteListView';
 import { NoteDetailView } from './views/NoteDetailView';
 import { FileTree } from './components/FileTree';
@@ -74,9 +75,14 @@ const NotesPage = () => {
   }, []);
 
   // 删除后返回列表
-  const handleDelete = useCallback((id: string) => {
-    deleteNote(id);
-    setViewMode('list');
+  const handleDelete = useCallback(async (id: string) => {
+    try {
+      await deleteNote(id);
+      setViewMode('list');
+      Message.success('删除成功');
+    } catch (err) {
+      Message.error(err instanceof Error ? err.message : '删除失败');
+    }
   }, [deleteNote]);
 
   // 监听全局新建笔记事件（来自 TitleBar）
@@ -89,12 +95,12 @@ const NotesPage = () => {
   }, [handleCreateClick]);
 
   // 保存笔记（可选是否返回列表）
-  const handleSave = useCallback((
+  const handleSave = useCallback(async (
     params: Parameters<typeof saveNote>[0],
     isCreate: Parameters<typeof saveNote>[1],
     shouldReturnToList = true
   ) => {
-    saveNote(params, isCreate);
+    await saveNote(params, isCreate);
     if (shouldReturnToList) {
       setViewMode('list');
     }

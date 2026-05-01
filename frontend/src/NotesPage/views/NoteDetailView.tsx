@@ -2,11 +2,9 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Typography, Input, Tag, Button, Breadcrumb, Message, Modal, Dropdown } from '@arco-design/web-react';
 import SmartTextArea, { type SmartTextAreaRef } from '../../components/SmartTextArea';
 const BreadcrumbItem = Breadcrumb.Item;
-import { 
+import {
   IconLeft,
-  IconDelete, 
-  IconEdit,
-  IconEye,
+  IconDelete,
   IconFolder,
   IconHistory,
   IconTags,
@@ -27,7 +25,7 @@ interface NoteDetailViewProps {
   isCreateMode: boolean;
   allFolders: string[];
   onBack: () => void;
-  onSave: (params: UpdateNoteParams | CreateNoteParams, isCreate: boolean, shouldReturnToList?: boolean) => void;
+  onSave: (params: UpdateNoteParams | CreateNoteParams, isCreate: boolean, shouldReturnToList?: boolean) => Promise<void>;
   onDelete?: (id: string) => void;
 }
 
@@ -59,18 +57,18 @@ export const NoteDetailView = ({
   const [folder, setFolder] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
-  const [isEditing, setIsEditing] = useState(isCreateMode);
-  
-  // 预览模式状态 - 用于在非编辑模式下切换编辑/预览
-  const [isPreviewMode, setIsPreviewMode] = useState(false);
-  
+
   // 关联功能状态
   const [showRelationsPanel, setShowRelationsPanel] = useState(false);
   const [showGraphDrawer, setShowGraphDrawer] = useState(false);
   
   // SmartTextArea ref
   const textAreaRef = useRef<SmartTextAreaRef>(null);
-  
+
+  // 脏状态跟踪与防抖自动保存
+  const isDirty = useRef(false);
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // 插入标题
   const insertHeading = (level: number) => {
     const heading = '#'.repeat(level) + ' ';
@@ -90,17 +88,15 @@ export const NoteDetailView = ({
   useEffect(() => {
     const handleLockChange = (e: CustomEvent<{ locked: boolean }>) => {
       setIsGloballyLocked(e.detail.locked);
-      // 如果全局锁定且当前正在编辑，自动保存并退出编辑模式
-      if (e.detail.locked && isEditing && !isCreateMode) {
-        handleSave(false);
-        setIsEditing(false);
-        setIsPreviewMode(true);
+      // 如果全局锁定且当前可编辑（非创建模式且之前未锁定），自动保存
+      if (e.detail.locked && !isGloballyLocked && !isCreateMode) {
+        void handleSave(false);
       }
     };
-    
+
     window.addEventListener('papyrus_edit_lock_changed', handleLockChange as EventListener);
     return () => window.removeEventListener('papyrus_edit_lock_changed', handleLockChange as EventListener);
-  }, [isEditing, isCreateMode]);
+  }, [isGloballyLocked, isCreateMode]);
 
   // 初始化表单
   useEffect(() => {
@@ -109,68 +105,102 @@ export const NoteDetailView = ({
       setContent(note.content || note.preview);
       setFolder(note.folder);
       setTags(note.tags);
-      setIsEditing(isCreateMode);
-      // 非创建模式下，默认进入预览模式
-      setIsPreviewMode(!isCreateMode);
     } else if (isCreateMode) {
       setTitle('');
       setContent('');
       setFolder(allFolders[0] || '默认文件夹');
       setTags([]);
-      setIsEditing(true);
-      setIsPreviewMode(false);
     }
   }, [note, isCreateMode, allFolders]);
 
-  const handleSave = (showMessage = true, shouldReturnToList = true) => {
+  // 输入变化时标记脏状态
+  useEffect(() => {
+    isDirty.current = true;
+  }, [title, content, folder, tags]);
+
+  const handleSave = async (showMessage = true, shouldReturnToList = true) => {
     if (!title.trim()) {
       Message.warning('请输入标题');
       return false;
     }
 
-    if (isCreateMode) {
-      onSave({
-        title: title.trim(),
-        folder: folder.trim() || '默认文件夹',
-        content: content.trim(),
-        tags,
-      }, true, shouldReturnToList);
-    } else if (note) {
-      onSave({
-        id: note.id,
-        title: title.trim(),
-        folder: folder.trim(),
-        content: content.trim(),
-        tags,
-      }, false, shouldReturnToList);
+    try {
+      if (isCreateMode) {
+        await onSave({
+          title: title.trim(),
+          folder: folder.trim() || '默认文件夹',
+          content: content.trim(),
+          tags,
+        }, true, shouldReturnToList);
+      } else if (note) {
+        await onSave({
+          id: note.id,
+          title: title.trim(),
+          folder: folder.trim(),
+          content: content.trim(),
+          tags,
+        }, false, shouldReturnToList);
+      }
+      if (showMessage) {
+        Message.success('保存成功');
+      }
+      isDirty.current = false;
+      return true;
+    } catch (err) {
+      Message.error(err instanceof Error ? err.message : '保存失败');
+      return false;
     }
-    if (showMessage) {
-      Message.success('保存成功');
-    }
-    setIsEditing(false);
-    setIsPreviewMode(true);
-    return true;
   };
-  
+
+  // 编辑状态由全局锁定和创建模式推导：创建模式始终可编辑，否则由全局锁定控制
+  const isEditable = isCreateMode || !isGloballyLocked;
+
+  // 防抖自动保存（2秒无输入后触发）
+  useEffect(() => {
+    if (!isEditable || !title.trim()) return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => {
+      if (isDirty.current) {
+        void handleSave(false, false);
+        isDirty.current = false;
+      }
+    }, 2000);
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    };
+  }, [title, content, folder, tags, isEditable]);
+
+  // 组件卸载时如有未保存内容则自动保存
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+      if (isDirty.current && title.trim()) {
+        void handleSave(false, false);
+      }
+    };
+  }, []);
+
   // 返回时自动保存
-  const handleBackWithSave = () => {
-    if ((isEditing || isCreateMode) && title.trim() && !isGloballyLocked) {
-      handleSave(false, true);
+  const handleBackWithSave = async () => {
+    if (isEditable && title.trim()) {
+      const success = await handleSave(false, true);
+      if (!success) return;
     }
     onBack();
   };
-  
-  // 计算实际是否处于可编辑状态（考虑全局锁定）
-  const isEditable = (isEditing || isCreateMode) && !isGloballyLocked;
 
   const handleDelete = () => {
     if (note && onDelete) {
       Modal.confirm({
         title: '确认删除',
         content: `确定要删除笔记 "${note.title}" 吗？`,
-        onOk: () => {
-          onDelete(note.id);
-          Message.success('删除成功');
+        onOk: async () => {
+          try {
+            await onDelete(note.id);
+            Message.success('删除成功');
+          } catch {
+            Message.error('删除失败');
+          }
         },
       });
     }
@@ -250,18 +280,6 @@ export const NoteDetailView = ({
     return md.render(content);
   }, [content]);
 
-  // 切换编辑/预览模式
-  const toggleEditPreview = () => {
-    if (isPreviewMode) {
-      // 切换到编辑模式
-      setIsPreviewMode(false);
-      setIsEditing(true);
-    } else {
-      // 切换到预览模式，保存但不返回列表
-      handleSave(false, false);
-    }
-  };
-
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* 顶部栏：面包屑居中 */}
@@ -287,9 +305,9 @@ export const NoteDetailView = ({
         {/* 面包屑 - 居中 */}
         <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
           <Breadcrumb>
-            <BreadcrumbItem 
+            <BreadcrumbItem
               style={{ cursor: 'pointer' }}
-              onClick={onBack}
+              onClick={handleBackWithSave}
             >
               笔记库
             </BreadcrumbItem>
@@ -347,20 +365,7 @@ export const NoteDetailView = ({
               )}
             </>
           )}
-          
-          {/* 编辑/预览切换按钮 - 只在非创建模式下显示 */}
-          {!isCreateMode && (
-            <Button
-              type='primary'
-              icon={isPreviewMode ? <IconEdit /> : <IconEye />}
-              onClick={toggleEditPreview}
-              disabled={isGloballyLocked}
-              title={isGloballyLocked ? '编辑已被全局锁定' : (isPreviewMode ? '编辑' : '预览')}
-            >
-              {isPreviewMode ? '编辑' : '预览'}
-            </Button>
-          )}
-          
+
           {!isCreateMode && (
             <>
               <Button
@@ -581,10 +586,11 @@ export const NoteDetailView = ({
           >
             <RelationsPanel
               noteId={note.id}
-              onNavigateToNote={(targetId) => {
+              onNavigateToNote={async (targetId) => {
                 // 保存当前笔记后跳转
                 if (isEditable && title.trim()) {
-                  handleSave(false);
+                  const success = await handleSave(false);
+                  if (!success) return;
                 }
                 onBack();
                 // 这里可以添加跳转到目标笔记的逻辑

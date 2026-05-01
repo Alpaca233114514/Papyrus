@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { IconFolderAdd, IconUpload, IconFolder, IconImage, IconFileVideo, IconMusic, IconFile, IconDownload, IconDelete, IconLeft } from '@arco-design/web-react/icon';
 import { usePageScenery } from '../hooks/useScenery';
 import { useSceneryColor } from '../hooks/useSceneryColor';
-import { api, BACKEND_URL } from '../api';
+import { api, getFileUrl } from '../api';
 import type { FileItemData } from '../api';
 
 import ZipIcon from './ZipIcon';
@@ -315,8 +315,9 @@ const FilesPage = () => {
       return;
     }
     try {
-      const res = await api.createFolder(trimmed, currentFolder ?? undefined);
-      setAllFiles(prev => [res.file, ...prev]);
+      await api.createFolder(trimmed, currentFolder ?? undefined);
+      const listRes = await api.listFiles();
+      setAllFiles(listRes.files);
       Message.success(`已创建文件夹 "${trimmed}"`);
       setFolderModalVisible(false);
     } catch {
@@ -328,6 +329,8 @@ const FilesPage = () => {
     fileInputRef.current?.click();
   };
 
+  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = e.target.files;
     if (!selectedFiles || selectedFiles.length === 0) return;
@@ -337,16 +340,35 @@ const FilesPage = () => {
     try {
       for (let i = 0; i < selectedFiles.length; i++) {
         const f = selectedFiles[i];
+        if (f.size > MAX_FILE_SIZE) {
+          throw new Error(`文件 "${f.name}" 过大（${formatSize(f.size)}），请压缩后上传（最大 ${formatSize(MAX_FILE_SIZE)}）`);
+        }
         const base64 = await fileToBase64(f);
         uploadTasks.push({ name: f.name, content: base64, mimeType: f.type });
       }
 
-      await api.uploadFiles(uploadTasks, currentFolder ?? undefined);
+      const res = await api.uploadFiles(uploadTasks, currentFolder ?? undefined);
       const listRes = await api.listFiles();
       setAllFiles(listRes.files);
-      Message.success(`已上传 ${uploadTasks.length} 个文件`);
-    } catch {
-      Message.error('上传文件失败');
+
+      // 检查上传的文件是否出现在正确的文件夹中
+      const errors: string[] = [];
+      if (res.files) {
+        for (const uploaded of res.files) {
+          const found = listRes.files.find(f => f.id === uploaded.id);
+          if (found && found.parent_id !== currentFolder) {
+            errors.push(`"${uploaded.name}" 未出现在当前文件夹中`);
+          }
+        }
+      }
+
+      if (errors.length > 0) {
+        Message.warning(`上传完成，但 ${errors.length} 个文件位置异常`);
+      } else {
+        Message.success(`已上传 ${uploadTasks.length} 个文件`);
+      }
+    } catch (err) {
+      Message.error(err instanceof Error ? err.message : '上传文件失败');
     }
 
     e.target.value = '';
@@ -378,7 +400,7 @@ const FilesPage = () => {
       setActiveFilter('全部');
       return;
     }
-    window.open(`${BACKEND_URL}/api/files/${file.id}/download`, '_blank');
+    window.open(getFileUrl(file.id, 'download'), '_blank');
   };
 
   function isPreviewableFile(file: FileItemData): boolean {
@@ -399,7 +421,7 @@ const FilesPage = () => {
     } else if (isPreviewableFile(file)) {
       setPreviewFile(file);
     } else {
-      window.open(`${BACKEND_URL}/api/files/${file.id}/download`, '_blank');
+      window.open(getFileUrl(file.id, 'download'), '_blank');
     }
   }, []);
 
@@ -483,7 +505,7 @@ const FilesPage = () => {
       <StatsBar stats={currentFolderStats} viewMode={viewMode} setViewMode={setViewMode} loading={loading} />
 
       {/* 筛选标签 */}
-      {!loading && currentFiles.length > 0 && (
+      {!loading && (
         <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
           {FILTER_TAGS.map(tag => (
             <Tag
@@ -501,7 +523,7 @@ const FilesPage = () => {
       {loading ? (
         <Empty description='加载中...' style={{ padding: '64px 0' }} />
       ) : currentFiles.length === 0 ? (
-        <Empty description={currentFolder ? '该文件夹为空' : '暂无文件'} style={{ padding: '64px 0' }} />
+        <Empty description={activeFilter !== '全部' ? '暂无符合条件的文件' : currentFolder ? '该文件夹为空' : '暂无文件'} style={{ padding: '64px 0' }} />
       ) : viewMode === 'grid' ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '16px' }}>
           {currentFiles.map(file => <GridFileCard key={file.id} file={file} onClick={handleFileClick} />)}

@@ -103,6 +103,7 @@ const DataView = ({ onBack }: DataViewProps) => {
       if (data.success) {
         Message.success('所有数据已重置');
         window.dispatchEvent(new CustomEvent('papyrus_cards_changed'));
+        window.dispatchEvent(new CustomEvent('papyrus_notes_changed'));
       } else {
         Message.error(data.error || '重置失败');
       }

@@ -750,7 +750,7 @@ describe('AIManager', () => {
         log: {},
       }));
       const config = new AIConfig(testDir);
-      expect(config.config.current_model).toBe('gpt-4');
+      expect(config.config.current_model).toBe('gpt-4o');
     });
 
     it('should handle corrupted config file', () => {

@@ -204,10 +204,12 @@ const ChatView = ({ onBack }: ChatViewProps) => {
   const [completionRequireConfirm, setCompletionRequireConfirm] = useState(false);
   const [completionTriggerDelay, setCompletionTriggerDelay] = useState(500);
   const [completionMaxTokens, setCompletionMaxTokens] = useState(50);
+  const [completionSaving, setCompletionSaving] = useState(false);
   
   const [providers, setProviders] = useState<Provider[]>([]);
   const [providersLoading, setProvidersLoading] = useState(false);
-  const [currentModelId, setCurrentModelId] = useState<string>('m1');
+  const [currentModelId, setCurrentModelId] = useState<string>('');
+  const [aiCurrentModel, setAiCurrentModel] = useState<string>('');
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [addForm] = Form.useForm();
   const [newProviderType, setNewProviderType] = useState('openai');
@@ -248,10 +250,27 @@ const ChatView = ({ onBack }: ChatViewProps) => {
     fetch('/api/config/ai')
       .then(res => res.json())
       .then(data => {
-        if (data.success && data.config && data.config.features) {
-          const agentEnabled = data.config.features.agent_enabled ?? false;
-          setAgentModeEnabledState(agentEnabled);
-          saveAgentSettings({ agentModeEnabled: agentEnabled });
+        if (data.success && data.config) {
+          const backendCurrentModel = data.config.current_model;
+          if (backendCurrentModel) {
+            setAiCurrentModel(backendCurrentModel);
+            // 如果 providers 已加载，立即同步 currentModelId
+            setProviders(currentProviders => {
+              for (const p of currentProviders) {
+                const model = p.models.find(m => m.modelId === backendCurrentModel && m.enabled);
+                if (model) {
+                  setCurrentModelId(model.id);
+                  break;
+                }
+              }
+              return currentProviders;
+            });
+          }
+          if (data.config.features) {
+            const agentEnabled = data.config.features.agent_enabled ?? false;
+            setAgentModeEnabledState(agentEnabled);
+            saveAgentSettings({ agentModeEnabled: agentEnabled });
+          }
         }
       })
       .catch(console.error);
@@ -267,6 +286,16 @@ const ChatView = ({ onBack }: ChatViewProps) => {
       .then(data => {
         if (data.success && data.providers) {
           setProviders(data.providers);
+          // 根据后端 current_model (modelId) 查找对应的数据库 id
+          if (aiCurrentModel) {
+            for (const p of data.providers) {
+              const model = p.models.find(m => m.modelId === aiCurrentModel && m.enabled);
+              if (model) {
+                setCurrentModelId(model.id);
+                break;
+              }
+            }
+          }
         }
       })
       .catch(console.error)
@@ -319,7 +348,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
           }
         })
         .catch(err => {
-          console.error(err);
+          console.error('添加供应商失败:', err);
           Message.error('添加供应商失败');
         });
 
@@ -337,7 +366,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
         }
       })
       .catch(err => {
-        console.error(err);
+        console.error('删除供应商失败:', err);
         Message.error('删除供应商失败');
       });
   };
@@ -353,7 +382,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
         }
       })
       .catch(err => {
-        console.error(err);
+        console.error('设置默认供应商失败:', err);
         Message.error('设置默认供应商失败');
       });
   };
@@ -369,7 +398,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
         }
       })
       .catch(err => {
-        console.error(err);
+        console.error('删除模型失败:', err);
         Message.error('删除模型失败');
       });
   };
@@ -423,6 +452,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
       if (values.cap_reasoning) capabilities.push('reasoning');
       
       const modelData = {
+        id: values.modelId.trim(),
         name: values.name.trim(),
         modelId: values.modelId.trim(),
         port: values.port,
@@ -442,7 +472,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
             }
           })
           .catch(err => {
-            console.error(err);
+            console.error('更新模型失败:', err);
             Message.error('更新模型失败');
           });
       } else {
@@ -456,7 +486,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
             }
           })
           .catch(err => {
-            console.error(err);
+            console.error('添加模型失败:', err);
             Message.error('添加模型失败');
           });
       }
@@ -533,6 +563,65 @@ const ChatView = ({ onBack }: ChatViewProps) => {
 
   const notifyAIConfigChanged = () => {
     window.dispatchEvent(new CustomEvent('papyrus_ai_config_changed'));
+  };
+
+  const handleModelChange = async (modelId: string) => {
+    setCurrentModelId(modelId);
+    try {
+      const res = await fetch('/api/config/ai');
+      const data = await res.json();
+      if (data.success && data.config) {
+        const provider = providers.find(p => p.models.some(m => m.id === modelId));
+        const model = provider?.models.find(m => m.id === modelId);
+        const updated = {
+          ...data.config,
+          current_model: model?.modelId || modelId,
+        };
+        if (provider) {
+          updated.current_provider = provider.type;
+          // 同步 provider 的 API key 到 AI config
+          const firstKey = provider.apiKeys.find(k => k.key.trim() !== '');
+          if (firstKey) {
+            updated.providers = {
+              ...data.config.providers,
+              [provider.type]: {
+                ...data.config.providers[provider.type],
+                api_key: firstKey.key,
+              },
+            };
+          }
+        }
+        await fetch('/api/config/ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updated),
+        });
+        notifyAIConfigChanged();
+      }
+    } catch (err) {
+      console.error('同步模型配置到后端失败:', err);
+    }
+  };
+
+  const saveCompletionConfig = async (updates: Partial<{ enabled: boolean; require_confirm: boolean; trigger_delay: number; max_tokens: number }>) => {
+    if (completionSaving) return;
+    setCompletionSaving(true);
+    try {
+      await fetch('/api/completion/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: updates.enabled ?? completionEnabled,
+          require_confirm: updates.require_confirm ?? completionRequireConfirm,
+          trigger_delay: updates.trigger_delay ?? completionTriggerDelay,
+          max_tokens: updates.max_tokens ?? completionMaxTokens,
+        }),
+      });
+    } catch (err) {
+      console.error('保存补全配置失败:', err);
+    } finally {
+      setCompletionSaving(false);
+    }
   };
 
   const syncKeyToAIConfig = (providerType: string, apiKey: string) => {
@@ -671,21 +760,11 @@ const ChatView = ({ onBack }: ChatViewProps) => {
             marginBottom: 24,
           }}>
             <SettingItem title="Agent 模式" desc="启用工具调用功能，AI 可以操作卡片和笔记">
-              <Switch 
-                checked={agentModeEnabled && currentModelSupportTools}
+              <Switch
+                checked={agentModeEnabled}
                 onChange={setAgentModeEnabled}
-                disabled={!currentModelSupportTools}
               />
             </SettingItem>
-
-            {!currentModelSupportTools && currentModel && (
-              <div className="settings-warning-tip">
-                <IconBulb style={{ color: 'var(--color-warning)' }} />
-                <Text type="secondary" style={{ fontSize: 13 }}>
-                  当前选中的模型 "{currentModel.name}" 不支持工具调用
-                </Text>
-              </div>
-            )}
 
             <SettingItem title="显示时间戳" desc="在消息旁显示发送时间">
               <Switch checked={showTimestamp} onChange={setShowTimestamp} />
@@ -856,26 +935,23 @@ const ChatView = ({ onBack }: ChatViewProps) => {
             marginBottom: 24,
           }}>
             <SettingItem title="笔记自动补全" desc="启用 AI 驱动的笔记内容自动补全功能">
-              <Switch checked={completionEnabled} onChange={setCompletionEnabled} />
+              <Switch
+                checked={completionEnabled}
+                onChange={(checked) => {
+                  setCompletionEnabled(checked);
+                  saveCompletionConfig({ enabled: checked });
+                }}
+              />
             </SettingItem>
 
             {completionEnabled && (
               <>
                 <SettingItem title="二次确认模式" desc="开启后需按 Tab 触发补全，Enter 确认；关闭时输入自动显示补全，Tab 直接接受">
-                  <Switch 
-                    checked={completionRequireConfirm} 
+                  <Switch
+                    checked={completionRequireConfirm}
                     onChange={(checked) => {
                       setCompletionRequireConfirm(checked);
-                      fetch('/api/completion/config', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          enabled: completionEnabled,
-                          require_confirm: checked,
-                          trigger_delay: completionTriggerDelay,
-                          max_tokens: completionMaxTokens,
-                        }),
-                      });
+                      saveCompletionConfig({ require_confirm: checked });
                     }}
                   />
                 </SettingItem>
@@ -888,16 +964,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
                     value={completionTriggerDelay}
                     onChange={(val) => {
                       setCompletionTriggerDelay(val as number);
-                      fetch('/api/completion/config', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          enabled: completionEnabled,
-                          require_confirm: completionRequireConfirm,
-                          trigger_delay: val,
-                          max_tokens: completionMaxTokens,
-                        }),
-                      });
+                      saveCompletionConfig({ trigger_delay: val as number });
                     }}
                     style={{ width: 200 }}
                   />
@@ -911,16 +978,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
                     value={completionMaxTokens}
                     onChange={(val) => {
                       setCompletionMaxTokens(val as number);
-                      fetch('/api/completion/config', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          enabled: completionEnabled,
-                          require_confirm: completionRequireConfirm,
-                          trigger_delay: completionTriggerDelay,
-                          max_tokens: val,
-                        }),
-                      });
+                      saveCompletionConfig({ max_tokens: val as number });
                     }}
                     style={{ width: 200 }}
                   />
@@ -942,7 +1000,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
             marginBottom: 24,
           }}>
             <SettingItem title="当前模型" desc="选择要使用的 AI 模型" divider={false}>
-              <Select value={currentModelId} onChange={setCurrentModelId} style={{ width: 280 }}>
+              <Select value={currentModelId} onChange={handleModelChange} style={{ width: 280 }}>
                 {providers.filter(p => p.enabled).map(p => (
                   <OptGroup key={p.id} label={
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1235,7 +1293,7 @@ const ProvidersSection = ({ providers, loadProviders, deleteProvider, setDefault
         }
       })
       .catch(err => {
-        console.error(err);
+        console.error('保存供应商配置失败:', err);
         Message.error('保存供应商配置失败');
       });
   };
@@ -1280,7 +1338,7 @@ const ProvidersSection = ({ providers, loadProviders, deleteProvider, setDefault
                       }
                     })
                     .catch(err => {
-                      console.error(err);
+                      console.error('更新供应商状态失败:', err);
                       Message.error('更新供应商状态失败');
                       loadProviders();
                     });

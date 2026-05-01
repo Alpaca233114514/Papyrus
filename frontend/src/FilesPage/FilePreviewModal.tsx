@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Modal, Message, Button } from '@arco-design/web-react';
+import { Modal, Message, Button, Spin } from '@arco-design/web-react';
 import { IconDownload } from '@arco-design/web-react/icon';
-import { BACKEND_URL } from '../api';
+import { getFileUrl } from '../api';
 import type { FileItemData } from '../api';
 
 interface FilePreviewModalProps {
@@ -30,21 +30,29 @@ export default function FilePreviewModal({ file, onClose }: FilePreviewModalProp
   const [textContent, setTextContent] = useState<string>('');
   const [textLoading, setTextLoading] = useState(false);
   const [textError, setTextError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [mediaError, setMediaError] = useState(false);
+  const [mediaErrorType, setMediaErrorType] = useState<string>('');
+  const [pdfError, setPdfError] = useState(false);
 
   const previewUrl = useMemo(() => {
     if (!file) return '';
-    return `${BACKEND_URL}/api/files/${file.id}/preview`;
+    return getFileUrl(file.id, 'preview');
   }, [file]);
 
   const downloadUrl = useMemo(() => {
     if (!file) return '';
-    return `${BACKEND_URL}/api/files/${file.id}/download`;
+    return getFileUrl(file.id, 'download');
   }, [file]);
 
   useEffect(() => {
     if (!file) {
       setTextContent('');
       setTextError(false);
+      setImageLoading(false);
+      setMediaError(false);
+      setMediaErrorType('');
+      setPdfError(false);
       return;
     }
 
@@ -88,39 +96,77 @@ export default function FilePreviewModal({ file, onClose }: FilePreviewModalProp
       );
     }
 
+    const handleMediaError = (type: string) => {
+      if (!mediaError) {
+        setMediaError(true);
+        setMediaErrorType(type);
+        Message.error(`${type}加载失败`);
+      }
+    };
+
+    const renderMediaError = () => (
+      <div style={{ textAlign: 'center', padding: '48px 0' }}>
+        <div style={{ fontSize: '16px', color: 'var(--color-text-2)', marginBottom: '16px' }}>
+          {mediaErrorType}加载失败
+        </div>
+        <Button type="primary" icon={<IconDownload />} href={downloadUrl} target="_blank">
+          下载文件
+        </Button>
+      </div>
+    );
+
     switch (file.type) {
       case 'image':
+        if (mediaError) return renderMediaError();
         return (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', maxHeight: '70vh', overflow: 'auto' }}>
+            {imageLoading && (
+              <div style={{ position: 'absolute', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Spin size={32} />
+              </div>
+            )}
             <img
               src={previewUrl}
               alt={file.name}
-              style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }}
-              onError={() => Message.error('图片加载失败')}
+              style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', opacity: imageLoading ? 0 : 1, transition: 'opacity 0.2s' }}
+              onLoad={() => setImageLoading(false)}
+              onError={(e) => {
+                setImageLoading(false);
+                const target = e.currentTarget as HTMLImageElement;
+                let errorMsg = '图片';
+                if (target.naturalWidth === 0 && target.naturalHeight === 0) {
+                  errorMsg = '图片加载失败（文件可能不存在或格式不支持）';
+                } else {
+                  errorMsg = '图片解码失败（文件可能已损坏）';
+                }
+                handleMediaError(errorMsg);
+              }}
             />
           </div>
         );
       case 'video':
+        if (mediaError) return renderMediaError();
         return (
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <video
               src={previewUrl}
               controls
               style={{ maxWidth: '100%', maxHeight: '70vh' }}
-              onError={() => Message.error('视频加载失败')}
+              onError={() => handleMediaError('视频')}
             >
               您的浏览器不支持视频播放
             </video>
           </div>
         );
       case 'audio':
+        if (mediaError) return renderMediaError();
         return (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
             <audio
               src={previewUrl}
               controls
               style={{ width: '100%', maxWidth: '500px' }}
-              onError={() => Message.error('音频加载失败')}
+              onError={() => handleMediaError('音频')}
             >
               您的浏览器不支持音频播放
             </audio>
@@ -128,12 +174,41 @@ export default function FilePreviewModal({ file, onClose }: FilePreviewModalProp
         );
       case 'document':
         if (ext === 'pdf') {
+          if (pdfError) {
+            return (
+              <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                <div style={{ fontSize: '16px', color: 'var(--color-text-2)', marginBottom: '16px' }}>
+                  PDF 加载失败（文件可能不存在或格式损坏）
+                </div>
+                <Button type="primary" icon={<IconDownload />} href={downloadUrl} target="_blank">
+                  下载文件
+                </Button>
+              </div>
+            );
+          }
           return (
             <div style={{ height: '70vh' }}>
               <iframe
                 src={previewUrl}
                 title={file.name}
                 style={{ width: '100%', height: '100%', border: 'none' }}
+                onLoad={() => {
+                  // 延迟检查 iframe 是否正常加载
+                  setTimeout(() => {
+                    const iframe = document.querySelector(`iframe[src="${previewUrl}"]`);
+                    if (iframe) {
+                      try {
+                        // 尝试访问 contentWindow，如果跨域会抛异常，但加载成功时通常可访问
+                        const cw = (iframe as HTMLIFrameElement).contentWindow;
+                        if (!cw && !pdfError) {
+                          setPdfError(true);
+                        }
+                      } catch {
+                        // 跨域限制，视为正常加载
+                      }
+                    }
+                  }, 3000);
+                }}
               />
             </div>
           );
@@ -179,7 +254,21 @@ export default function FilePreviewModal({ file, onClose }: FilePreviewModalProp
 
   return (
     <Modal
-      title={file.name}
+      title={
+        <span
+          style={{
+            display: 'inline-block',
+            maxWidth: '70vw',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            verticalAlign: 'bottom',
+          }}
+          title={file.name}
+        >
+          {file.name}
+        </span>
+      }
       visible={!!file}
       onCancel={onClose}
       footer={null}

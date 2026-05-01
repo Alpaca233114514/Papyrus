@@ -4,6 +4,16 @@
    ============================================ */
 
 /* Arco Design 深色模式变量覆盖 */
+body[data-font-size="small"] {
+  --font-size-base: 14px;
+}
+body[data-font-size="medium"] {
+  --font-size-base: 15px;
+}
+body[data-font-size="large"] {
+  --font-size-base: 16px;
+}
+
 body[arco-theme='dark'] {
   /* 背景色 */
   --color-bg-1: #2a2a2b;
@@ -55,6 +65,9 @@ body[arco-theme='dark'] {
 
 /* 浅色模式默认值 */
 :root {
+  /* 基础字号 */
+  --font-size-base: 15px;
+
   /* 主色调 */
   --color-primary: #206CCF;
   --color-primary-light: rgba(32, 108, 207, 0.08);
@@ -75,8 +88,8 @@ body[arco-theme='dark'] {
 
 /* 全局过渡动画 - 可选 */
 @media (prefers-reduced-motion: no-preference) {
-  body,
-  body * {
+  html:not(.aaa-no-animation) body,
+  html:not(.aaa-no-animation) body * {
     transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
   }
 }
