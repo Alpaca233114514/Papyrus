@@ -1,5 +1,5 @@
 import { AIConfig } from './config.js';
-import { loadAllProviders } from '../db/database.js';
+import { loadAllProviders, saveProvider, saveApiKey, saveModel } from '../db/database.js';
 
 /**
  * 从数据库同步全局配置到 AIConfig
@@ -36,12 +36,46 @@ export function syncDBToAIConfig(aiConfig: AIConfig): void {
 }
 
 /**
- * 将 AIConfig 中的全局配置回写到数据库
- * Phase 1 中不再同步 provider 列表（数据库为唯一事实来源）
+ * 将 AIConfig 中的 provider 配置同步到数据库
+ * 确保 POST /api/config/ai 设置的 api_key / base_url / models 能被后续路由读取
  */
-export function syncAIConfigToDB(_aiConfig: AIConfig): void {
-  // Provider 配置已在数据库中维护，AIConfig 不再作为 provider 的存储介质
-  // 此函数保留用于未来扩展全局参数的双向同步
+export function syncAIConfigToDB(aiConfig: AIConfig): void {
+  try {
+    const dbProviders = loadAllProviders();
+    for (const [providerType, providerConfig] of Object.entries(aiConfig.config.providers)) {
+      const existing = dbProviders.find((p) => p.type === providerType);
+      const providerId = existing?.id ?? `p-${providerType}-${Date.now()}`;
+
+      saveProvider({
+        id: providerId,
+        type: providerType,
+        name: existing?.name ?? providerType,
+        baseUrl: providerConfig.base_url,
+        enabled: true,
+        isDefault: aiConfig.config.current_provider === providerType,
+      });
+
+      const existingKey = existing?.apiKeys[0];
+      saveApiKey(providerId, {
+        id: existingKey?.id ?? `${providerId}-key`,
+        name: 'default',
+        key: providerConfig.api_key,
+      });
+
+      for (const modelId of providerConfig.models) {
+        if (modelId) {
+          saveModel(providerId, {
+            id: `${providerId}-${modelId}`,
+            modelId,
+            name: modelId,
+            enabled: true,
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('同步 AI 配置到数据库失败:', e instanceof Error ? e.message : String(e));
+  }
 }
 
 /**

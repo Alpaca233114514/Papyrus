@@ -100,7 +100,18 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
       aiConfig.config.current_provider = payload.current_provider;
       aiConfig.config.current_model = payload.current_model;
 
-      // 只同步全局参数，provider 配置由数据库独立维护
+      // 同步前端传来的 provider 配置到内存与数据库
+      if (payload.providers) {
+        aiConfig.config.providers = {};
+        for (const [name, cfg] of Object.entries(payload.providers)) {
+          aiConfig.config.providers[name] = {
+            api_key: cfg.api_key,
+            base_url: cfg.base_url,
+            models: [...cfg.models],
+          };
+        }
+      }
+
       if (payload.parameters) {
         aiConfig.config.parameters = {
           temperature: payload.parameters.temperature ?? aiConfig.config.parameters.temperature,
@@ -472,13 +483,18 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
       return;
     }
 
-    // 如果数据库中没有 key，尝试 fallback
+    // 如果数据库中没有 key，尝试 fallback（ollama 等本地 provider 不需要 key）
     if (!providerConfig.api_key) {
       const dbKey = getProviderApiKeyFromDB(providerName);
       if (dbKey) providerConfig.api_key = dbKey;
     }
 
-    if (!providerConfig.api_key) {
+    const isLocalProvider = providerName === 'ollama' || providerName === 'lm-studio' ||
+      providerName === 'localai' || providerName === 'tabbyapi' ||
+      providerName === 'koboldcpp' || providerName === 'text-generation-webui' ||
+      providerName === 'llamacpp';
+
+    if (!providerConfig.api_key && !isLocalProvider) {
       reply.status(400).send({ success: false, error: 'AI API Key 未设置' });
       return;
     }

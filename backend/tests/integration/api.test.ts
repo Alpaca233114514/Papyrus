@@ -10,6 +10,7 @@ let aiManagerSingleton: Record<string, unknown> | null = null;
 
 describe('API Integration Tests', () => {
   const testDir = path.join(os.tmpdir(), `papyrus-api-test-${Date.now()}`);
+  const originalFetch = global.fetch;
 
   beforeAll(async () => {
     fs.mkdirSync(testDir, { recursive: true });
@@ -21,6 +22,30 @@ describe('API Integration Tests', () => {
     closeDb();
     fs.rmSync(testDir, { recursive: true, force: true });
     delete process.env.PAPYRUS_DATA_DIR;
+  });
+
+  beforeEach(async () => {
+    // 1. 清理数据库业务表（保留 providers / api_keys / models seed）
+    const { getDb } = await import('../../src/db/database.js');
+    const db = getDb();
+    db.exec(`DELETE FROM files; DELETE FROM cards; DELETE FROM notes;
+             DELETE FROM card_versions; DELETE FROM note_versions;
+             DELETE FROM relations;`);
+
+    // 2. 清理文件系统 vault
+    const { paths } = await import('../../src/utils/paths.js');
+    fs.rmSync(paths.vaultDir, { recursive: true, force: true });
+
+    // 3. 重置内存单例
+    const { aiManager, aiConfig } = await import('../../src/api/routes/ai.js');
+    aiManager.reset();
+    aiConfig.loadConfig();
+
+    const { resetToolManager } = await import('../../src/ai/tool-manager.js');
+    resetToolManager();
+
+    // 4. 恢复 fetch mock（兜底）
+    global.fetch = originalFetch;
   });
 
   it('GET /api/health should return ok', async () => {
@@ -720,15 +745,17 @@ describe('API Integration Tests', () => {
   });
 
   it('POST /api/config/ai/test should reject private url', async () => {
+    // 直接绕过 /config/ai 的 validateConfig 保存，构造数据库中存在私有地址的场景
+    const { saveProvider, saveApiKey } = await import('../../src/db/database.js');
+    saveProvider({ id: 'p-openai', type: 'openai', name: 'OpenAI', baseUrl: 'http://192.168.1.1/v1', enabled: true, isDefault: false });
+    saveApiKey('p-openai', { id: 'k-openai', name: 'default', key: 'sk-test' });
     await app.inject({
       method: 'POST',
       url: '/api/config/ai',
       payload: {
         current_provider: 'openai',
         current_model: 'gpt-4',
-        providers: {
-          openai: { api_key: 'sk-test', base_url: 'http://192.168.1.1/v1', models: ['gpt-4'] },
-        },
+        providers: {},
         parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
         features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
       },
@@ -1148,10 +1175,9 @@ describe('API Integration Tests', () => {
       payload: { prefix: 'hello' },
     });
 
-    expect(response.statusCode).toBe(400);
-    const body = JSON.parse(response.body);
-    expect(body.success).toBe(false);
-    expect(body.error).toContain('API Key');
+    // completion 使用 SSE hijack，缺失 api_key 时返回 200 并在流中输出错误
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('API Key');
   });
 
   it('POST /api/chat should stream ollama response', async () => {

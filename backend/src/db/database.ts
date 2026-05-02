@@ -1060,7 +1060,7 @@ export function getFilesByParentId(parentId: string | null): FileRecord[] {
 export function insertFile(file: FileRecord, logger?: PapyrusLogger): void {
   const database = getDb();
   const stmt = database.prepare(
-    'INSERT INTO files (id, name, type, size, mime_type, parent_id, file_storage_path, is_folder, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    'INSERT OR REPLACE INTO files (id, name, type, size, mime_type, parent_id, file_storage_path, is_folder, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
   );
   stmt.run(file.id, file.name, file.type, file.size, file.mime_type, file.parent_id, file.file_storage_path, file.is_folder, file.created_at, file.updated_at);
   logger?.info(`插入文件: ${file.id}`);
