@@ -2,9 +2,9 @@
 
 **English** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md)
 
-> ⚠️ **Preview README** — this version describes the upcoming **`v2.0.0-beta.3`** (TypeScript / Fastify backend). The code currently on `main` is still the legacy Python build. This README ships ahead of the backend rewrite via PR — feature mentions and install instructions will only apply once the backend rewrite lands on `main`.
+> ⚠️ **Preview README** — this version describes the upcoming **`v2.0.0`** (TypeScript / Fastify backend). The code currently on `main` is still the legacy Python build. This README ships ahead of the backend rewrite via PR — feature mentions and install instructions will only apply once the backend rewrite lands on `main`.
 
-![Version](https://img.shields.io/badge/version-v2.0.0--beta.3-blue)
+![Version](https://img.shields.io/badge/version-v2.0.0-blue)
 ![Node.js](https://img.shields.io/badge/Node.js-24-339933)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![Fastify](https://img.shields.io/badge/Fastify-5-000000)
@@ -45,7 +45,7 @@ Pre-built installers are published on the [Releases](https://github.com/PapyrusO
 | macOS | arm64 | DMG (`.dmg`), ZIP (`.zip`) |
 | Linux | x64 | AppImage, DEB (`.deb`), TAR.GZ |
 
-> ⚠️ `v2.0.0-beta.3` is a beta. The data schema is stable, but the UI and APIs may still evolve before `v2.0.0`.
+> ⚠️ `v2.0.0-beta` is a beta. The data schema is stable, but the UI and APIs may still evolve before `v2.0.0`.
 
 ---
 
