@@ -42,6 +42,7 @@ export class LLMCache {
     messages: Array<{ role: string; content: string | Array<Record<string, unknown>> }>,
     params: { temperature?: number; max_tokens?: number; top_p?: number; presence_penalty?: number; frequency_penalty?: number },
     systemPrompt?: string,
+    sessionId?: string,
   ): string {
     const payload = JSON.stringify({
       provider,
@@ -55,6 +56,7 @@ export class LLMCache {
         frequency_penalty: params.frequency_penalty,
       },
       systemPrompt,
+      sessionId,
     });
     return createHash('sha256').update(payload).digest('hex');
   }

@@ -191,7 +191,6 @@ html.aaa-reading-mode .aaa-reading-text {
   text-align: left !important;
   -webkit-hyphens: none !important;
   hyphens: none !important;
-  text-justify: none !important;
 }
 
 /* 列表间距 */
@@ -436,7 +435,7 @@ body.has-focus-trap {
   a span,
   button svg,
   a svg {
-    min-height: auto;
-    min-width: auto;
+    min-height: 0;
+    min-width: 0;
   }
 }

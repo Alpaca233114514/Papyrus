@@ -14,6 +14,7 @@ import {
   IconCheckCircle,
   IconExclamationCircle,
 } from '@arco-design/web-react/icon';
+import './AboutView.css';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -133,10 +134,10 @@ const AboutView = ({ onBack }: AboutViewProps) => {
   };
 
   return (
-    <div className="settings-detail" style={{ height: '100%', overflowY: 'auto' }}>
+    <div className="settings-detail about-view">
       <div className="settings-detail-header-row">
-        <Button 
-          type="text" 
+        <Button
+          type="text"
           icon={<IconArrowLeft />}
           onClick={onBack}
           className="settings-back-btn"
@@ -145,25 +146,25 @@ const AboutView = ({ onBack }: AboutViewProps) => {
         </Button>
       </div>
       <Title heading={2} className="settings-detail-title">关于</Title>
-      
-      <div className="settings-section" style={{ textAlign: 'center', padding: '40px 0' }}>
-        <img 
+
+      <div className="settings-section about-hero">
+        <img
           src="./icon.png"
-          alt="Papyrus" 
-          style={{ width: 80, height: 80, marginBottom: 16 }}
+          alt="Papyrus"
+          className="about-logo"
         />
-        <Title heading={3} style={{ margin: '0 0 8px 0' }}>Papyrus</Title>
-        <Text type="secondary" style={{ fontSize: 14 }}>
+        <Title heading={3} className="about-app-name">Papyrus</Title>
+        <Text type="secondary" className="about-version">
           版本 {versionInfo?.current_version || 'v2.0.0-beta.5'}
         </Text>
-        <Paragraph type="secondary" style={{ marginTop: 16, maxWidth: 400, margin: '16px auto 0' }}>
+        <Paragraph type="secondary" className="about-description">
           SRS 复习引擎 - 基于间隔重复算法的智能记忆卡片应用
         </Paragraph>
-        
-        <div style={{ marginTop: 32, display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+
+        <div className="about-actions">
           {checkResult === 'update' ? (
-            <Button 
-              type="primary" 
+            <Button
+              type="primary"
               shape="round"
               status="success"
               icon={<IconExclamationCircle />}
@@ -172,8 +173,8 @@ const AboutView = ({ onBack }: AboutViewProps) => {
               下载更新
             </Button>
           ) : (
-            <Button 
-              type="primary" 
+            <Button
+              type="primary"
               shape="round"
               onClick={handleCheckUpdate}
               disabled={isChecking}
@@ -186,41 +187,25 @@ const AboutView = ({ onBack }: AboutViewProps) => {
             shape="round"
             onClick={() => window.open('https://github.com/PapyrusOR/Papyrus_Desktop', '_blank')}
           >
-            <IconGithub style={{ marginRight: 8 }} />
+            <IconGithub className="about-github-icon" />
             GitHub
           </Button>
         </div>
 
         {/* 更新状态提示 */}
         {checkResult === 'latest' && (
-          <div style={{ 
-            marginTop: 16, 
-            padding: '8px 16px', 
-            backgroundColor: 'var(--color-success-light)', 
-            borderRadius: 8,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-          }}>
-            <IconCheckCircle style={{ color: 'var(--color-success)' }} />
-            <Text style={{ color: 'var(--color-success)', margin: 0 }}>
+          <div className="about-status-badge success">
+            <IconCheckCircle className="about-status-icon success" />
+            <Text className="about-status-text success">
               当前已是最新版本
             </Text>
           </div>
         )}
 
         {checkResult === 'error' && (
-          <div style={{ 
-            marginTop: 16, 
-            padding: '8px 16px', 
-            backgroundColor: 'var(--color-danger-light)', 
-            borderRadius: 8,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-          }}>
-            <IconExclamationCircle style={{ color: 'var(--color-danger)' }} />
-            <Text style={{ color: 'var(--color-danger)', margin: 0 }}>
+          <div className="about-status-badge error">
+            <IconExclamationCircle className="about-status-icon error" />
+            <Text className="about-status-text error">
               {errorMessage || '检查更新失败'}
             </Text>
           </div>
@@ -229,34 +214,24 @@ const AboutView = ({ onBack }: AboutViewProps) => {
 
       {/* 更新详情 */}
       {checkResult === 'update' && versionInfo?.has_update && (
-        <div 
-          className="settings-section" 
-          style={{ 
-            backgroundColor: 'var(--color-fill-2)', 
-            borderRadius: 8,
-            border: '1px solid var(--color-border)',
-          }}
+        <div
+          className="settings-section about-update-card"
         >
-          <Title heading={4} className="settings-section-title" style={{ color: 'var(--color-success)' }}>
-            <IconExclamationCircle style={{ marginRight: 8 }} />
+          <Title heading={4} className="settings-section-title about-update-title">
+            <IconInfoCircle className="about-update-title-icon" />
             发现新版本
           </Title>
-          <div style={{ marginBottom: 16 }}>
-            <Text bold style={{ fontSize: 16 }}>{versionInfo.latest_version}</Text>
+          <div className="about-update-version-row">
+            <Text bold className="about-update-version">{versionInfo.latest_version}</Text>
             {versionInfo.published_at && (
-              <Text type="secondary" style={{ marginLeft: 12 }}>
+              <Text type="secondary" className="about-update-date">
                 发布于 {formatDate(versionInfo.published_at)}
               </Text>
             )}
           </div>
           {versionInfo.release_notes && (
-            <div style={{ 
-              backgroundColor: 'var(--color-bg-1)', 
-              padding: 12, 
-              borderRadius: 4,
-              marginBottom: 16,
-            }}>
-              <Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 13 }}>
+            <div className="about-release-notes">
+              <Paragraph className="about-release-notes-text">
                 {truncateReleaseNotes(versionInfo.release_notes)}
               </Paragraph>
             </div>
@@ -269,10 +244,10 @@ const AboutView = ({ onBack }: AboutViewProps) => {
 
       <div className="settings-section">
         <Title heading={4} className="settings-section-title">致谢</Title>
-        <Paragraph type="secondary" style={{ fontSize: 13 }}>
+        <Paragraph type="secondary" className="about-paragraph">
           感谢使用 Papyrus！本应用使用了以下开源项目：
         </Paragraph>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+        <div className="about-tech-tags">
           {['React', 'Arco Design', 'Electron', 'Node.js'].map(tech => (
             <Tag key={tech} color="arcoblue">{tech}</Tag>
           ))}
@@ -281,14 +256,14 @@ const AboutView = ({ onBack }: AboutViewProps) => {
 
       <div className="settings-section">
         <Title heading={4} className="settings-section-title">许可证</Title>
-        <Paragraph type="secondary" style={{ fontSize: 13 }}>
+        <Paragraph type="secondary" className="about-paragraph">
           Papyrus 采用 MIT 许可证开源。您可以自由使用、修改和分发本软件。
         </Paragraph>
       </div>
 
-      <div className="settings-tip" style={{ marginTop: 24 }}>
-        <IconHeart style={{ color: 'var(--color-danger)' }} />
-        <Text type="secondary" style={{ fontSize: 13 }}>
+      <div className="settings-tip about-tip">
+        <IconHeart className="about-tip-icon" />
+        <Text type="secondary" className="about-tip-text">
           如果喜欢这个项目，请在 GitHub 上给我们一个 Star ⭐
         </Text>
       </div>

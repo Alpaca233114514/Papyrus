@@ -251,6 +251,13 @@ export class AIManager {
     return this.sessions[this.activeSessionId]!;
   }
 
+  private getSessionForChat(sessionId?: string): SessionData {
+    if (sessionId && sessionId in this.sessions) {
+      return this.sessions[sessionId]!;
+    }
+    return this.getActiveSession();
+  }
+
   getSession(sessionId: string): SessionData | null {
     return this.sessions[sessionId] ?? null;
   }
@@ -579,6 +586,7 @@ export class AIManager {
     overrideModel?: string,
     mode?: string,
     reasoning?: unknown,
+    sessionId?: string,
   ): AsyncGenerator<StreamChunk> {
     const providerName = this.config.config.current_provider;
     const providerConfig = getProviderConfigFromDB(providerName);
@@ -587,10 +595,12 @@ export class AIManager {
       return;
     }
 
+    const chatSession = this.getSessionForChat(sessionId);
+
     const messages: ProviderMessage[] = [];
     const effectiveSystemPrompt = systemPrompt || (
       mode === 'agent'
-        ? '你是一个智能学习助手。你可以使用工具来完成用户的请求，包括创建卡片、搜索笔记、获取统计数据等。请根据用户的需求，自主决定使用哪些工具，并逐步完成任务。'
+        ? '你是一个智能学习助手。你可以使用工具来完成用户的请求。\n\n工具使用规则：\n1. 只读工具（如搜索卡片、搜索笔记、获取统计、读取文件）可以在分析用户需求后主动使用。\n2. 写操作工具（如创建卡片、更新卡片、删除卡片、创建笔记、修改笔记）只能在用户**明确要求**修改数据时才调用。\n3. 如果用户只是打招呼、闲聊或没有明确请求，不要调用任何工具，直接自然回复即可。\n请根据用户的需求，自主决定使用哪些合适的工具。'
         : undefined
     );
     if (effectiveSystemPrompt) {
@@ -599,7 +609,7 @@ export class AIManager {
 
     const contextLength = this.config.config.features.context_length;
     if (contextLength > 0) {
-      const history = this.conversationHistory.slice(-(contextLength * 2));
+      const history = chatSession.messages.slice(-(contextLength * 2));
       for (const msg of history) {
         messages.push(this.messageToProviderFormat(providerName, msg));
       }
@@ -612,21 +622,22 @@ export class AIManager {
     const model = overrideModel || this.config.config.current_model;
     const normalizedReasoning = normalizeReasoning(reasoning);
 
-    const cacheKey = this.llmCache.buildCacheKey(providerName, model, messages, params, systemPrompt);
+    const cacheKey = this.llmCache.buildCacheKey(providerName, model, messages, params, systemPrompt, sessionId);
     const cached = this.llmCache.get(cacheKey);
     if (cached) {
       try {
         for (const chunk of cached) {
           yield chunk;
         }
-        const activeSession = this.getActiveSession();
-        activeSession.messages.push({
-          role: 'user',
-          content: userMessage,
-          attachments: attachmentsMeta,
+        await this.saveMutex.runExclusive(() => {
+          chatSession.messages.push({
+            role: 'user',
+            content: userMessage,
+            attachments: attachmentsMeta,
+          });
+          chatSession.updated_at = Date.now() / 1000;
+          this.saveSessions();
         });
-        activeSession.updated_at = Date.now() / 1000;
-        this.saveSessions();
         yield { type: 'done', data: '' };
       } catch (e) {
         yield { type: 'error', data: e instanceof Error ? e.message : String(e) };
@@ -635,14 +646,15 @@ export class AIManager {
     }
 
     // Save user message BEFORE streaming to avoid data loss on API failure
-    const activeSession = this.getActiveSession();
-    activeSession.messages.push({
-      role: 'user',
-      content: userMessage,
-      attachments: attachmentsMeta,
+    await this.saveMutex.runExclusive(() => {
+      chatSession.messages.push({
+        role: 'user',
+        content: userMessage,
+        attachments: attachmentsMeta,
+      });
+      chatSession.updated_at = Date.now() / 1000;
+      this.saveSessions();
     });
-    activeSession.updated_at = Date.now() / 1000;
-    this.saveSessions();
 
     const collectedChunks: StreamChunk[] = [];
     try {

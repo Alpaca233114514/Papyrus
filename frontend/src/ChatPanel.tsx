@@ -138,6 +138,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   const [availableModels, setAvailableModels] = useState<ProviderModel[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string>('');
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState('');
   const dragStartY = useRef<number>(0);
@@ -285,6 +286,20 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
       initializeChatConfig();
     }
   }, [open, initializeChatConfig]);
+
+  // 初始化会话：当面板打开且没有当前会话时，创建新会话
+  useEffect(() => {
+    if (open && !currentSessionId) {
+      authFetch('/sessions', { method: 'POST' })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.session) {
+            setCurrentSessionId(data.session.id);
+          }
+        })
+        .catch(() => { /* ignore */ });
+    }
+  }, [open, currentSessionId]);
 
   // 监听设置页 AI 配置变化，实时刷新
   useEffect(() => {
@@ -703,6 +718,9 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
         mode,
         reasoning,
       };
+      if (currentSessionId) {
+        chatBody.session_id = currentSessionId;
+      }
       if (attachments.length > 0) {
         chatBody.attachments = attachments;
       }
@@ -823,7 +841,6 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
 
     authFetch(`/tools/approve/${encodeURIComponent(cid)}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
     })
       .then(async (response) => {
         if (!response.ok) {
@@ -1061,6 +1078,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
             model: m.role === 'assistant' ? model : undefined,
           }));
           setMessages(loadedMessages);
+          setCurrentSessionId(sessionId);
         }
       }
     } catch (err) {
@@ -1140,7 +1158,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
           </button>
         </Dropdown>
         <div className="chat-panel-header-actions">
-          <Tooltip content="新建对话" mini><button className="chat-panel-header-btn" aria-label="新建对话" onClick={() => { setMessages([]); authFetch('/sessions', { method: 'POST' }).catch(() => {}); }}><IconPlus /></button></Tooltip>
+          <Tooltip content="新建对话" mini><button className="chat-panel-header-btn" aria-label="新建对话" onClick={async () => { setMessages([]); try { const res = await authFetch('/sessions', { method: 'POST' }); const data = await res.json(); if (data.success && data.session) { setCurrentSessionId(data.session.id); } } catch { /* ignore */ } }}><IconPlus /></button></Tooltip>
           <Dropdown
             trigger="click"
             droplist={

@@ -535,6 +535,20 @@
   }
 }
 
+.settings-main-scrollable {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.settings-category-icon-svg {
+  font-size: 32px;
+}
+
+.settings-animation-wrapper {
+  height: 100%;
+  overflow: hidden;
+}
+
 .settings-page-enter {
   animation: settingsPageEnter 0.2s ease-out forwards;
 }

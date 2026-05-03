@@ -133,7 +133,7 @@ const SettingsPage = () => {
             color: category.color,
           }}
         >
-          <Icon style={{ fontSize: 32 }} />
+          <Icon className="settings-category-icon-svg" />
         </div>
         <div className="settings-category-content">
           <Text bold className="settings-category-title">{category.title}</Text>
@@ -146,11 +146,8 @@ const SettingsPage = () => {
   };
 
   const MainView = () => (
-    <div
-      className="settings-main"
-      style={{ height: '100%', overflowY: 'auto' }}
-    >
-      <Title heading={1} style={{ fontWeight: 600, lineHeight: 1, margin: 0, fontSize: '40px', marginBottom: 32 }}>{t('settings.title')}</Title>
+    <div className="settings-main settings-main-scrollable">
+      <Title heading={1} className="settings-page-title">{t('settings.title')}</Title>
       <div className="settings-categories-grid">
         {SETTING_CATEGORIES.map(category => (
           <CategoryCard key={category.key} category={category} />
@@ -177,11 +174,8 @@ const SettingsPage = () => {
     <div className="settings-page">
       {activeCategory === null && !animating && <MainView />}
       {activeCategory === null && animating && direction === 'out' && (
-        <div
-          className="settings-main settings-page-exit"
-          style={{ height: '100%', overflowY: 'auto' }}
-        >
-          <Title heading={1} style={{ fontWeight: 600, lineHeight: 1, margin: 0, fontSize: '40px', marginBottom: 32 }}>{t('settings.title')}</Title>
+        <div className="settings-main settings-main-scrollable settings-page-exit">
+          <Title heading={1} className="settings-page-title">{t('settings.title')}</Title>
           <div className="settings-categories-grid">
             {SETTING_CATEGORIES.map(category => (
               <CategoryCard key={category.key} category={category} />
@@ -190,9 +184,8 @@ const SettingsPage = () => {
         </div>
       )}
       {activeCategory !== null && (
-        <div 
-          className={direction === 'in' ? 'settings-page-enter' : 'settings-page-exit'}
-          style={{ height: '100%', overflow: 'hidden' }}
+        <div
+          className={`settings-animation-wrapper ${direction === 'in' ? 'settings-page-enter' : 'settings-page-exit'}`}
         >
           {getViewComponent(activeCategory)}
         </div>

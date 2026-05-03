@@ -469,6 +469,7 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
   fastify.post('/chat', async (request, reply) => {
     const payload = request.body as {
       message: string;
+      session_id?: string;
       system_prompt?: string;
       attachments?: Array<{ path?: string } | string>;
       model?: string;
@@ -515,6 +516,7 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
         payload.model,
         payload.mode,
         payload.reasoning,
+        payload.session_id,
       );
 
       let assistantContent = '';

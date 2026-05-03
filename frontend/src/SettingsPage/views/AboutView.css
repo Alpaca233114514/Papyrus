@@ -1,0 +1,141 @@
+.about-view {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.about-hero {
+  text-align: center;
+  padding: 40px 0;
+}
+
+.about-logo {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 16px;
+}
+
+.about-app-name {
+  margin: 0 0 8px 0;
+}
+
+.about-version {
+  font-size: 14px;
+}
+
+.about-description {
+  max-width: 400px;
+  margin: 16px auto 0;
+}
+
+.about-actions {
+  margin-top: 32px;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.about-github-icon {
+  margin-right: 8px;
+}
+
+.about-status-badge {
+  margin-top: 16px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.about-status-badge.success {
+  background-color: var(--color-success-light);
+}
+
+.about-status-badge.error {
+  background-color: var(--color-danger-light);
+}
+
+.about-status-icon.success {
+  color: var(--color-success);
+}
+
+.about-status-icon.error {
+  color: var(--color-danger);
+}
+
+.about-status-text {
+  margin: 0;
+}
+
+.about-status-text.success {
+  color: var(--color-success);
+}
+
+.about-status-text.error {
+  color: var(--color-danger);
+}
+
+.about-update-card {
+  background-color: var(--color-fill-2);
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+.about-update-title {
+  color: var(--color-success);
+  display: inline-flex;
+  align-items: center;
+}
+
+.about-update-title-icon {
+  margin-right: 8px;
+}
+
+.about-update-version-row {
+  margin-bottom: 16px;
+}
+
+.about-update-version {
+  font-size: 16px;
+}
+
+.about-update-date {
+  margin-left: 12px;
+}
+
+.about-release-notes {
+  background-color: var(--color-bg-1);
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+.about-release-notes-text {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 13px;
+}
+
+.about-paragraph {
+  font-size: 13px;
+}
+
+.about-tech-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.about-tip {
+  margin-top: 24px;
+}
+
+.about-tip-icon {
+  color: var(--color-danger);
+}
+
+.about-tip-text {
+  font-size: 13px;
+}

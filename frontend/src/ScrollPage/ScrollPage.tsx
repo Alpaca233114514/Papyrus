@@ -280,7 +280,7 @@ const ScrollCard = ({ scroll, onStudy }: { scroll: Scroll; onStudy?: () => void 
       role="button"
       tabIndex={onStudy ? 0 : -1}
       aria-label={`${scroll.title}，${scroll.collection}，${scroll.dueCount > 0 ? `${scroll.dueCount} 张待复习` : '已完成'}，共 ${scroll.cardCount} 张卡片`}
-      aria-disabled={onStudy ? undefined : true}
+      aria-disabled={!onStudy}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={onStudy}
