@@ -32,10 +32,4 @@
       transition: none;
     }
   }
-
-  /* 开始页窗景图片左侧透明度铺开渐变 */
-  .tw-scenery-mask {
-    -webkit-mask-image: linear-gradient(to right, transparent, black 30%);
-    mask-image: linear-gradient(to right, transparent, black 30%);
-  }
 }

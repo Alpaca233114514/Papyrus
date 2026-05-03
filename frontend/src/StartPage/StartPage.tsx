@@ -1,5 +1,5 @@
 import { Typography, Button, Message } from '@arco-design/web-react';
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import RecentScrolls from './RecentScrolls';
 import RecentNotes from './RecentNotes';
@@ -8,6 +8,7 @@ import { getSolarTerm, fetchSolarTerm } from './solarTerms';
 import { type SceneryContent, fetchSceneryContent } from './sceneryContent';
 import FlashcardStudy from '../ScrollPage/FlashcardStudy';
 import { api } from '../api';
+import './StartPage.css';
 
 
 type StartPageStats = {
@@ -38,24 +39,6 @@ type PendingCardProps = {
   solarTerm: string | null;
   loading: boolean;
   onStartStudy?: () => void;
-};
-
-const PRIMARY_COLOR = '#206CCF';
-const SECONDARY_COLOR = '#9FD4FD';
-const CARD_HEIGHT_EXPR = 'calc(61.8vh - 128px)';
-
-
-
-const cardStyle: CSSProperties = {
-  position: 'absolute',
-  top: '152px',
-  left: '64px',
-  right: '64px',
-  height: CARD_HEIGHT_EXPR,
-  border: '1px solid var(--color-text-3)',
-  borderRadius: '16px',
-  overflow: 'hidden',
-  transform: 'translateZ(0)',
 };
 
 function getGreeting(hour: number): string {
@@ -164,18 +147,8 @@ function useCardHeight() {
 }
 
 const ShelfSection = ({ label, children }: { label: string; children: ReactNode }) => (
-  <section style={{ marginBottom: '48px' }}>
-    <Typography.Title
-      heading={3}
-      style={{
-        fontWeight: 200,
-        lineHeight: 1,
-        margin: '0 0 24px 0',
-        padding: 0,
-        fontSize: '16px',
-        color: 'var(--color-text-3)',
-      }}
-    >
+  <section className="start-shelf-section">
+    <Typography.Title heading={3} className="start-shelf-section-title">
       {label}
     </Typography.Title>
     {children}
@@ -184,6 +157,7 @@ const ShelfSection = ({ label, children }: { label: string; children: ReactNode 
 
 const ShortcutCard = ({ icon, label, onClick }: { icon: ReactNode; label: string; onClick: () => void }) => {
   const [hovered, setHovered] = useState(false);
+  const hoverState = hovered ? 'true' : 'false';
   return (
     <div
       role="button"
@@ -195,43 +169,20 @@ const ShortcutCard = ({ icon, label, onClick }: { icon: ReactNode; label: string
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); }
       }}
-      style={{
-        flex: '0 0 auto',
-        width: '160px',
-        height: '100px',
-        borderRadius: '16px',
-        border: `2px solid ${hovered ? SECONDARY_COLOR : 'var(--color-text-3)'}`,
-        background: hovered ? `${PRIMARY_COLOR}08` : 'transparent',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '12px',
-        cursor: 'pointer',
-        transition: 'border-color 0.2s, background 0.2s',
-        boxSizing: 'border-box' as const,
-      }}
+      className="start-shortcut"
+      data-hovered={hoverState}
     >
-      <div style={{ fontSize: '28px', color: hovered ? PRIMARY_COLOR : 'var(--color-text-3)' }}>
+      <div className="start-shortcut-icon-wrap" data-hovered={hoverState}>
         {icon}
       </div>
       <Typography.Text
         type={hovered ? 'primary' : 'secondary'}
-        style={{ fontSize: '14px', fontWeight: 500 }}
+        className="start-shortcut-label"
       >
         {label}
       </Typography.Text>
     </div>
   );
-};
-
-const shelfContainerStyle = {
-  display: 'flex',
-  flexDirection: 'row' as const,
-  gap: '16px',
-  overflowX: 'auto' as const,
-  overflowY: 'hidden' as const,
-  paddingBottom: '8px',
 };
 
 const ShelfSections = ({ onStudyTag, onNavigate }: { onStudyTag?: (tag: string) => void; onNavigate?: (page: string) => void }) => {
@@ -240,36 +191,28 @@ const ShelfSections = ({ onStudyTag, onNavigate }: { onStudyTag?: (tag: string) 
 
   return (
     <>
-      <div
-        ref={ref}
-        style={{
-          position: 'absolute',
-          height: CARD_HEIGHT_EXPR,
-          visibility: 'hidden',
-          pointerEvents: 'none',
-        }}
-      />
+      <div ref={ref} className="start-shelf-measure" />
 
       {onNavigate && (
         <ShelfSection label={t('startPage.shortcuts')}>
-          <div style={shelfContainerStyle}>
+          <div className="start-shelf-row">
             <ShortcutCard
-              icon={<span style={{ fontSize: '28px' }}>📝</span>}
+              icon={<span className="start-shortcut-icon">📝</span>}
               label={t('sidebar.notes')}
               onClick={() => onNavigate('notes')}
             />
             <ShortcutCard
-              icon={<span style={{ fontSize: '28px' }}>📁</span>}
+              icon={<span className="start-shortcut-icon">📁</span>}
               label={t('sidebar.files')}
               onClick={() => onNavigate('files')}
             />
             <ShortcutCard
-              icon={<span style={{ fontSize: '28px' }}>📊</span>}
+              icon={<span className="start-shortcut-icon">📊</span>}
               label={t('sidebar.charts')}
               onClick={() => onNavigate('charts')}
             />
             <ShortcutCard
-              icon={<span style={{ fontSize: '28px' }}>⚙️</span>}
+              icon={<span className="start-shortcut-icon">⚙️</span>}
               label={t('sidebar.settings')}
               onClick={() => onNavigate('settings')}
             />
@@ -298,7 +241,7 @@ const LatticeBackground = () => {
       xmlns='http://www.w3.org/2000/svg'
       width='100%'
       height='100%'
-      style={{ position: 'absolute', inset: 0 }}
+      className="start-lattice-svg"
       aria-hidden='true'
     >
       <defs>
@@ -329,22 +272,14 @@ const PendingCard = ({ stats, greeting, dateLabel, solarTerm, loading, onStartSt
   };
 
   return (
-    <div
-      style={{
-        ...cardStyle,
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        background: 'var(--color-bg-2)',
-      }}
-    >
+    <div className="start-card-frame start-card-frame--pending">
       <LatticeBackground />
 
-      <div style={{ position: 'relative', zIndex: 1, padding: '24px' }}>
+      <div className="start-card-top">
         <Typography.Paragraph
           type='secondary'
           spacing='close'
-          style={{ margin: 0, fontSize: '48px', fontWeight: 600 }}
+          className="start-card-headline"
         >
           {loading ? (
             t('startPage.fetchCardsFailed')
@@ -354,23 +289,13 @@ const PendingCard = ({ stats, greeting, dateLabel, solarTerm, loading, onStartSt
             </>
           )}
         </Typography.Paragraph>
-        <Typography.Text className='scenery-sub-text' style={{ fontSize: '24px' }}>
+        <Typography.Text className="scenery-sub-text start-card-subline">
           {loading ? '' : `已连续精进 ${stats.streakDays} 天 | 今日目标已完成 ${stats.todayProgress}%`}
         </Typography.Text>
       </div>
 
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          padding: '24px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-end',
-          gap: '24px',
-        }}
-      >
-        <Typography.Text className='scenery-sub-text' style={{ fontSize: '24px', fontWeight: 600 }}>
+      <div className="start-card-bottom">
+        <Typography.Text className="scenery-sub-text start-card-greeting">
           {greeting} | {dateLabel}{solarTerm ? ` | ${solarTerm}` : ''}
         </Typography.Text>
 
@@ -378,17 +303,8 @@ const PendingCard = ({ stats, greeting, dateLabel, solarTerm, loading, onStartSt
           shape='round'
           size='large'
           type={highlighted ? 'primary' : 'secondary'}
-          style={{
-            position: 'relative',
-            overflow: 'hidden',
-            minWidth: '120px',
-            height: '48px',
-            padding: '0 32px',
-            fontSize: '16px',
-            flexShrink: 0,
-            backgroundColor: highlighted ? PRIMARY_COLOR : undefined,
-            borderColor: highlighted ? PRIMARY_COLOR : undefined,
-          }}
+          className="start-cta-button"
+          data-highlighted={highlighted ? 'true' : 'false'}
           onMouseEnter={() => {
             setHovered(true);
             setRippleKey((value) => value + 1);
@@ -402,23 +318,9 @@ const PendingCard = ({ stats, greeting, dateLabel, solarTerm, loading, onStartSt
           onClick={handleClick}
         >
           {hovered ? (
-            <span
-              key={rippleKey}
-              className='start-btn-ripple'
-              style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                width: '100%',
-                aspectRatio: '1',
-                borderRadius: '50%',
-                background: PRIMARY_COLOR,
-                pointerEvents: 'none',
-                zIndex: 0,
-              }}
-            />
+            <span key={rippleKey} className="start-btn-ripple" />
           ) : null}
-          <span style={{ position: 'relative', zIndex: 1 }}>{t('startPage.start')}</span>
+          <span className="start-cta-button-label">{t('startPage.start')}</span>
         </Button>
       </div>
     </div>
@@ -427,41 +329,24 @@ const PendingCard = ({ stats, greeting, dateLabel, solarTerm, loading, onStartSt
 
 const DoneCard = ({ scenery }: { scenery: SceneryContent | null }) => {
   const [hovered, setHovered] = useState(false);
+  const hoverState = hovered ? 'true' : 'false';
 
   // 窗景关闭时（scenery 为 null），显示纯背景卡片样式
   if (!scenery) {
     return (
-      <div
-        style={{
-          ...cardStyle,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          background: 'var(--color-bg-2)',
-        }}
-      >
-        <div style={{ position: 'relative', zIndex: 1, padding: '24px' }}>
+      <div className="start-card-frame start-card-frame--done">
+        <div className="start-card-top">
           <Typography.Paragraph
             type='secondary'
             spacing='close'
-            style={{ margin: 0, fontSize: '48px', fontWeight: 600 }}
+            className="start-card-headline"
           >
             恭喜你，今日任务已完成！
           </Typography.Paragraph>
         </div>
 
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 1,
-            padding: '24px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-end',
-            gap: '24px',
-          }}
-        >
-          <Typography.Text className='scenery-sub-text' style={{ fontSize: '24px', fontWeight: 600 }}>
+        <div className="start-card-bottom">
+          <Typography.Text className="scenery-sub-text start-card-greeting">
             继续保持，明天见。
           </Typography.Text>
         </div>
@@ -478,98 +363,32 @@ const DoneCard = ({ scenery }: { scenery: SceneryContent | null }) => {
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={cardStyle}
+      className="start-card-frame start-card-frame--scenery"
     >
       <img
         src={image}
         alt={`窗景图片：${poem} —— ${source}`}
-        className={[
-          'tw-absolute tw-top-0 tw-right-0 tw-bottom-0 tw-h-full',
-          'tw-object-cover tw-object-[right_center]',
-          'tw-transition-[width] tw-duration-[6000ms] tw-ease-[cubic-bezier(0.83,0,0.17,1)]',
-          'tw-scenery-mask',
-          hovered ? 'tw-w-[61.8%]' : 'tw-w-[38.2%]',
-        ].join(' ')}
+        className="start-scenery-image"
+        data-hovered={hoverState}
       />
 
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 1,
-          padding: '24px',
-          opacity: hovered ? 0 : 1,
-          transition: 'opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-          pointerEvents: hovered ? 'none' : 'auto',
-        }}
-      >
+      <div className="start-done-greeting" data-hovered={hoverState}>
         <Typography.Paragraph
           type='secondary'
           spacing='close'
-          style={{ margin: 0, fontSize: '48px', fontWeight: 600 }}
+          className="start-card-headline"
         >
           恭喜你，今日任务已完成！
         </Typography.Paragraph>
       </div>
 
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          bottom: 0,
-          left: 0,
-          width: '38.2%',
-          zIndex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          overflow: 'hidden',
-          opacity: hovered ? 1 : 0,
-          transition: 'opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-          pointerEvents: 'none',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'row-reverse',
-            alignItems: 'flex-start',
-            gap: '12px',
-            height: '90%',
-            maxHeight: '90%',
-            overflow: 'hidden',
-          }}
-        >
-          <div
-            style={{
-              writingMode: 'vertical-rl',
-              fontFamily: '"Noto Serif SC", "Source Han Serif SC", "STSong", serif',
-              fontSize: '18px',
-              fontWeight: 400,
-              letterSpacing: '0.3em',
-              color: 'var(--color-text-1)',
-              lineHeight: 1.6,
-              height: '100%',
-              overflow: 'hidden',
-            }}
-          >
+      <div className="start-poem-container" data-hovered={hoverState}>
+        <div className="start-poem-inner">
+          <div className="start-poem-text">
             {poem}
           </div>
           {source && (
-            <div
-              style={{
-                writingMode: 'vertical-rl',
-                fontFamily: '"Noto Serif SC", "Source Han Serif SC", "STSong", serif',
-                fontSize: '14px',
-                fontWeight: 400,
-                letterSpacing: '0.15em',
-                color: 'var(--color-text-3)',
-                lineHeight: 1.6,
-                overflow: 'hidden',
-              }}
-            >
+            <div className="start-poem-source">
               {'——'}{source}
             </div>
           )}
@@ -610,19 +429,16 @@ const StartPage = ({ onDoneChange, onNavigate }: StartPageProps) => {
   // 学习模式
   if (isStudying) {
     return (
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="start-study-shell">
         <FlashcardStudy onExit={() => setIsStudying(false)} demo={false} filterTag={studyTag} />
       </div>
     );
   }
 
   return (
-    <div id="start-page-scroll" style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
-      <div style={{ position: 'relative', height: '61.8vh', padding: '48px 0 0 64px' }}>
-        <Typography.Title
-          heading={1}
-          style={{ fontWeight: 600, lineHeight: 1, margin: 0, fontSize: '40px' }}
-        >
+    <div id="start-page-scroll" className="start-page-root">
+      <div className="start-hero">
+        <Typography.Title heading={1} className="start-hero-title">
           开始
         </Typography.Title>
 
@@ -643,11 +459,8 @@ const StartPage = ({ onDoneChange, onNavigate }: StartPageProps) => {
         )}
       </div>
 
-      <div style={{ padding: '48px 64px 64px' }}>
-        <Typography.Title
-          heading={2}
-          style={{ fontWeight: 400, lineHeight: 1, margin: '0 0 16px 0', padding: 0, fontSize: '28px' }}
-        >
+      <div className="start-shelves">
+        <Typography.Title heading={2} className="start-shelves-title">
           书架
         </Typography.Title>
 
@@ -659,29 +472,8 @@ const StartPage = ({ onDoneChange, onNavigate }: StartPageProps) => {
           }}
         />
 
-        <div style={{ height: '64px' }} />
+        <div className="start-bottom-spacer" />
       </div>
-
-      <style>{`
-        .scenery-sub-text {
-          color: var(--color-text-3);
-        }
-
-        @keyframes ripple-effect {
-          0% {
-            transform: translate(-50%, -50%) scale(0);
-            opacity: 0.6;
-          }
-          100% {
-            transform: translate(-50%, -50%) scale(2.5);
-            opacity: 0;
-          }
-        }
-
-        .start-btn-ripple {
-          animation: ripple-effect 0.6s ease-out forwards;
-        }
-      `}</style>
     </div>
   );
 };

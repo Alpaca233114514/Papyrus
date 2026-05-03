@@ -88,7 +88,7 @@ body[arco-theme='dark'] {
 
 /* 全局过渡动画 - 可选
    用 :where() 把选择器特异性强制降为 (0,0,0)，作为"默认值"提供颜色过渡。
-   组件自定义的 transition（如 .scenery-img 的 mask-start 动画）能直接覆盖。
+   组件自定义的 transition（如 .start-scenery-image 的 mask-stop 动画）能直接覆盖。
    :where() 不影响 !important / 媒体查询，所以 a11y.css 的无障碍钩子仍然胜出。 */
 @media (prefers-reduced-motion: no-preference) {
   :where(html:not(.aaa-no-animation) body),
