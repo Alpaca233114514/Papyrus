@@ -627,6 +627,7 @@ export class AIManager {
         });
         activeSession.updated_at = Date.now() / 1000;
         this.saveSessions();
+        yield { type: 'done', data: '' };
       } catch (e) {
         yield { type: 'error', data: e instanceof Error ? e.message : String(e) };
       }

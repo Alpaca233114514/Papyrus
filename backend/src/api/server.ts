@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import { pathToFileURL } from 'node:url';
+import { randomUUID } from 'node:crypto';
 import { paths } from '../utils/paths.js';
 import { PapyrusLogger } from '../utils/logger.js';
 import { MCPServer } from '../mcp/server.js';
@@ -25,11 +26,32 @@ const app = Fastify({
 
 // Error handler — sanitize error messages in production to avoid info leakage
 const isDebugMode = process.env.PAPYRUS_DEBUG === '1' || process.env.NODE_ENV === 'development';
-app.setErrorHandler((error: Error & { statusCode?: number }, _request, reply) => {
-  logger.error(`API Error: ${error.message}`);
-  reply.status(error.statusCode ?? 500).send({
+app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => {
+  const errorId = randomUUID().slice(0, 8);
+  const status = error.statusCode ?? 500;
+
+  if (status >= 500) {
+    const ctx = {
+      errorId,
+      method: request.method,
+      url: request.url,
+      params: logger.sanitize(request.params),
+      query: logger.sanitize(request.query),
+      body: logger.sanitize(request.body),
+    };
+    logger.error(
+      `API Error [${errorId}] ${request.method} ${request.url}: ${error.message}\n` +
+      `Context: ${JSON.stringify(ctx)}\n` +
+      `Stack: ${error.stack ?? '(no stack)'}`
+    );
+  } else {
+    logger.error(`API Error [${errorId}] ${request.method} ${request.url} ${status}: ${error.message}`);
+  }
+
+  reply.status(status).send({
     success: false,
     error: isDebugMode ? error.message : 'Internal server error',
+    errorId,
   });
 });
 
@@ -49,6 +71,8 @@ const PORT = process.env.PAPYRUS_PORT ? parseInt(process.env.PAPYRUS_PORT, 10) :
 
 export async function initApp(): Promise<void> {
   setGlobalLogger(logger);
+  const { initAIConfig } = await import('../ai/config-instance.js');
+  initAIConfig();
   const allowedPorts = new Set([5173, 4173, 8000, 3000, 9100]);
   await app.register(cors, {
     origin: (origin, cb) => {
@@ -122,6 +146,7 @@ export async function initApp(): Promise<void> {
   const { default: cardVersionRoutes } = await import('./routes/card-versions.js');
   const { default: filesRoutes } = await import('./routes/files.js');
   const { default: relationsRoutes } = await import('./routes/relations.js');
+  const { default: extensionsRoutes } = await import('./routes/extensions.js');
 
   app.register(cardsRoutes, { prefix: '/api/cards' });
   app.register(reviewRoutes, { prefix: '/api/review' });
@@ -139,6 +164,7 @@ export async function initApp(): Promise<void> {
   app.register(cardVersionRoutes, { prefix: '/api/cards/:cardId' });
   app.register(filesRoutes, { prefix: '/api/files' });
   app.register(relationsRoutes, { prefix: '/api' });
+  app.register(extensionsRoutes, { prefix: '/api' });
 }
 
 let mcpServer: MCPServer | null = null;

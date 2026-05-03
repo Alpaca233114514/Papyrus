@@ -32,26 +32,29 @@ export async function getAuthToken(): Promise<string | null> {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     const token = await getAuthToken();
+    const hasBody = init?.body !== undefined;
     const res = await fetch(`${BASE}${path}`, {
       ...init,
       headers: {
-        'Content-Type': 'application/json',
+        ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { 'X-Papyrus-Token': token } : {}),
         ...(init?.headers as Record<string, string> || {}),
       },
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      const message = body.detail ?? body.error ?? res.statusText;
+      const baseMessage = body.detail ?? body.error ?? res.statusText;
+      const message = body.errorId ? `${baseMessage} [errorId: ${body.errorId}]` : baseMessage;
       if (res.status === 401 && !cachedToken) {
         console.warn('[API] Received 401, retrying token fetch...');
         cachedToken = undefined;
         const retryToken = await getAuthToken();
         if (retryToken) {
+          const retryHasBody = init?.body !== undefined;
           const retryRes = await fetch(`${BASE}${path}`, {
             ...init,
             headers: {
-              'Content-Type': 'application/json',
+              ...(retryHasBody ? { 'Content-Type': 'application/json' } : {}),
               'X-Papyrus-Token': retryToken,
               ...(init?.headers as Record<string, string> || {}),
             },
@@ -60,7 +63,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
             return retryRes.json();
           }
           const retryBody = await retryRes.json().catch(() => ({}));
-          const retryMsg = retryBody.detail ?? retryBody.error ?? retryRes.statusText;
+          const retryBaseMsg = retryBody.detail ?? retryBody.error ?? retryRes.statusText;
+          const retryMsg = retryBody.errorId ? `${retryBaseMsg} [errorId: ${retryBody.errorId}]` : retryBaseMsg;
           console.error(`[API] Retry also failed with ${retryRes.status}: ${retryMsg}`);
           throw new Error(retryMsg);
         }
@@ -318,10 +322,10 @@ export const api = {
   // AI Config
   getAIConfig: () =>
     request<AIConfigRes>('/config/ai'),
-  saveAIConfig: (config: AIConfig) => 
-    request<{ success: boolean }>('/config/ai', { 
-      method: 'POST', 
-      body: JSON.stringify(config) 
+  saveAIConfig: (config: Partial<AIConfig>) =>
+    request<{ success: boolean }>('/config/ai', {
+      method: 'POST',
+      body: JSON.stringify(config)
     }),
   testAIConnection: () => 
     request<{ success: boolean; message: string }>('/config/ai/test', { method: 'POST' }),
@@ -437,4 +441,17 @@ export const api = {
     request<{ success: boolean; message: string; error?: string }>(`/providers/${providerId}/models/${modelId}`, {
       method: 'DELETE',
     }),
+
+  // Tools
+  getToolsCatalog: () =>
+    request<{ success: boolean; tools: Array<{ name: string; category: string; side_effect: 'read' | 'write'; description: string }> }>('/tools/catalog'),
+  getToolsConfig: () =>
+    request<{ success: boolean; config: { mode: string; auto_execute_tools: string[] } }>('/tools/config'),
+  saveToolsConfig: (data: { mode: string; auto_execute_tools: string[] }) =>
+    request<{ success: boolean }>('/tools/config', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getExtensionsList: () =>
+    request<{ success: boolean; extensions: Array<{ id: string; name: string; description: string; version: string; author: string; rating: number; downloads: number; isEnabled: boolean; updateAvailable?: boolean; tags: string[] }>; count: number }>('/extensions'),
 };

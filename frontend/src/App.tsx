@@ -126,8 +126,10 @@ const App = () => {
 
   // 渲染当前页面
   const renderPage = () => {
-    const animationClass = animationDirection ? `page-transition-${animationDirection}` : '';
-    
+    const animationClass =
+      animationDirection === 'up' ? 'motion-safe:tw-animate-page-up' :
+      animationDirection === 'down' ? 'motion-safe:tw-animate-page-down' : '';
+
     const pages: Record<string, React.ReactNode> = {
       start: <StartPage onDoneChange={setTodayDone} onNavigate={handlePageChange} />,
       scroll: <ScrollPage initialTag={initialScrollTag} onInitialTagUsed={() => setInitialScrollTag(undefined)} />,
@@ -139,9 +141,9 @@ const App = () => {
     };
 
     return (
-      <div 
+      <div
         key={activePage}
-        className={`page-container ${animationClass}`}
+        className={`tw-absolute tw-inset-0 tw-flex tw-flex-col ${animationClass}`}
       >
         {pages[activePage]}
       </div>
@@ -149,14 +151,7 @@ const App = () => {
   };
 
   return (
-    <div 
-      className="tw-relative tw-flex tw-flex-col tw-mx-auto tw-bg-arco-bg-1"
-      style={{ 
-        width: '100%', 
-        height: '100vh',
-        overflow: 'hidden'
-      }}
-    >
+    <div className="tw-relative tw-flex tw-flex-col tw-mx-auto tw-w-full tw-h-screen tw-overflow-hidden tw-bg-arco-bg-1">
       {/* Skip Link - 无障碍导航（AA 级） */}
       <a 
         href="#main-content" 
@@ -169,13 +164,9 @@ const App = () => {
       {/* 返回顶部按钮 */}
       {activePage === 'start' && (
         <BackTop
+          className="tw-absolute tw-bottom-12 tw-transition-[right] tw-duration-300 tw-ease-[ease]"
           visibleHeight={200}
-          style={{
-            position: 'absolute',
-            right: chatOpen ? chatWidth + 48 : 48,
-            bottom: 48,
-            transition: 'right 0.3s ease',
-          }}
+          style={{ right: chatOpen ? chatWidth + 48 : 48 }}
           target={() => document.getElementById('start-page-scroll') ?? window as unknown as HTMLElement}
           aria-label="返回顶部"
         />
@@ -210,13 +201,8 @@ const App = () => {
         >
           {/* 完成状态光晕 */}
           {activePage === 'start' && todayDone && (
-            <div 
-              className="tw-absolute tw-inset-x-0 tw-top-0 tw-pointer-events-none"
-              style={{ 
-                height: '160px', 
-                background: 'linear-gradient(to bottom, rgba(232, 255, 234, 0.45) 0%, transparent 100%)',
-                zIndex: 0 
-              }} 
+            <div
+              className="tw-absolute tw-inset-x-0 tw-top-0 tw-h-[160px] tw-pointer-events-none tw-z-0 tw-bg-gradient-to-b tw-from-[rgba(232,255,234,0.45)] tw-to-transparent"
               aria-hidden="true"
             />
           )}
@@ -240,16 +226,11 @@ const App = () => {
             aria-label="AI 助手聊天面板"
           >
             <div
-              className="tw-flex-shrink-0 tw-transition-colors tw-duration-200"
-              style={{ 
-                width: 4, 
-                cursor: activePage === 'start' ? 'default' : 'ew-resize'
-              }}
+              className={[
+                "tw-flex-shrink-0 tw-w-1 tw-transition-colors tw-duration-200",
+                activePage === 'start' ? "tw-cursor-default" : "tw-cursor-ew-resize hover:tw-bg-arco-border-2"
+              ].join(" ")}
               onMouseDown={activePage !== 'start' ? onChatDragStart : undefined}
-              onMouseEnter={e => { 
-                if (activePage !== 'start') e.currentTarget.style.background = 'var(--color-border-2)'; 
-              }}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               role="separator"
               aria-orientation="vertical"
               aria-label="调整聊天面板宽度"

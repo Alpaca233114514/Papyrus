@@ -2,6 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { AIConfig } from './config.js';
 import { loadAllProviders, saveProvider, saveApiKey, saveModel } from '../db/database.js';
 
+function isMaskedKey(key: string): boolean {
+  return key.length > 0 && key.startsWith('*');
+}
+
 /**
  * 从数据库同步全局配置到 AIConfig
  * - 同步 isDefault provider 到 current_provider / current_model
@@ -44,34 +48,44 @@ export function syncAIConfigToDB(aiConfig: AIConfig): void {
   try {
     const dbProviders = loadAllProviders();
     for (const [providerType, providerConfig] of Object.entries(aiConfig.config.providers)) {
-      const existing = dbProviders.find((p) => p.type === providerType);
+      const sameType = dbProviders.filter((p) => p.type === providerType);
+      if (sameType.length > 1) {
+        console.warn(`[syncAIConfigToDB] 发现 ${sameType.length} 个同名 provider type "${providerType}"，使用第一个`);
+      }
+      const existing = sameType[0];
       const providerId = existing?.id ?? `p-${providerType}-${randomUUID()}`;
 
-      saveProvider({
-        id: providerId,
-        type: providerType,
-        name: existing?.name ?? providerType,
-        baseUrl: providerConfig.base_url,
-        enabled: true,
-        isDefault: aiConfig.config.current_provider === providerType,
-      });
+      try {
+        saveProvider({
+          id: providerId,
+          type: providerType,
+          name: existing?.name ?? providerType,
+          baseUrl: providerConfig.base_url,
+          enabled: true,
+          isDefault: aiConfig.config.current_provider === providerType,
+        });
 
-      const existingKey = existing?.apiKeys[0];
-      saveApiKey(providerId, {
-        id: existingKey?.id ?? `${providerId}-key`,
-        name: 'default',
-        key: providerConfig.api_key,
-      });
-
-      for (const modelId of providerConfig.models) {
-        if (modelId) {
-          saveModel(providerId, {
-            id: `${providerId}-${modelId}`,
-            modelId,
-            name: modelId,
-            enabled: true,
+        const existingKey = existing?.apiKeys[0];
+        if (!isMaskedKey(providerConfig.api_key)) {
+          saveApiKey(providerId, {
+            id: existingKey?.id ?? `${providerId}-key`,
+            name: 'default',
+            key: providerConfig.api_key,
           });
         }
+
+        for (const modelId of providerConfig.models) {
+          if (modelId) {
+            saveModel(providerId, {
+              id: `${providerId}-${modelId}`,
+              modelId,
+              name: modelId,
+              enabled: true,
+            });
+          }
+        }
+      } catch (innerErr) {
+        console.warn(`[syncAIConfigToDB] 同步 provider "${providerType}" 失败:`, innerErr instanceof Error ? innerErr.message : String(innerErr));
       }
     }
   } catch (e) {

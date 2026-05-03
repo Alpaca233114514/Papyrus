@@ -189,6 +189,7 @@ html.aaa-reading-mode p,
 html.aaa-reading-mode .arco-typography-paragraph,
 html.aaa-reading-mode .aaa-reading-text {
   text-align: left !important;
+  -webkit-hyphens: none !important;
   hyphens: none !important;
   text-justify: none !important;
 }

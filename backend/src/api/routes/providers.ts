@@ -49,6 +49,10 @@ export default async function providersRoutes(fastify: FastifyInstance): Promise
       reply.send({ success: true, provider: { ...body, id }, message: 'Provider created' });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('UNIQUE constraint failed')) {
+        reply.status(409).send({ success: false, error: '相同配置的服务商已存在' });
+        return;
+      }
       reply.status(500).send({ success: false, error: `添加供应商失败: ${msg}` });
     }
   });
@@ -60,15 +64,28 @@ export default async function providersRoutes(fastify: FastifyInstance): Promise
       runInTransaction(() => {
         saveProvider({ ...body, id: providerId });
 
+        const incomingKeyIds = new Set(body.apiKeys?.map(k => k.id).filter(Boolean) ?? []);
         if (body.apiKeys) {
           for (const key of body.apiKeys) {
-            saveApiKey(providerId, key);
+            const savedKeyId = saveApiKey(providerId, key);
+            incomingKeyIds.add(savedKeyId);
+          }
+        }
+        const db = getDb();
+        const allKeys = db.prepare('SELECT id FROM api_keys WHERE provider_id = ?').all(providerId) as { id: string }[];
+        for (const row of allKeys) {
+          if (!incomingKeyIds.has(row.id)) {
+            deleteApiKey(row.id);
           }
         }
       });
       reply.send({ success: true, message: 'Provider updated' });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('UNIQUE constraint failed')) {
+        reply.status(409).send({ success: false, error: '相同配置的服务商已存在' });
+        return;
+      }
       reply.status(500).send({ success: false, error: `更新供应商失败: ${msg}` });
     }
   });
@@ -122,6 +139,10 @@ export default async function providersRoutes(fastify: FastifyInstance): Promise
       reply.send({ success: true, modelId, message: 'Model added' });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('UNIQUE constraint failed')) {
+        reply.status(409).send({ success: false, error: '该模型已存在于当前供应商' });
+        return;
+      }
       if (msg.includes('FOREIGN KEY')) {
         reply.status(400).send({ success: false, error: `添加模型失败:外键约束失败,apiKeyId 或 providerId 不存在 (${msg})` });
         return;
@@ -149,7 +170,11 @@ export default async function providersRoutes(fastify: FastifyInstance): Promise
   fastify.delete('/:providerId/models/:modelId', async (request, reply) => {
     try {
       const { modelId } = request.params as { modelId: string };
-      deleteModel(modelId);
+      const deleted = deleteModel(modelId);
+      if (!deleted) {
+        reply.status(404).send({ success: false, error: 'Model not found' });
+        return;
+      }
       reply.send({ success: true, message: 'Model deleted' });
     } catch (err) {
       const message = err instanceof Error ? err.message : '服务器内部错误';

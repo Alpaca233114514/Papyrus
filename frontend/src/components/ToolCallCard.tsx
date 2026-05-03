@@ -8,36 +8,36 @@ const CollapseItem = Collapse.Item;
 export type ToolCallStatus = 'pending' | 'executing' | 'success' | 'failed';
 
 export interface ToolCallCardProps {
-  /** 工具名称 */
   toolName: string;
-  /** 工具图标 */
   icon?: React.ReactNode;
-  /** 执行状态 */
   status: ToolCallStatus;
-  /** 工具参数 */
-  params?: Record<string, any>;
-  /** 执行结果 */
-  result?: any;
-  /** 错误信息 */
+  params?: Record<string, unknown>;
+  result?: unknown;
   error?: string;
-  /** 批准回调 */
   onApprove?: () => void;
-  /** 拒绝回调 */
   onReject?: () => void;
-  /** 默认是否展开 */
   defaultExpanded?: boolean;
+  expanded?: boolean;
+  serverName?: string;
 }
 
-/**
- * 工具调用卡片组件
- * 
- * 显示工具调用的状态、参数和结果
- * - pending: 黄色边框/背景，显示"待审批"标签，有批准/拒绝按钮
- * - executing: 蓝色边框/背景，显示加载动画，"执行中..."
- * - success: 绿色边框/背景，显示"执行成功"标签和结果
- * - failed: 红色边框/背景，显示"执行失败"标签和错误信息
- * - 支持自动折叠功能（点击标题展开/折叠详情）
- */
+function pickParamPreview(params: Record<string, unknown> | undefined): string | null {
+  if (!params || Object.keys(params).length === 0) return null;
+  for (const key of ['url', 'title', 'name', 'query', 'keyword', 'note_id', 'topic']) {
+    const val = params[key];
+    if (typeof val === 'string' && val.trim().length > 0) {
+      const s = val.trim();
+      return s.length > 60 ? s.slice(0, 60) + '...' : s;
+    }
+  }
+  const firstStr = Object.values(params).find(v => typeof v === 'string' && v.trim().length > 0);
+  if (typeof firstStr === 'string') {
+    const s = firstStr.trim();
+    return s.length > 60 ? s.slice(0, 60) + '...' : s;
+  }
+  return null;
+}
+
 export const ToolCallCard: React.FC<ToolCallCardProps> = ({
   toolName,
   icon,
@@ -48,41 +48,49 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = ({
   onApprove,
   onReject,
   defaultExpanded = false,
+  expanded,
+  serverName,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const [internalExpanded, setInternalExpanded] = useState(defaultExpanded);
+  const isExpanded = expanded !== undefined ? expanded : internalExpanded;
 
-  // 状态配置
+  const handleCollapseChange = (_key: string, keys: string[]) => {
+    if (expanded === undefined) {
+      setInternalExpanded(keys.includes('1'));
+    }
+  };
+
   const statusConfig = {
     pending: {
       label: '待审批',
-      color: 'orange',
+      color: 'orange' as const,
       className: 'tool-call-pending',
       icon: <IconTool />,
     },
     executing: {
       label: '执行中',
-      color: 'blue',
+      color: 'blue' as const,
       className: 'tool-call-executing',
       icon: <IconLoading className="tool-call-spin" />,
     },
     success: {
       label: '执行成功',
-      color: 'green',
+      color: 'green' as const,
       className: 'tool-call-success',
       icon: <IconCheck />,
     },
     failed: {
       label: '执行失败',
-      color: 'red',
+      color: 'red' as const,
       className: 'tool-call-failed',
       icon: <IconClose />,
     },
   };
 
   const config = statusConfig[status];
+  const paramPreview = pickParamPreview(params);
 
-  // 格式化 JSON 数据
-  const formatJSON = (data: any): string => {
+  const formatJSON = (data: unknown): string => {
     try {
       return JSON.stringify(data, null, 2);
     } catch {
@@ -90,85 +98,43 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = ({
     }
   };
 
-  // 渲染参数
-  const renderParams = () => {
-    if (!params || Object.keys(params).length === 0) {
-      return <div className="tool-call-empty">无参数</div>;
-    }
-
-    const data = Object.entries(params).map(([key, value]) => ({
-      label: key,
-      value: typeof value === 'object' ? JSON.stringify(value) : String(value),
-    }));
-
-    return (
-      <Descriptions
-        data={data}
-        layout="inline-vertical"
-        column={1}
-        size="small"
-        className="tool-call-params"
-      />
-    );
-  };
-
-  // 渲染结果
-  const renderResult = () => {
-    if (status === 'failed') {
-      return (
-        <div className="tool-call-error">
-          <div className="tool-call-error-message">
-            {error || '未知错误'}
-          </div>
-        </div>
-      );
-    }
-
-    if (result === undefined || result === null) {
-      return <div className="tool-call-empty">暂无结果</div>;
-    }
-
-    return (
-      <pre className="tool-call-result">
-        <code>{formatJSON(result)}</code>
-      </pre>
-    );
-  };
+  const toolLabel = serverName ? `${serverName} : ${toolName}` : toolName;
 
   return (
     <div className={`tool-call-card ${config.className}`}>
       <Collapse
         bordered={false}
         activeKey={isExpanded ? ['1'] : []}
-        onChange={(keys) => setIsExpanded(keys.includes('1'))}
+        onChange={handleCollapseChange}
         className="tool-call-collapse"
       >
         <CollapseItem
           name="1"
           header={(
             <div className="tool-call-header">
-              <div className="tool-call-title-wrapper">
-                <span className="tool-call-icon">{icon || config.icon}</span>
-                <span className="tool-call-name">调用：{toolName}</span>
-                <Tag 
-                  color={config.color} 
-                  size="small"
-                  className="tool-call-status-tag"
-                >
-                  {status === 'executing' ? (
-                    <span className="tool-call-status-with-spin">
-                      <Spin size={12} />
-                      {config.label}
-                    </span>
-                  ) : (
-                    config.label
-                  )}
-                </Tag>
-              </div>
+              <span className="tool-call-icon">{icon || config.icon}</span>
+              <span className="tool-call-name">{toolLabel}</span>
+              {paramPreview && (
+                <span className="tool-call-param-preview">{paramPreview}</span>
+              )}
+              <Tag
+                color={config.color}
+                size="small"
+                className="tool-call-status-tag"
+              >
+                {status === 'executing' ? (
+                  <span className="tool-call-status-with-spin">
+                    <Spin size={12} />
+                    {config.label}
+                  </span>
+                ) : (
+                  config.label
+                )}
+              </Tag>
               {status === 'pending' && (
                 <div className="tool-call-actions" onClick={(e) => e.stopPropagation()}>
-                  <Button 
-                    type="primary" 
+                  <Button
+                    type="primary"
                     size="mini"
                     status="success"
                     onClick={onApprove}
@@ -176,8 +142,8 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = ({
                   >
                     批准
                   </Button>
-                  <Button 
-                    type="secondary" 
+                  <Button
+                    type="secondary"
                     size="mini"
                     status="danger"
                     onClick={onReject}
@@ -200,7 +166,20 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = ({
             <div className="tool-call-section">
               <div className="tool-call-section-title">参数</div>
               <div className="tool-call-section-body">
-                {renderParams()}
+                {(params && Object.keys(params).length > 0) ? (
+                  <Descriptions
+                    data={Object.entries(params).map(([key, value]) => ({
+                      label: key,
+                      value: typeof value === 'object' ? JSON.stringify(value) : String(value),
+                    }))}
+                    layout="inline-vertical"
+                    column={1}
+                    size="small"
+                    className="tool-call-params"
+                  />
+                ) : (
+                  <div className="tool-call-empty">无参数</div>
+                )}
               </div>
             </div>
             {(status === 'success' || status === 'failed') && (
@@ -209,7 +188,17 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = ({
                   {status === 'failed' ? '错误信息' : '执行结果'}
                 </div>
                 <div className="tool-call-section-body">
-                  {renderResult()}
+                  {status === 'failed' ? (
+                    <div className="tool-call-error">
+                      <div className="tool-call-error-message">
+                        {error || '未知错误'}
+                      </div>
+                    </div>
+                  ) : (
+                    <pre className="tool-call-result">
+                      <code>{result !== undefined && result !== null ? formatJSON(result) : '暂无结果'}</code>
+                    </pre>
+                  )}
                 </div>
               </div>
             )}

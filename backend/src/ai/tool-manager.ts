@@ -23,7 +23,18 @@ export class ToolManager {
   private allCalls: Map<string, ToolCallRecord> = new Map();
   private config: ToolCallConfig = {
     mode: 'manual',
-    auto_execute_tools: ['search_cards', 'get_card_stats'],
+    auto_execute_tools: [
+      'search_cards',
+      'get_card_stats',
+      'search_notes',
+      'get_note',
+      'list_relations',
+      'read_file',
+      'list_files',
+      'read_data_stats',
+      'list_extensions',
+      'get_settings',
+    ],
   };
 
   getConfig(): ToolCallConfig {

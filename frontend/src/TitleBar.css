@@ -8,6 +8,7 @@
   height: 40px;
   background: var(--color-bg-1);
   padding: 0;
+  -webkit-user-select: none;
   user-select: none;
   flex-shrink: 0;
   font-size: 13px;

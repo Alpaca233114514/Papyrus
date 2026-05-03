@@ -192,69 +192,85 @@ function initSchema(database: DatabaseSync): void {
   if (isNewDb) {
     seedDefaults(database);
   }
+
+  deduplicateData(database);
+
+  try {
+    database.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_providers_unique ON providers(type, name, base_url);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_models_unique ON provider_models(provider_id, model_id);
+    `);
+  } catch (err) {
+    console.error('创建唯一索引失败:', err instanceof Error ? err.message : String(err));
+  }
 }
 
-function seedDefaults(database: DatabaseSync): void {
-  const now = Date.now() / 1000;
-  const encryptedEmpty = encryptApiKey('');
+function deduplicateData(database: DatabaseSync): void {
+  try {
+    database.exec('BEGIN TRANSACTION;');
 
-  const providers = [
-    ['p-openai', 'openai', 'OpenAI', 'https://api.openai.com/v1', 1, 0, now, now],
-    ['p-anthropic', 'anthropic', 'Anthropic', 'https://api.anthropic.com/v1', 1, 0, now, now],
-    ['p-gemini', 'gemini', 'Gemini', 'https://generativelanguage.googleapis.com/v1beta', 1, 0, now, now],
-    ['p-deepseek', 'deepseek', 'DeepSeek', 'https://api.deepseek.com', 1, 0, now, now],
-    ['p-moonshot', 'moonshot', '月之暗面', 'https://api.moonshot.cn', 1, 0, now, now],
-    ['p-liyuan-deepseek', 'liyuan-deepseek', 'LiYuan For DeepSeek', 'https://papyrus.liyuanstudio.com/v1', 1, 0, now, now],
-    ['p-siliconflow', 'siliconflow', '硅基流动', 'https://api.siliconflow.cn', 1, 0, now, now],
-    ['p-ollama', 'ollama', 'Ollama', 'http://localhost:11434', 1, 0, now, now],
-  ];
+    // Step 1: Deduplicate providers by (type, name, base_url)
+    // Keep the one that is default, or has the earliest created_at, or minimum id
+    const providerDups = database.prepare(`
+      SELECT type, name, base_url,
+        COALESCE(
+          MIN(CASE WHEN is_default = 1 THEN id END),
+          MIN(CASE WHEN created_at > 0 THEN id END),
+          MIN(id)
+        ) as keeper_id,
+        COUNT(*) as cnt
+      FROM providers
+      GROUP BY type, name, base_url
+      HAVING cnt > 1
+    `).all() as Array<{ type: string; name: string; base_url: string; keeper_id: string }>;
 
-  const insertProvider = database.prepare(
-    'INSERT INTO providers (id, type, name, base_url, enabled, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-  );
-  for (const p of providers) {
-    insertProvider.run(...p);
+    for (const dup of providerDups) {
+      const dupIds = database.prepare(
+        'SELECT id FROM providers WHERE type = ? AND name = ? AND base_url = ? AND id != ?'
+      ).all(dup.type, dup.name, dup.base_url, dup.keeper_id) as Array<{ id: string }>;
+
+      for (const { id } of dupIds) {
+        database.prepare('UPDATE api_keys SET provider_id = ? WHERE provider_id = ?').run(dup.keeper_id, id);
+        database.prepare('UPDATE provider_models SET provider_id = ? WHERE provider_id = ?').run(dup.keeper_id, id);
+        database.prepare('DELETE FROM providers WHERE id = ?').run(id);
+      }
+    }
+
+    if (providerDups.length > 0) {
+      console.info(`数据去重: 清理 ${providerDups.length} 组重复供应商`);
+    }
+
+    // Step 2: Deduplicate models by (provider_id, model_id)
+    // Keep enabled one if possible, otherwise minimum id
+    const modelDups = database.prepare(`
+      SELECT provider_id, model_id,
+        COALESCE(MIN(CASE WHEN enabled = 1 THEN id END), MIN(id)) as keeper_id,
+        COUNT(*) as cnt
+      FROM provider_models
+      GROUP BY provider_id, model_id
+      HAVING cnt > 1
+    `).all() as Array<{ provider_id: string; model_id: string; keeper_id: string }>;
+
+    for (const dup of modelDups) {
+      database.prepare(
+        'DELETE FROM provider_models WHERE provider_id = ? AND model_id = ? AND id != ?'
+      ).run(dup.provider_id, dup.model_id, dup.keeper_id);
+    }
+
+    if (modelDups.length > 0) {
+      console.info(`数据去重: 清理 ${modelDups.length} 组重复模型`);
+    }
+
+    database.exec('COMMIT;');
+  } catch (err) {
+    database.exec('ROLLBACK;');
+    console.error('数据去重失败:', err instanceof Error ? err.message : String(err));
   }
+}
 
-  const apiKeys = [
-    ['k-openai', 'p-openai', 'default', encryptedEmpty, now],
-    ['k-anthropic', 'p-anthropic', 'default', encryptedEmpty, now],
-    ['k-gemini', 'p-gemini', 'default', encryptedEmpty, now],
-    ['k-deepseek', 'p-deepseek', 'default', encryptedEmpty, now],
-    ['k-moonshot', 'p-moonshot', 'default', encryptedEmpty, now],
-    ['k-liyuan-deepseek', 'p-liyuan-deepseek', 'default', encryptedEmpty, now],
-    ['k-siliconflow', 'p-siliconflow', 'default', encryptedEmpty, now],
-    ['k-ollama', 'p-ollama', 'default', encryptedEmpty, now],
-  ];
-
-  const insertKey = database.prepare(
-    'INSERT INTO api_keys (id, provider_id, name, encrypted_key, created_at) VALUES (?, ?, ?, ?, ?)'
-  );
-  for (const k of apiKeys) {
-    insertKey.run(...k);
-  }
-
-  const allCaps = JSON.stringify(['tools', 'vision', 'reasoning']);
-  const dsCaps = JSON.stringify(['tools', 'reasoning']);
-
-  const models = [
-    ['m-openai-1', 'p-openai', 'GPT 5.5', 'gpt-5.5', 'openai', allCaps, 'k-openai', 1],
-    ['m-anthropic-1', 'p-anthropic', 'Claude Mythos', 'claude-mythos', 'anthropic', allCaps, 'k-anthropic', 1],
-    ['m-anthropic-2', 'p-anthropic', 'Opus 4.7', 'claude-opus-4.7', 'anthropic', allCaps, 'k-anthropic', 1],
-    ['m-gemini-1', 'p-gemini', 'Gemini 3.1 Pro', 'gemini-3.1-pro-preview', 'gemini', allCaps, 'k-gemini', 1],
-    ['m-gemini-2', 'p-gemini', 'Gemini 3.0 Flash', 'gemini-3-flash-preview', 'gemini', allCaps, 'k-gemini', 1],
-    ['m-deepseek-1', 'p-deepseek', 'DeepSeek V4 Pro', 'deepseek-v4-pro', 'openai', dsCaps, 'k-deepseek', 1],
-    ['m-moonshot-1', 'p-moonshot', 'Kimi K2.6', 'kimi-k2.6', 'openai', allCaps, 'k-moonshot', 1],
-    ['m-liyuan-ds-flash', 'p-liyuan-deepseek', 'DeepSeek V4 Flash', 'deepseek-v4-flash', 'openai', allCaps, 'k-liyuan-deepseek', 1],
-    ['m-liyuan-ds-pro', 'p-liyuan-deepseek', 'DeepSeek V4 Pro', 'liyuan-deepseek-v4-pro', 'openai', dsCaps, 'k-liyuan-deepseek', 0],
-  ];
-
-  const insertModel = database.prepare(
-    'INSERT INTO provider_models (id, provider_id, name, model_id, port, capabilities, api_key_id, enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-  );
-  for (const m of models) {
-    insertModel.run(...m);
-  }
+function seedDefaults(_database: DatabaseSync): void {
+  // 不再预填 mock 供应商/模型数据
+  // 用户通过设置界面手动添加供应商和模型
 }
 
 function tagsToJson(tags: string[] | undefined): string {
@@ -668,7 +684,7 @@ export function loadAllProviders(logger?: PapyrusLogger): Provider[] {
       modelId: m.model_id,
       port: m.port,
       capabilities: jsonFromStr(m.capabilities) as string[],
-      apiKeyId: m.api_key_id,
+      apiKeyId: m.api_key_id ?? null,
       enabled: Boolean(m.enabled),
     }));
 
@@ -684,7 +700,25 @@ export function loadAllProviders(logger?: PapyrusLogger): Provider[] {
     });
   }
 
-  return providers;
+  // 防御性去重：即使数据库出现重复，输出层也不渲染重复项
+  const seenProviders = new Set<string>();
+  const dedupedProviders: Provider[] = [];
+  for (const p of providers) {
+    const key = `${p.type}|${p.name}|${p.baseUrl}`;
+    if (seenProviders.has(key)) continue;
+    seenProviders.add(key);
+
+    const seenModels = new Set<string>();
+    const dedupedModels = p.models.filter(m => {
+      if (seenModels.has(m.modelId)) return false;
+      seenModels.add(m.modelId);
+      return true;
+    });
+
+    dedupedProviders.push({ ...p, models: dedupedModels });
+  }
+
+  return dedupedProviders;
 }
 
 function inferProviderType(baseUrl: string | undefined, fallbackType: string | undefined): string {
@@ -703,9 +737,19 @@ function inferProviderType(baseUrl: string | undefined, fallbackType: string | u
 
 export function saveProvider(provider: Partial<Provider> & { id?: string }, logger?: PapyrusLogger): string {
   const database = getDb();
-  const providerId = provider.id ?? randomUUID();
-  const now = Date.now() / 1000;
   const providerType = inferProviderType(provider.baseUrl, provider.type);
+
+  let providerId: string;
+  if (provider.id) {
+    providerId = provider.id;
+  } else {
+    const existing = database.prepare(
+      'SELECT id FROM providers WHERE type = ? AND name = ? AND base_url = ?'
+    ).get(providerType, provider.name ?? '', provider.baseUrl ?? '') as { id: string } | undefined;
+    providerId = existing?.id ?? randomUUID();
+  }
+
+  const now = Date.now() / 1000;
 
   const existing = database.prepare('SELECT id FROM providers WHERE id = ?').get(providerId) as { id: string } | undefined;
   if (existing) {
@@ -794,9 +838,18 @@ export function deleteApiKey(keyId: string, logger?: PapyrusLogger): boolean {
 
 // ==================== Models ====================
 
-export function saveModel(providerId: string, model: { id?: string; name?: string; modelId?: string; port?: string; capabilities?: string[]; apiKeyId?: string; enabled?: boolean }, logger?: PapyrusLogger): string {
+export function saveModel(providerId: string, model: { id?: string; name?: string; modelId?: string; port?: string; capabilities?: string[]; apiKeyId?: string | null; enabled?: boolean }, logger?: PapyrusLogger): string {
   const database = getDb();
-  const modelId = model.id ?? randomUUID();
+
+  let modelId: string;
+  if (model.id) {
+    modelId = model.id;
+  } else {
+    const existing = database.prepare(
+      'SELECT id FROM provider_models WHERE provider_id = ? AND model_id = ?'
+    ).get(providerId, model.modelId ?? '') as { id: string } | undefined;
+    modelId = existing?.id ?? randomUUID();
+  }
 
   const existing = database.prepare('SELECT id FROM provider_models WHERE id = ?').get(modelId) as { id: string } | undefined;
   if (existing) {

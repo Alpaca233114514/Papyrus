@@ -10,13 +10,9 @@ interface AIResponseParserClass {
 }
 
 interface CardToolsInstance {
-  createCard(q: string, a: string, tags?: string[]): { success: boolean; card?: { q: string } };
-  searchCards(keyword: string): { success: boolean; results?: Array<{ question: string }> };
-  getCardStats(): { success: boolean; stats?: { total_cards: number } };
-  executeTool(tool: string, params: Record<string, unknown>): { success: boolean; error?: string; new?: { q: string } };
-  updateCard(index: number, q?: string, a?: string): { success: boolean; new?: { q: string } };
-  deleteCard(index: number): { success: boolean };
+  executeTool(tool: string, params: Record<string, unknown>): { success: boolean; error?: string; new?: { q: string }; stats?: { total_cards: number }; results?: Array<{ question: string }>; card?: { q: string } };
   parseToolCall(text: string): { tool: string } | null;
+  getToolsForOpenAI(): Array<{ type: string; function: { name: string; description: string; parameters: { type: string; required: string[]; properties: Record<string, unknown> } } }>;
 }
 
 const testDir = path.join(os.tmpdir(), `papyrus-ai-tools-test-${Date.now()}`);
@@ -84,33 +80,33 @@ describe('CardTools', () => {
   });
 
   it('should create card', () => {
-    const result = tools.createCard('What is 2+2?', '4');
+    const result = tools.executeTool('create_card', { question: 'What is 2+2?', answer: '4' });
     expect(result.success).toBe(true);
     expect(result.card?.q).toBe('What is 2+2?');
   });
 
   it('should reject empty card', () => {
-    const result = tools.createCard('', '');
+    const result = tools.executeTool('create_card', { question: '', answer: '' });
     expect(result.success).toBe(false);
   });
 
   it('should search cards', () => {
-    tools.createCard('Math question xyz', '42', ['math']);
-    tools.createCard('History question', '1066', ['history']);
-    const result = tools.searchCards('xyz');
+    tools.executeTool('create_card', { question: 'Math question xyz', answer: '42', tags: ['math'] });
+    tools.executeTool('create_card', { question: 'History question', answer: '1066', tags: ['history'] });
+    const result = tools.executeTool('search_cards', { keyword: 'xyz' });
     expect(result.success).toBe(true);
     expect(result.results?.some(r => r.question === 'Math question xyz')).toBe(true);
   });
 
   it('should get card stats', () => {
-    const result = tools.getCardStats();
+    const result = tools.executeTool('get_card_stats', {});
     expect(result.success).toBe(true);
     expect(result.stats).toBeDefined();
     expect(typeof result.stats?.total_cards).toBe('number');
   });
 
   it('should execute known tools', () => {
-    tools.createCard('Q1', 'A1');
+    tools.executeTool('create_card', { question: 'Q1', answer: 'A1' });
     const result = tools.executeTool('get_card_stats', {});
     expect(result.success).toBe(true);
   });
@@ -122,25 +118,25 @@ describe('CardTools', () => {
   });
 
   it('should update a card', () => {
-    tools.createCard('Old Q', 'Old A');
-    const result = tools.updateCard(0, 'New Q', 'New A');
+    tools.executeTool('create_card', { question: 'Old Q', answer: 'Old A' });
+    const result = tools.executeTool('update_card', { card_index: 0, question: 'New Q', answer: 'New A' });
     expect(result.success).toBe(true);
     expect(result.new?.q).toBe('New Q');
   });
 
   it('should reject invalid card index for update', () => {
-    const result = tools.updateCard(999, 'Q');
+    const result = tools.executeTool('update_card', { card_index: 999, question: 'Q' });
     expect(result.success).toBe(false);
   });
 
   it('should delete a card', () => {
-    tools.createCard('Del', 'A');
-    const result = tools.deleteCard(0);
+    tools.executeTool('create_card', { question: 'Del', answer: 'A' });
+    const result = tools.executeTool('delete_card', { card_index: 0 });
     expect(result.success).toBe(true);
   });
 
   it('should reject invalid card index for delete', () => {
-    const result = tools.deleteCard(999);
+    const result = tools.executeTool('delete_card', { card_index: 999 });
     expect(result.success).toBe(false);
   });
 
@@ -155,7 +151,7 @@ describe('CardTools', () => {
   });
 
   it('should execute update_card via executeTool', () => {
-    tools.createCard('Q', 'A');
+    tools.executeTool('create_card', { question: 'Q', answer: 'A' });
     const result = tools.executeTool('update_card', { card_index: 0, question: 'New' });
     expect(result.success).toBe(true);
   });
@@ -166,7 +162,7 @@ describe('CardTools', () => {
   });
 
   it('should execute delete_card via executeTool', () => {
-    tools.createCard('Q', 'A');
+    tools.executeTool('create_card', { question: 'Q', answer: 'A' });
     const result = tools.executeTool('delete_card', { card_index: 0 });
     expect(result.success).toBe(true);
   });
@@ -177,7 +173,7 @@ describe('CardTools', () => {
   });
 
   it('should execute search_cards via executeTool', () => {
-    tools.createCard('Math', '42');
+    tools.executeTool('create_card', { question: 'Math', answer: '42' });
     const result = tools.executeTool('search_cards', { keyword: 'math' });
     expect(result.success).toBe(true);
   });
@@ -285,9 +281,9 @@ describe('getToolsForOpenAI', () => {
     tools = new toolsModule.CardTools();
   });
 
-  it('should return 6 tool definitions', () => {
+  it('should return 21 tool definitions (6 original + 15 new)', () => {
     const schema = tools.getToolsForOpenAI();
-    expect(schema.length).toBe(6);
+    expect(schema.length).toBe(21);
   });
 
   it('should have correct structure for each tool', () => {
@@ -300,7 +296,7 @@ describe('getToolsForOpenAI', () => {
     }
   });
 
-  it('should cover all known tools', () => {
+  it('should cover all original 6 card tools', () => {
     const schema = tools.getToolsForOpenAI();
     const names = schema.map((d) => d.function.name);
     expect(names).toContain('create_card');
@@ -309,6 +305,21 @@ describe('getToolsForOpenAI', () => {
     expect(names).toContain('search_cards');
     expect(names).toContain('get_card_stats');
     expect(names).toContain('generate_practice_set');
+  });
+
+  it('should include new tools', () => {
+    const schema = tools.getToolsForOpenAI();
+    const names = schema.map((d) => d.function.name);
+    expect(names).toContain('create_note');
+    expect(names).toContain('search_notes');
+    expect(names).toContain('create_relation');
+    expect(names).toContain('list_relations');
+    expect(names).toContain('list_files');
+    expect(names).toContain('read_file');
+    expect(names).toContain('read_data_stats');
+    expect(names).toContain('list_extensions');
+    expect(names).toContain('get_settings');
+    expect(names).toContain('update_settings');
   });
 
   it('should have required fields matching dispatcher', () => {
@@ -324,11 +335,12 @@ describe('getToolsForOpenAI', () => {
     expect(stats?.function.parameters.required).toEqual([]);
   });
 
-  it('should roundtrip through executeTool for every tool', () => {
+  it('should roundtrip through executeTool for every original card tool', () => {
     const schema = tools.getToolsForOpenAI();
+    const cardNames = new Set(['create_card', 'update_card', 'delete_card', 'search_cards', 'get_card_stats', 'generate_practice_set']);
     for (const def of schema) {
+      if (!cardNames.has(def.function.name)) continue;
       const result = tools.executeTool(def.function.name, {});
-      // empty params may fail validation, but it should not be "unknown tool"
       if (result.error) {
         expect(result.error).not.toMatch(/未知工具/);
       }

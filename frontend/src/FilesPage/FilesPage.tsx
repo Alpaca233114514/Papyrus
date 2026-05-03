@@ -8,18 +8,9 @@ import type { FileItemData } from '../api';
 
 import ZipIcon from './ZipIcon';
 import FilePreviewModal from './FilePreviewModal';
+import './FilesPage.css';
 
 const PRIMARY_COLOR = '#206CCF';
-const SECONDARY_COLOR = '#9FD4FD';
-
-// 通用卡片样式
-const useCardStyle = (hovered: boolean) => ({
-  borderRadius: '16px',
-  border: `2px solid ${hovered ? SECONDARY_COLOR : 'var(--color-text-3)'}`,
-  background: 'transparent',
-  transition: 'border-color 0.2s, background 0.2s',
-  cursor: 'pointer',
-});
 
 // 文件图标
 const FileTypeIcon = ({ type, size = 48 }: { type: string; size?: number }) => {
@@ -53,31 +44,18 @@ function formatDate(timestamp: number): string {
 
 // 网格文件卡片
 const GridFileCard = ({ file, onClick }: { file: FileItemData; onClick?: (f: FileItemData) => void }) => {
-  const [hovered, setHovered] = useState(false);
-  const cardStyle = useCardStyle(hovered);
-
   return (
     <Tooltip content={file.name} position='top'>
       <div
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        className="files-grid-card"
         onClick={() => onClick?.(file)}
-        style={{
-          ...cardStyle,
-          padding: '24px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          textAlign: 'center',
-          gap: '12px',
-        }}
       >
         <FileTypeIcon type={file.type} size={48} />
-        <div style={{ width: '100%' }}>
-          <Typography.Text style={{ fontSize: '14px', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={file.name}>
+        <div className="files-grid-card-name-wrapper">
+          <Typography.Text className="files-grid-card-name" title={file.name}>
             {file.name}
           </Typography.Text>
-          <Typography.Text type='secondary' style={{ fontSize: '12px' }}>
+          <Typography.Text type='secondary' className="files-grid-card-meta">
             {file.is_folder ? `${file.itemCount ?? 0} 项` : formatSize(file.size)} · {formatDate(file.updated_at)}
           </Typography.Text>
         </div>
@@ -88,40 +66,26 @@ const GridFileCard = ({ file, onClick }: { file: FileItemData; onClick?: (f: Fil
 
 // 列表文件行
 const ListFileRow = ({ file, onClick, onDownload, onDelete }: { file: FileItemData; onClick?: (f: FileItemData) => void; onDownload?: (f: FileItemData) => void; onDelete?: (id: string) => void }) => {
-  const [hovered, setHovered] = useState(false);
-
   return (
     <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      className="files-list-row"
       onClick={() => onClick?.(file)}
-      style={{
-        borderRadius: '8px',
-        border: `2px solid ${hovered ? SECONDARY_COLOR : 'transparent'}`,
-        background: 'transparent',
-        padding: '12px 16px',
-        cursor: 'pointer',
-        transition: 'border-color 0.2s',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-      }}
     >
       <FileTypeIcon type={file.type} size={32} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <Typography.Text style={{ fontSize: '14px', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: hovered ? '#57A9FB' : 'var(--color-text-1)' }} title={file.name}>
+      <div className="files-list-name-wrapper">
+        <Typography.Text className="files-list-name" title={file.name}>
           {file.name}
         </Typography.Text>
       </div>
-      <Typography.Text type='secondary' style={{ fontSize: '13px', width: '100px' }}>
+      <Typography.Text type='secondary' className="files-list-size">
         {file.is_folder ? `${file.itemCount ?? 0} 项` : formatSize(file.size)}
       </Typography.Text>
-      <Typography.Text type='secondary' style={{ fontSize: '13px', width: '80px' }}>
+      <Typography.Text type='secondary' className="files-list-date">
         {formatDate(file.updated_at)}
       </Typography.Text>
-      <div style={{ display: 'flex', gap: '8px', opacity: hovered ? 1 : 0, transition: 'opacity 0.2s' }}>
-        <IconDownload style={{ fontSize: '16px', color: 'var(--color-text-3)', cursor: 'pointer' }} onClick={(e: React.MouseEvent) => { e.stopPropagation(); onDownload?.(file); }} />
-        <IconDelete style={{ fontSize: '16px', color: 'var(--color-text-3)', cursor: 'pointer' }} onClick={(e: React.MouseEvent) => { e.stopPropagation(); onDelete?.(file.id); }} />
+      <div className="files-list-actions">
+        <IconDownload className="files-list-action-icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); onDownload?.(file); }} />
+        <IconDelete className="files-list-action-icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); onDelete?.(file.id); }} />
       </div>
     </div>
   );
@@ -157,16 +121,7 @@ const StatsBar = ({ stats, viewMode, setViewMode, loading }: StatsBarProps) => {
 
   if (loading || !loaded) {
     return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: '24px',
-        marginBottom: '24px',
-        borderRadius: '16px',
-        border: '1px solid var(--color-text-3)',
-        background: 'var(--color-fill-2)',
-      }}>
+      <div className="files-stats-loading">
         <Typography.Text type="secondary">加载中...</Typography.Text>
       </div>
     );
@@ -191,16 +146,7 @@ const StatsBar = ({ stats, viewMode, setViewMode, loading }: StatsBarProps) => {
 
   if (!sceneryConfig.enabled) {
     return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '24px',
-        marginBottom: '24px',
-        borderRadius: '16px',
-        border: '1px solid var(--color-text-3)',
-        background: 'var(--color-fill-2)',
-      }}>
+      <div className="files-stats-bar" style={{ background: 'var(--color-fill-2)' }}>
         {content}
         <Radio.Group type='button' value={viewMode} onChange={setViewMode} options={[{ label: '网格', value: 'grid' }, { label: '列表', value: 'list' }]} />
       </div>
@@ -216,39 +162,20 @@ const StatsBar = ({ stats, viewMode, setViewMode, loading }: StatsBarProps) => {
     : `rgba(0, 0, 0, ${overlayOpacity})`;
 
   return (
-    <div style={{
-      position: 'relative',
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: '24px',
-      marginBottom: '24px',
-      borderRadius: '16px',
-      border: '1px solid var(--color-text-3)',
-      overflow: 'hidden',
-    }}>
+    <div className="files-stats-bar">
       <img
         src={image}
         alt={`窗景图片：${poem} —— ${source}`}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-        }}
+        className="files-stats-bg"
       />
       <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: overlayColor,
-        }}
+        className="files-stats-overlay"
+        style={{ background: overlayColor }}
       />
-      <div style={{ position: 'relative', zIndex: 1 }}>
+      <div className="files-stats-content-wrapper">
         {content}
       </div>
-      <div style={{ position: 'relative', zIndex: 1 }}>
+      <div className="files-stats-controls">
         <Radio.Group type='button' value={viewMode} onChange={setViewMode} options={[{ label: '网格', value: 'grid' }, { label: '列表', value: 'list' }]} />
       </div>
     </div>
@@ -443,18 +370,18 @@ const FilesPage = () => {
   }, [allFiles, currentFolder]);
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '48px 64px 64px', background: 'var(--color-bg-1)' }}>
+    <div className="files-page">
       {/* 标题栏 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+      <div className="files-page-header">
         <div>
-          <Typography.Title heading={1} style={{ fontWeight: 600, lineHeight: 1, margin: 0, fontSize: '40px' }}>
+          <Typography.Title heading={1} className="files-page-title">
             文件库
           </Typography.Title>
-          <Typography.Text type='secondary' style={{ fontSize: '14px', marginTop: '8px', display: 'block' }}>
+          <Typography.Text type='secondary' className="files-page-subtitle">
             {currentFolderStats.totalFiles} 个文件 · {currentFolderStats.totalFolders} 个文件夹
           </Typography.Text>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div className="files-page-actions">
           <Button
             shape='round'
             size='large'
@@ -481,13 +408,14 @@ const FilesPage = () => {
             multiple
             style={{ display: 'none' }}
             onChange={handleFileChange}
+            aria-label="选择上传文件"
           />
         </div>
       </div>
 
       {/* 面包屑导航 */}
       {folderStack.length > 1 && (
-        <div style={{ marginBottom: '16px' }}>
+        <div className="files-breadcrumb-wrapper">
           <Breadcrumb>
             {folderStack.map((item, index) => (
               <Breadcrumb.Item
@@ -506,7 +434,7 @@ const FilesPage = () => {
 
       {/* 筛选标签 */}
       {!loading && (
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+        <div className="files-filter-bar">
           {FILTER_TAGS.map(tag => (
             <Tag
               key={tag}
@@ -521,27 +449,27 @@ const FilesPage = () => {
       )}
 
       {loading ? (
-        <Empty description='加载中...' style={{ padding: '64px 0' }} />
+        <Empty description='加载中...' className="files-empty-padded" />
       ) : currentFiles.length === 0 ? (
-        <Empty description={activeFilter !== '全部' ? '暂无符合条件的文件' : currentFolder ? '该文件夹为空' : '暂无文件'} style={{ padding: '64px 0' }} />
+        <Empty description={activeFilter !== '全部' ? '暂无符合条件的文件' : currentFolder ? '该文件夹为空' : '暂无文件'} className="files-empty-padded" />
       ) : viewMode === 'grid' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '16px' }}>
+        <div className="files-grid">
           {currentFiles.map(file => <GridFileCard key={file.id} file={file} onClick={handleFileClick} />)}
         </div>
       ) : (
-        <div style={{ border: '1px solid var(--color-text-3)', borderRadius: '12px', overflow: 'hidden', background: 'var(--color-bg-1)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--color-border-2)', background: 'var(--color-fill-2)', fontSize: '13px', color: 'var(--color-text-3)', fontWeight: 500 }}>
-            <div style={{ width: '32px', marginRight: '16px' }} />
-            <div style={{ flex: 1 }}>名称</div>
-            <div style={{ width: '100px' }}>大小</div>
-            <div style={{ width: '80px' }}>修改时间</div>
-            <div style={{ width: '60px' }} />
+        <div className="files-list-table">
+          <div className="files-list-header">
+            <div className="files-list-header-icon" />
+            <div className="files-list-header-name">名称</div>
+            <div className="files-list-header-size">大小</div>
+            <div className="files-list-header-date">修改时间</div>
+            <div className="files-list-header-actions" />
           </div>
           {currentFiles.map(file => <ListFileRow key={file.id} file={file} onClick={handleFileClick} onDownload={handleDownloadFile} onDelete={handleDeleteFile} />)}
         </div>
       )}
 
-      <div style={{ height: '32px' }} />
+      <div className="files-empty-spacing" />
 
       <Modal
         title="新建文件夹"

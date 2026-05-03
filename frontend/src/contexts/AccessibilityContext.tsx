@@ -176,8 +176,8 @@ const applySettingsToDOM = (settings: AccessibilitySettings): void => {
         animation: none !important;
         transition: none !important;
       }
-      html.aaa-no-animation .page-transition-up,
-      html.aaa-no-animation .page-transition-down {
+      html.aaa-no-animation .tw-animate-page-up,
+      html.aaa-no-animation .tw-animate-page-down {
         animation: none !important;
       }
     `;

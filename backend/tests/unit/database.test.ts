@@ -292,9 +292,9 @@ describe('Database', () => {
   });
 
   describe('Providers', () => {
-    it('should seed default providers on new db', () => {
+    it('should start with no providers on new db', () => {
       const providers = loadAllProviders();
-      expect(providers.length).toBe(8);
+      expect(providers.length).toBe(0);
     });
 
     it('should save and load a custom provider', () => {

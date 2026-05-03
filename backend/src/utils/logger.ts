@@ -226,9 +226,9 @@ export class PapyrusLogger {
     };
   }
 
-  private _sanitize(obj: unknown, maxStrLen: number = 800): JSONValue {
+  public sanitize(obj: unknown, maxStrLen: number = 800): JSONValue {
     const maskValue = (v: unknown): JSONValue => {
-      if (typeof v !== 'string') return this._sanitize(v, maxStrLen);
+      if (typeof v !== 'string') return this.sanitize(v, maxStrLen);
       if (v.length <= 8) return '***';
       return v.slice(0, 3) + '***' + v.slice(-2);
     };
@@ -243,7 +243,7 @@ export class PapyrusLogger {
     if (typeof obj === 'number' || typeof obj === 'boolean') return obj;
 
     if (Array.isArray(obj)) {
-      return obj.map(x => this._sanitize(x, maxStrLen));
+      return obj.map(x => this.sanitize(x, maxStrLen));
     }
 
     if (typeof obj === 'object') {
@@ -253,7 +253,7 @@ export class PapyrusLogger {
         if (['api_key', 'authorization', 'token', 'secret', 'password', 'key'].some(t => keyLower.includes(t))) {
           masked[k] = maskValue(v);
         } else {
-          masked[k] = this._sanitize(v, maxStrLen);
+          masked[k] = this.sanitize(v, maxStrLen);
         }
       }
       return masked;
@@ -275,7 +275,7 @@ export class PapyrusLogger {
       timestamp: new Date().toISOString(),
       event: eventType,
       level,
-      data: this._sanitize(data),
+      data: this.sanitize(data),
     };
     this._writeJsonLine(this.eventsLogFile, event);
   }
@@ -284,7 +284,7 @@ export class PapyrusLogger {
     const activity: ActivityLogEntry = {
       timestamp: new Date().toISOString(),
       type: activityType,
-      details: this._sanitize(details),
+      details: this.sanitize(details),
     };
     this._writeJsonLine(this.activityLogFile, activity);
   }

@@ -61,6 +61,6 @@ export interface Model {
   modelId: string;
   port: string;
   capabilities: string[];
-  apiKeyId: string;
+  apiKeyId: string | null;
   enabled: boolean;
 }

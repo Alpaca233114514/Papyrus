@@ -86,10 +86,13 @@ body[arco-theme='dark'] {
   --color-border-danger: rgba(245, 63, 63, 0.5);
 }
 
-/* 全局过渡动画 - 可选 */
+/* 全局过渡动画 - 可选
+   用 :where() 把选择器特异性强制降为 (0,0,0)，作为"默认值"提供颜色过渡。
+   组件自定义的 transition（如 .scenery-img 的 mask-start 动画）能直接覆盖。
+   :where() 不影响 !important / 媒体查询，所以 a11y.css 的无障碍钩子仍然胜出。 */
 @media (prefers-reduced-motion: no-preference) {
-  html:not(.aaa-no-animation) body,
-  html:not(.aaa-no-animation) body * {
+  :where(html:not(.aaa-no-animation) body),
+  :where(html:not(.aaa-no-animation) body *) {
     transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
   }
 }
@@ -188,49 +191,4 @@ select:focus-visible {
   opacity: 0.6;
 }
 
-/* 页面切换动画 */
-.page-container {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100%;
-}
-
-.page-transition-up {
-  animation: pageSlideUp 0.25s ease-out forwards;
-}
-
-.page-transition-down {
-  animation: pageSlideDown 0.25s ease-out forwards;
-}
-
-@keyframes pageSlideUp {
-  from {
-    opacity: 0;
-    transform: translateY(24px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes pageSlideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-24px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .page-transition-up,
-  .page-transition-down {
-    animation: none;
-  }
-}
+/* 页面切换动画已迁移至 tailwind.config.js — 通过 motion-safe:tw-animate-page-up/down 使用 */

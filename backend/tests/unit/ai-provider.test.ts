@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { saveProvider, saveApiKey, saveModel, closeDb } from '../../src/db/database.js';
 
 interface ConfigLike {
   config: {
@@ -71,6 +72,7 @@ describe('AIManager', () => {
   });
 
   afterAll(() => {
+    closeDb();
     fs.rmSync(testDir, { recursive: true, force: true });
     delete process.env.PAPYRUS_DATA_DIR;
   });
@@ -88,6 +90,15 @@ describe('AIManager', () => {
     config.config.current_model = 'llama2';
     config.config.providers.ollama = { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] };
     (config.config.features as Record<string, unknown>).cache_enabled = cacheEnabled;
+
+    // Seed DB so getProviderConfigFromDB resolves
+    const providerId = saveProvider({
+      id: 'p-ollama-unit', type: 'ollama', name: 'ollama',
+      baseUrl: 'http://localhost:11434', enabled: true, isDefault: true,
+    });
+    saveApiKey(providerId, { id: 'k-ollama', name: 'default', key: '' });
+    saveModel(providerId, { id: 'm-llama2', modelId: 'llama2', name: 'llama2', enabled: true });
+
     return new AIManager(config);
   }
 
@@ -394,9 +405,10 @@ describe('AIManager', () => {
       const tmpFile = path.join(testDir, 'doc2.txt');
       fs.writeFileSync(tmpFile, 'hello world');
       const stored = manager.storeAttachments([{ path: tmpFile }]) as Array<Record<string, unknown>>;
-      const result = manager.buildUserMessageForProvider('anthropic', 'read', stored) as { role: string; content: string };
+      const result = manager.buildUserMessageForProvider('anthropic', 'read', stored) as { role: string; content: Array<Record<string, unknown>> };
       expect(result.role).toBe('user');
-      expect(result.content).toContain('hello world');
+      const texts = result.content.map(b => b.text as string).join('\n');
+      expect(texts).toContain('hello world');
     });
 
     it('should build non-openai message with non-txt document', () => {
@@ -404,10 +416,11 @@ describe('AIManager', () => {
       const tmpFile = path.join(testDir, 'doc.pdf');
       fs.writeFileSync(tmpFile, 'pdf-content');
       const stored = manager.storeAttachments([{ path: tmpFile }]) as Array<Record<string, unknown>>;
-      const result = manager.buildUserMessageForProvider('anthropic', 'read', stored) as { role: string; content: string };
+      const result = manager.buildUserMessageForProvider('anthropic', 'read', stored) as { role: string; content: Array<Record<string, unknown>> };
       expect(result.role).toBe('user');
-      expect(result.content).toContain('doc.pdf');
-      expect(result.content).not.toContain('内容摘要');
+      const texts = result.content.map(b => b.text as string).join('\n');
+      expect(texts).toContain('doc.pdf');
+      expect(texts).not.toContain('内容摘要');
     });
 
     it('should build non-openai message with invalid attachment path', () => {

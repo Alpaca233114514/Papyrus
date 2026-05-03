@@ -1,25 +1,16 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { AIConfig } from '../../ai/config.js';
 import { AIManager } from '../../ai/provider.js';
-import { CardTools, AIResponseParser } from '../../ai/tools.js';
+import { PapyrusTools, AIResponseParser } from '../../ai/tools.js';
+import { aiConfig } from '../../ai/config-instance.js';
 import { getToolManager } from '../../ai/tool-manager.js';
 import type { ToolCallRecord } from '../../ai/tool-manager.js';
 import { isPrivateUrl } from '../../ai/config.js';
-import { paths } from '../../utils/paths.js';
-import { syncDBToAIConfig, syncAIConfigToDB, getProviderApiKeyFromDB, getProviderConfigFromDB } from '../../ai/db-sync.js';
+import { getProviderApiKeyFromDB, getProviderConfigFromDB } from '../../ai/db-sync.js';
 import { loadAllProviders } from '../../db/database.js';
 
-export const aiConfig = new AIConfig(paths.dataDir);
+export { aiConfig };
 const aiManager = new AIManager(aiConfig);
-const cardTools = new CardTools();
-
-// 启动时从数据库同步一次配置，确保 ai_config.json 与数据库一致
-try {
-  syncDBToAIConfig(aiConfig);
-  aiConfig.saveConfig();
-} catch (e) {
-  console.warn('启动时同步 AI 配置失败:', e instanceof Error ? e.message : String(e));
-}
+const papyrusTools = new PapyrusTools();
 
 const _completionConfig: Record<string, unknown> = {
   enabled: true,
@@ -52,6 +43,19 @@ interface ParsePayload {
   reasoning_content?: string | null;
 }
 
+function isKeylessProvider(name: string): boolean {
+  return (
+    name === 'ollama' ||
+    name === 'lm-studio' ||
+    name === 'localai' ||
+    name === 'tabbyapi' ||
+    name === 'koboldcpp' ||
+    name === 'text-generation-webui' ||
+    name === 'llamacpp' ||
+    name === 'liyuan-deepseek'
+  );
+}
+
 function convertCallToResponse(call: ToolCallRecord): Record<string, unknown> {
   return {
     call_id: call.call_id,
@@ -67,12 +71,16 @@ function convertCallToResponse(call: ToolCallRecord): Record<string, unknown> {
 
 export default async function aiRoutes(fastify: FastifyInstance): Promise<void> {
   // AI Config
-  fastify.get('/config/ai', async (_request, reply) => {
+  fastify.get('/config/ai', async (request, reply) => {
     const masked = aiConfig.getMaskedConfig();
     // 从数据库读取 provider 列表，确保与前端一致
     const dbProviders = loadAllProviders();
     const providersFromDB: Record<string, { api_key: string; base_url: string; models: string[] }> = {};
     for (const p of dbProviders) {
+      if (providersFromDB[p.type]) {
+        request.log.warn(`Duplicate provider type "${p.type}" found in database; using first occurrence`);
+        continue;
+      }
       const firstKey = p.apiKeys.find((k) => k.key.trim() !== '');
       providersFromDB[p.type] = {
         api_key: firstKey?.key
@@ -97,20 +105,16 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
   fastify.post('/config/ai', async (request, reply) => {
     try {
       const payload = request.body as AIConfigPayload;
-      aiConfig.config.current_provider = payload.current_provider;
-      aiConfig.config.current_model = payload.current_model;
 
-      // 同步前端传来的 provider 配置到内存与数据库
-      if (payload.providers) {
-        aiConfig.config.providers = {};
-        for (const [name, cfg] of Object.entries(payload.providers)) {
-          aiConfig.config.providers[name] = {
-            api_key: cfg.api_key,
-            base_url: cfg.base_url,
-            models: [...cfg.models],
-          };
-        }
+      if (payload.current_provider !== undefined) {
+        aiConfig.config.current_provider = payload.current_provider;
       }
+      if (payload.current_model !== undefined) {
+        aiConfig.config.current_model = payload.current_model;
+      }
+
+      // Provider 配置仅通过 /api/providers 路由管理，此处不再处理 providers 字段
+      // 避免前端传回掩码 key 覆盖数据库中的真实 key
 
       if (payload.parameters) {
         aiConfig.config.parameters = {
@@ -133,7 +137,6 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
       }
 
       aiConfig.saveConfig();
-      syncAIConfigToDB(aiConfig);
       reply.send({ success: true });
     } catch (e) {
       reply.status(400).send({ success: false, error: e instanceof Error ? e.message : '保存配置失败' });
@@ -171,7 +174,7 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
       }
 
       const apiKey = providerConfig.api_key;
-      if (!apiKey) {
+      if (!apiKey && !isKeylessProvider(providerName)) {
         reply.send({ success: false, error: 'API Key 未设置' });
         return;
       }
@@ -187,8 +190,10 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
       }
 
       try {
+        const headers: Record<string, string> = {};
+        if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
         const resp = await fetch(`${baseUrl}/models`, {
-          headers: { Authorization: `Bearer ${apiKey}` },
+          headers,
           signal: AbortSignal.timeout(10000),
         });
         if (resp.ok) {
@@ -304,7 +309,7 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
           }
         }
       } else {
-        if (!providerConfig.api_key) {
+        if (!providerConfig.api_key && !isKeylessProvider(providerName)) {
           reply.raw.write(`data: {"error":"AI API Key 未设置"}\n\n`);
           reply.raw.write(`data: {"done":true}\n\n`);
           reply.raw.end();
@@ -338,12 +343,12 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
           ? `${baseUrl}/openai/chat/completions`
           : `${baseUrl}/chat/completions`;
 
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
         const resp = await fetch(endpoint, {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
+          headers,
           signal: AbortSignal.timeout(60000),
           body: JSON.stringify(reqBody),
         });
@@ -483,18 +488,13 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
       return;
     }
 
-    // 如果数据库中没有 key，尝试 fallback（ollama 等本地 provider 不需要 key）
+    // 如果数据库中没有 key，尝试 fallback（部分 provider 无需 key，仍需走 keyless 判断）
     if (!providerConfig.api_key) {
       const dbKey = getProviderApiKeyFromDB(providerName);
       if (dbKey) providerConfig.api_key = dbKey;
     }
 
-    const isLocalProvider = providerName === 'ollama' || providerName === 'lm-studio' ||
-      providerName === 'localai' || providerName === 'tabbyapi' ||
-      providerName === 'koboldcpp' || providerName === 'text-generation-webui' ||
-      providerName === 'llamacpp';
-
-    if (!providerConfig.api_key && !isLocalProvider) {
+    if (!providerConfig.api_key && !isKeylessProvider(providerName)) {
       reply.status(400).send({ success: false, error: 'AI API Key 未设置' });
       return;
     }
@@ -519,7 +519,7 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
 
       let assistantContent = '';
       let reasoningContent = '';
-      const pendingToolCalls: Array<{ name: string; args: string; id?: string }> = [];
+      const pendingToolCalls: Array<{ name: string; args: string; id?: string; callId?: string }> = [];
       for await (const chunk of stream) {
         if (chunk.type === 'content') {
           const text = typeof chunk.data === 'string' ? chunk.data : '';
@@ -531,15 +531,39 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
           reply.raw.write(`data: ${JSON.stringify({ type: 'reasoning', data: text })}\n\n`);
         } else if (chunk.type === 'tool_start') {
           const toolData = chunk.data as Record<string, unknown>;
-          reply.raw.write(`data: ${JSON.stringify({ type: 'tool_call', data: toolData })}\n\n`);
           const func = toolData.function as Record<string, unknown> | undefined;
+          let callId: string | undefined;
           if (func) {
+            const toolName = String(func.name ?? '');
+            let params: Record<string, unknown> = {};
+            const argStr = String(func.arguments ?? '');
+            if (argStr.trim()) {
+              try {
+                const parsed = JSON.parse(argStr) as unknown;
+                if (parsed !== null && typeof parsed === 'object') {
+                  params = parsed as Record<string, unknown>;
+                }
+              } catch {
+                // JSON parse error: params stays empty, will fail gracefully downstream
+              }
+            }
+            const toolManager = getToolManager();
+            if (toolManager.shouldAutoExecute(toolName)) {
+              callId = toolManager.createPendingCall(toolName, params);
+              toolManager.approveCall(callId);
+              toolManager.markExecuting(callId);
+            } else {
+              callId = toolManager.createPendingCall(toolName, params);
+            }
             pendingToolCalls.push({
-              name: String(func.name ?? ''),
-              args: String(func.arguments ?? ''),
+              name: toolName,
+              args: argStr,
               id: String(toolData.id ?? ''),
+              callId,
             });
           }
+          const enrichedData = callId ? { ...toolData, callId } : toolData;
+          reply.raw.write(`data: ${JSON.stringify({ type: 'tool_call', data: enrichedData })}\n\n`);
         } else if (chunk.type === 'done') {
           reply.raw.write(`data: ${JSON.stringify({ type: 'done', data: '' })}\n\n`);
         } else if (chunk.type === 'error') {
@@ -562,7 +586,11 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
           if (!toolCall.args) continue;
 
           const params = JSON.parse(toolCall.args);
-          const result = cardTools.executeTool(toolCall.name, params);
+          const result = papyrusTools.executeTool(toolCall.name, params);
+
+          if (toolCall.callId) {
+            toolManager.completeCall(toolCall.callId, result as unknown as Record<string, unknown>);
+          }
 
           reply.raw.write(`data: ${JSON.stringify({
             type: 'tool_result',
@@ -570,15 +598,22 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
               name: toolCall.name,
               success: true,
               result,
+              callId: toolCall.callId,
             },
           })}\n\n`);
         } catch (err) {
+          if (toolCall.callId) {
+            const toolManager = getToolManager();
+            toolManager.failCall(toolCall.callId, err instanceof Error ? err.message : String(err));
+          }
+
           reply.raw.write(`data: ${JSON.stringify({
             type: 'tool_result',
             data: {
               name: toolCall.name,
               success: false,
               error: err instanceof Error ? err.message : String(err),
+              callId: toolCall.callId,
             },
           })}\n\n`);
         }
@@ -589,6 +624,14 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
       reply.raw.write(`data: ${JSON.stringify({ type: 'error', data: e instanceof Error ? e.message : String(e) })}\n\n`);
       reply.raw.end();
     }
+  });
+
+  // Tools catalog — send tool list to UI
+  fastify.get('/tools/catalog', async (_request, reply) => {
+    reply.send({
+      success: true,
+      tools: papyrusTools.getCatalog(),
+    });
   });
 
   // Tools config
@@ -640,7 +683,7 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
     }
     manager.markExecuting(callId);
     try {
-      const result = cardTools.executeTool(call.tool_name, call.params);
+      const result = papyrusTools.executeTool(call.tool_name, call.params);
       manager.completeCall(callId, result as unknown as Record<string, unknown>);
       reply.send({
         success: true,
@@ -720,7 +763,7 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
       manager.approveCall(callId);
       manager.markExecuting(callId);
       try {
-        const result = cardTools.executeTool(payload.tool_name, payload.params);
+        const result = papyrusTools.executeTool(payload.tool_name, payload.params);
         manager.completeCall(callId, result as unknown as Record<string, unknown>);
         const call = manager.getCall(callId);
         reply.send({
@@ -762,4 +805,4 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
   });
 }
 
-export { aiManager, aiConfig };
+export { aiManager };

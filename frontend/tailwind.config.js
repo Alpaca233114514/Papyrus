@@ -82,6 +82,25 @@ export default {
         'arco-md': '4px',
         'arco-lg': '8px',
       },
+      animation: {
+        'page-up': 'pageSlideUp 0.25s ease-out forwards',
+        'page-down': 'pageSlideDown 0.25s ease-out forwards',
+      },
+      keyframes: {
+        pageSlideUp: {
+          from: { opacity: '0', transform: 'translateY(24px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        pageSlideDown: {
+          from: { opacity: '0', transform: 'translateY(-24px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+    },
+  },
+  variants: {
+    extend: {
+      animation: ['motion-safe', 'motion-reduce'],
     },
   },
   plugins: [],

@@ -280,7 +280,7 @@ const ScrollCard = ({ scroll, onStudy }: { scroll: Scroll; onStudy?: () => void 
       role="button"
       tabIndex={onStudy ? 0 : -1}
       aria-label={`${scroll.title}，${scroll.collection}，${scroll.dueCount > 0 ? `${scroll.dueCount} 张待复习` : '已完成'}，共 ${scroll.cardCount} 张卡片`}
-      aria-disabled={!onStudy}
+      aria-disabled={onStudy ? undefined : true}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={onStudy}
@@ -961,6 +961,7 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
                 checked={batchSelectedIds.has(card.id)}
                 onChange={() => {}}
                 style={{ cursor: 'pointer', accentColor: PRIMARY_COLOR }}
+                aria-label="选择此卡片"
               />
               <Typography.Text style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {card.q.slice(0, 60) || '无标题'}

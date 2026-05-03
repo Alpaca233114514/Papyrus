@@ -1,9 +1,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { app, initApp } from '../../src/api/server.js';
-import { closeDb } from '../../src/db/database.js';
-import { CardTools } from '../../src/ai/tools.js';
+import { app, initApp, logger } from '../../src/api/server.js';
+import { closeDb, saveProvider, saveApiKey, saveModel } from '../../src/db/database.js';
 
 // Access the aiManager singleton inside the route module for monkey-patching
 let aiManagerSingleton: Record<string, unknown> | null = null;
@@ -15,7 +14,14 @@ describe('API Integration Tests', () => {
   beforeAll(async () => {
     fs.mkdirSync(testDir, { recursive: true });
     process.env.PAPYRUS_DATA_DIR = testDir;
+    // Reset aiConfig to use test directory (config-instance may have been loaded early via import chain)
+    const { resetAIConfig } = await import('../../src/ai/config-instance.js');
+    resetAIConfig(testDir);
     await initApp();
+    logger.setLogDir(path.join(testDir, 'logs'));
+    app.post('/api/test-crash', async () => {
+      throw new Error('intentional test crash');
+    });
   });
 
   afterAll(() => {
@@ -25,12 +31,13 @@ describe('API Integration Tests', () => {
   });
 
   beforeEach(async () => {
-    // 1. 清理数据库业务表（保留 providers / api_keys / models seed）
+    // 1. 清理数据库所有业务表（providers 也清理，每个测试自负责 seed）
     const { getDb } = await import('../../src/db/database.js');
     const db = getDb();
     db.exec(`DELETE FROM files; DELETE FROM cards; DELETE FROM notes;
              DELETE FROM card_versions; DELETE FROM note_versions;
-             DELETE FROM relations;`);
+             DELETE FROM relations;
+             DELETE FROM provider_models; DELETE FROM api_keys; DELETE FROM providers;`);
 
     // 2. 清理文件系统 vault
     const { paths } = await import('../../src/utils/paths.js');
@@ -132,6 +139,28 @@ describe('API Integration Tests', () => {
 
     expect(response.statusCode).toBe(404);
     expect(JSON.parse(response.body).error).toBe('Not found');
+  });
+
+  it('should return 500 with errorId and log full context on uncaught exception', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/test-crash',
+      payload: { api_key: 'sk-secret-key-12345', data: 'test payload' },
+    });
+
+    expect(response.statusCode).toBe(500);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(false);
+    expect(body.error).toBe('Internal server error');
+    expect(body.errorId).toMatch(/^[a-f0-9]{8}$/);
+
+    const logs = logger.getLogs('error', null).join('\n');
+    expect(logs).toContain(body.errorId);
+    expect(logs).toContain('POST /api/test-crash');
+    expect(logs).toContain('intentional test crash');
+    expect(logs).toContain('Stack:');
+    expect(logs).not.toContain('sk-secret-key-12345');
+    expect(logs).toContain('sk-***45');
   });
 
   it('POST /api/cards should create a card', async () => {
@@ -682,19 +711,15 @@ describe('API Integration Tests', () => {
     try {
       global.fetch = () => Promise.resolve({ ok: false, status: 503 } as Response);
 
-      await app.inject({
-        method: 'POST',
-        url: '/api/config/ai',
-        payload: {
-          current_provider: 'ollama',
-          current_model: 'llama2',
-          providers: {
-            ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
-          },
-          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-        },
+      const { aiConfig } = await import('../../src/api/routes/ai.js');
+      const providerId = saveProvider({
+        id: 'p-ollama-test', type: 'ollama', name: 'ollama',
+        baseUrl: 'http://localhost:11434', enabled: true, isDefault: true,
       });
+      saveApiKey(providerId, { id: 'k-ollama', name: 'default', key: '' });
+      saveModel(providerId, { id: 'm-llama2', modelId: 'llama2', name: 'llama2', enabled: true });
+      aiConfig.config.current_provider = 'ollama';
+      aiConfig.config.current_model = 'llama2';
 
       const response = await app.inject({
         method: 'POST',
@@ -704,7 +729,7 @@ describe('API Integration Tests', () => {
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
       expect(body.success).toBe(false);
-      expect(body.message).toContain('503');
+      expect(body.error).toContain('503');
 
     } finally {
       global.fetch = savedFetch;
@@ -716,19 +741,15 @@ describe('API Integration Tests', () => {
     try {
       global.fetch = () => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ data: [] }) } as unknown as Response);
 
-      await app.inject({
-        method: 'POST',
-        url: '/api/config/ai',
-        payload: {
-          current_provider: 'openai',
-          current_model: 'gpt-4',
-          providers: {
-            openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
-          },
-          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-        },
+      const { aiConfig } = await import('../../src/api/routes/ai.js');
+      const providerId = saveProvider({
+        id: 'p-openai-test', type: 'openai', name: 'openai',
+        baseUrl: 'https://api.openai.com/v1', enabled: true, isDefault: false,
       });
+      saveApiKey(providerId, { id: 'k-openai', name: 'default', key: 'sk-test' });
+      saveModel(providerId, { id: 'm-gpt4', modelId: 'gpt-4', name: 'gpt-4', enabled: true });
+      aiConfig.config.current_provider = 'openai';
+      aiConfig.config.current_model = 'gpt-4';
 
       const response = await app.inject({
         method: 'POST',
@@ -769,23 +790,19 @@ describe('API Integration Tests', () => {
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body);
     expect(body.success).toBe(false);
-    expect(body.message).toContain('SSRF');
+    expect(body.error).toContain('SSRF');
   });
 
   it('POST /api/config/ai/test should report missing api key', async () => {
-    await app.inject({
-      method: 'POST',
-      url: '/api/config/ai',
-      payload: {
-        current_provider: 'openai',
-        current_model: 'gpt-4',
-        providers: {
-          openai: { api_key: '', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
-        },
-        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-      },
+    const { aiConfig } = await import('../../src/api/routes/ai.js');
+    const providerId = saveProvider({
+      id: 'p-openai-test', type: 'openai', name: 'openai',
+      baseUrl: 'https://api.openai.com/v1', enabled: true, isDefault: false,
     });
+    saveApiKey(providerId, { id: 'k-openai', name: 'default', key: '' });
+    saveModel(providerId, { id: 'm-gpt4', modelId: 'gpt-4', name: 'gpt-4', enabled: true });
+    aiConfig.config.current_provider = 'openai';
+    aiConfig.config.current_model = 'gpt-4';
 
     const response = await app.inject({
       method: 'POST',
@@ -795,23 +812,19 @@ describe('API Integration Tests', () => {
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body);
     expect(body.success).toBe(false);
-    expect(body.message).toContain('API Key');
+    expect(body.error).toContain('API Key');
   });
 
   it('POST /api/config/ai/test should report missing base url', async () => {
-    await app.inject({
-      method: 'POST',
-      url: '/api/config/ai',
-      payload: {
-        current_provider: 'openai',
-        current_model: 'gpt-4',
-        providers: {
-          openai: { api_key: 'sk-test', base_url: '', models: ['gpt-4'] },
-        },
-        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-      },
+    const { aiConfig } = await import('../../src/api/routes/ai.js');
+    const providerId = saveProvider({
+      id: 'p-openai-test', type: 'openai', name: 'openai',
+      baseUrl: '', enabled: true, isDefault: false,
     });
+    saveApiKey(providerId, { id: 'k-openai', name: 'default', key: 'sk-test' });
+    saveModel(providerId, { id: 'm-gpt4', modelId: 'gpt-4', name: 'gpt-4', enabled: true });
+    aiConfig.config.current_provider = 'openai';
+    aiConfig.config.current_model = 'gpt-4';
 
     const response = await app.inject({
       method: 'POST',
@@ -821,7 +834,7 @@ describe('API Integration Tests', () => {
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body);
     expect(body.success).toBe(false);
-    expect(body.message).toContain('Base URL');
+    expect(body.error).toContain('Base URL');
   });
 
   it('POST /api/config/ai/test should handle 401 response', async () => {
@@ -829,19 +842,15 @@ describe('API Integration Tests', () => {
     try {
       global.fetch = () => Promise.resolve({ ok: false, status: 401 } as Response);
 
-      await app.inject({
-        method: 'POST',
-        url: '/api/config/ai',
-        payload: {
-          current_provider: 'openai',
-          current_model: 'gpt-4',
-          providers: {
-            openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
-          },
-          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-        },
+      const { aiConfig } = await import('../../src/api/routes/ai.js');
+      const providerId = saveProvider({
+        id: 'p-openai-test', type: 'openai', name: 'openai',
+        baseUrl: 'https://api.openai.com/v1', enabled: true, isDefault: false,
       });
+      saveApiKey(providerId, { id: 'k-openai', name: 'default', key: 'sk-test' });
+      saveModel(providerId, { id: 'm-gpt4', modelId: 'gpt-4', name: 'gpt-4', enabled: true });
+      aiConfig.config.current_provider = 'openai';
+      aiConfig.config.current_model = 'gpt-4';
 
       const response = await app.inject({
         method: 'POST',
@@ -851,7 +860,7 @@ describe('API Integration Tests', () => {
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
       expect(body.success).toBe(false);
-      expect(body.message).toContain('无效');
+      expect(body.error).toContain('无效');
 
     } finally {
       global.fetch = savedFetch;
@@ -863,19 +872,15 @@ describe('API Integration Tests', () => {
     try {
       global.fetch = () => Promise.resolve({ ok: false, status: 404 } as Response);
 
-      await app.inject({
-        method: 'POST',
-        url: '/api/config/ai',
-        payload: {
-          current_provider: 'openai',
-          current_model: 'gpt-4',
-          providers: {
-            openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
-          },
-          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-        },
+      const { aiConfig } = await import('../../src/api/routes/ai.js');
+      const providerId = saveProvider({
+        id: 'p-openai-test', type: 'openai', name: 'openai',
+        baseUrl: 'https://api.openai.com/v1', enabled: true, isDefault: false,
       });
+      saveApiKey(providerId, { id: 'k-openai', name: 'default', key: 'sk-test' });
+      saveModel(providerId, { id: 'm-gpt4', modelId: 'gpt-4', name: 'gpt-4', enabled: true });
+      aiConfig.config.current_provider = 'openai';
+      aiConfig.config.current_model = 'gpt-4';
 
       const response = await app.inject({
         method: 'POST',
@@ -896,19 +901,15 @@ describe('API Integration Tests', () => {
     try {
       global.fetch = () => Promise.resolve({ ok: false, status: 503 } as Response);
 
-      await app.inject({
-        method: 'POST',
-        url: '/api/config/ai',
-        payload: {
-          current_provider: 'openai',
-          current_model: 'gpt-4',
-          providers: {
-            openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
-          },
-          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-        },
+      const { aiConfig } = await import('../../src/api/routes/ai.js');
+      const providerId = saveProvider({
+        id: 'p-openai-test', type: 'openai', name: 'openai',
+        baseUrl: 'https://api.openai.com/v1', enabled: true, isDefault: false,
       });
+      saveApiKey(providerId, { id: 'k-openai', name: 'default', key: 'sk-test' });
+      saveModel(providerId, { id: 'm-gpt4', modelId: 'gpt-4', name: 'gpt-4', enabled: true });
+      aiConfig.config.current_provider = 'openai';
+      aiConfig.config.current_model = 'gpt-4';
 
       const response = await app.inject({
         method: 'POST',
@@ -918,7 +919,7 @@ describe('API Integration Tests', () => {
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
       expect(body.success).toBe(false);
-      expect(body.message).toContain('503');
+      expect(body.error).toContain('503');
 
     } finally {
       global.fetch = savedFetch;
@@ -930,19 +931,15 @@ describe('API Integration Tests', () => {
     try {
       global.fetch = () => Promise.reject(new Error('timeout'));
 
-      await app.inject({
-        method: 'POST',
-        url: '/api/config/ai',
-        payload: {
-          current_provider: 'openai',
-          current_model: 'gpt-4',
-          providers: {
-            openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
-          },
-          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-        },
+      const { aiConfig } = await import('../../src/api/routes/ai.js');
+      const providerId = saveProvider({
+        id: 'p-openai-test', type: 'openai', name: 'openai',
+        baseUrl: 'https://api.openai.com/v1', enabled: true, isDefault: false,
       });
+      saveApiKey(providerId, { id: 'k-openai', name: 'default', key: 'sk-test' });
+      saveModel(providerId, { id: 'm-gpt4', modelId: 'gpt-4', name: 'gpt-4', enabled: true });
+      aiConfig.config.current_provider = 'openai';
+      aiConfig.config.current_model = 'gpt-4';
 
       const response = await app.inject({
         method: 'POST',
@@ -1014,19 +1011,15 @@ describe('API Integration Tests', () => {
         return Promise.resolve({ ok: true, body: readable } as unknown as Response);
       };
 
-      await app.inject({
-        method: 'POST',
-        url: '/api/config/ai',
-        payload: {
-          current_provider: 'ollama',
-          current_model: 'llama2',
-          providers: {
-            ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
-          },
-          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-        },
+      const { aiConfig } = await import('../../src/api/routes/ai.js');
+      const providerId = saveProvider({
+        id: 'p-ollama-test', type: 'ollama', name: 'ollama',
+        baseUrl: 'http://localhost:11434', enabled: true, isDefault: true,
       });
+      saveApiKey(providerId, { id: 'k-ollama', name: 'default', key: '' });
+      saveModel(providerId, { id: 'm-llama2', modelId: 'llama2', name: 'llama2', enabled: true });
+      aiConfig.config.current_provider = 'ollama';
+      aiConfig.config.current_model = 'llama2';
 
       const response = await app.inject({
         method: 'POST',
@@ -1045,19 +1038,15 @@ describe('API Integration Tests', () => {
     try {
       global.fetch = () => Promise.resolve({ ok: false, status: 500 } as Response);
 
-      await app.inject({
-        method: 'POST',
-        url: '/api/config/ai',
-        payload: {
-          current_provider: 'ollama',
-          current_model: 'llama2',
-          providers: {
-            ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
-          },
-          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-        },
+      const { aiConfig } = await import('../../src/api/routes/ai.js');
+      const providerId = saveProvider({
+        id: 'p-ollama-test', type: 'ollama', name: 'ollama',
+        baseUrl: 'http://localhost:11434', enabled: true, isDefault: true,
       });
+      saveApiKey(providerId, { id: 'k-ollama', name: 'default', key: '' });
+      saveModel(providerId, { id: 'm-llama2', modelId: 'llama2', name: 'llama2', enabled: true });
+      aiConfig.config.current_provider = 'ollama';
+      aiConfig.config.current_model = 'llama2';
 
       const response = await app.inject({
         method: 'POST',
@@ -1096,19 +1085,15 @@ describe('API Integration Tests', () => {
         return Promise.resolve({ ok: true, body: readable } as unknown as Response);
       };
 
-      await app.inject({
-        method: 'POST',
-        url: '/api/config/ai',
-        payload: {
-          current_provider: 'openai',
-          current_model: 'gpt-4',
-          providers: {
-            openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
-          },
-          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-        },
+      const { aiConfig } = await import('../../src/api/routes/ai.js');
+      const providerId = saveProvider({
+        id: 'p-openai-test', type: 'openai', name: 'openai',
+        baseUrl: 'https://api.openai.com/v1', enabled: true, isDefault: false,
       });
+      saveApiKey(providerId, { id: 'k-openai', name: 'default', key: 'sk-test' });
+      saveModel(providerId, { id: 'm-gpt4', modelId: 'gpt-4', name: 'gpt-4', enabled: true });
+      aiConfig.config.current_provider = 'openai';
+      aiConfig.config.current_model = 'gpt-4';
 
       const response = await app.inject({
         method: 'POST',
@@ -1127,19 +1112,15 @@ describe('API Integration Tests', () => {
     try {
       global.fetch = () => Promise.resolve({ ok: false, status: 503 } as Response);
 
-      await app.inject({
-        method: 'POST',
-        url: '/api/config/ai',
-        payload: {
-          current_provider: 'openai',
-          current_model: 'gpt-4',
-          providers: {
-            openai: { api_key: 'sk-test', base_url: 'https://api.openai.com/v1', models: ['gpt-4'] },
-          },
-          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-        },
+      const { aiConfig } = await import('../../src/api/routes/ai.js');
+      const providerId = saveProvider({
+        id: 'p-openai-test', type: 'openai', name: 'openai',
+        baseUrl: 'https://api.openai.com/v1', enabled: true, isDefault: false,
       });
+      saveApiKey(providerId, { id: 'k-openai', name: 'default', key: 'sk-test' });
+      saveModel(providerId, { id: 'm-gpt4', modelId: 'gpt-4', name: 'gpt-4', enabled: true });
+      aiConfig.config.current_provider = 'openai';
+      aiConfig.config.current_model = 'gpt-4';
 
       const response = await app.inject({
         method: 'POST',
@@ -1155,19 +1136,15 @@ describe('API Integration Tests', () => {
   });
 
   it('POST /api/completion should reject missing api_key for non-ollama', async () => {
-    await app.inject({
-      method: 'POST',
-      url: '/api/config/ai',
-      payload: {
-        current_provider: 'openai',
-        current_model: 'gpt-4',
-        providers: {
-          openai: { api_key: '', base_url: 'https://api.openai.com', models: ['gpt-4'] },
-        },
-        parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-        features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-      },
+    const { aiConfig } = await import('../../src/api/routes/ai.js');
+    const providerId = saveProvider({
+      id: 'p-openai-test', type: 'openai', name: 'openai',
+      baseUrl: 'https://api.openai.com', enabled: true, isDefault: false,
     });
+    saveApiKey(providerId, { id: 'k-openai', name: 'default', key: '' });
+    saveModel(providerId, { id: 'm-gpt4', modelId: 'gpt-4', name: 'gpt-4', enabled: true });
+    aiConfig.config.current_provider = 'openai';
+    aiConfig.config.current_model = 'gpt-4';
 
     const response = await app.inject({
       method: 'POST',
@@ -1203,19 +1180,20 @@ describe('API Integration Tests', () => {
         return Promise.resolve({ ok: true, body: readable } as unknown as Response);
       };
 
-      await app.inject({
-        method: 'POST',
-        url: '/api/config/ai',
-        payload: {
-          current_provider: 'ollama',
-          current_model: 'llama2',
-          providers: {
-            ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
-          },
-          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-        },
+      // Seed provider directly in DB (POST /config/ai no longer syncs providers)
+      const { aiConfig } = await import('../../src/api/routes/ai.js');
+      const providerId = saveProvider({
+        id: 'p-ollama-test',
+        type: 'ollama',
+        name: 'ollama',
+        baseUrl: 'http://localhost:11434',
+        enabled: true,
+        isDefault: true,
       });
+      saveApiKey(providerId, { id: 'k-ollama', name: 'default', key: '' });
+      saveModel(providerId, { id: 'm-llama2', modelId: 'llama2', name: 'llama2', enabled: true });
+      aiConfig.config.current_provider = 'ollama';
+      aiConfig.config.current_model = 'llama2';
 
       const response = await app.inject({
         method: 'POST',
@@ -1234,19 +1212,20 @@ describe('API Integration Tests', () => {
     try {
       global.fetch = () => Promise.reject(new Error('stream failed'));
 
-      await app.inject({
-        method: 'POST',
-        url: '/api/config/ai',
-        payload: {
-          current_provider: 'ollama',
-          current_model: 'llama2',
-          providers: {
-            ollama: { api_key: '', base_url: 'http://localhost:11434', models: ['llama2'] },
-          },
-          parameters: { temperature: 0.7, top_p: 1, max_tokens: 2000, presence_penalty: 0, frequency_penalty: 0 },
-          features: { auto_hint: false, auto_explain: false, context_length: 5, agent_enabled: false },
-        },
+      // Seed provider directly in DB
+      const { aiConfig } = await import('../../src/api/routes/ai.js');
+      const providerId = saveProvider({
+        id: 'p-ollama-test',
+        type: 'ollama',
+        name: 'ollama',
+        baseUrl: 'http://localhost:11434',
+        enabled: true,
+        isDefault: true,
       });
+      saveApiKey(providerId, { id: 'k-ollama', name: 'default', key: '' });
+      saveModel(providerId, { id: 'm-llama2', modelId: 'llama2', name: 'llama2', enabled: true });
+      aiConfig.config.current_provider = 'ollama';
+      aiConfig.config.current_model = 'llama2';
 
       const response = await app.inject({
         method: 'POST',
@@ -1259,6 +1238,56 @@ describe('API Integration Tests', () => {
     } finally {
       global.fetch = savedFetch;
     }
+  });
+
+  it('POST /api/chat should 400 without message', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/chat',
+      payload: {},
+    });
+    expect(response.statusCode).toBe(400);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(false);
+    expect(body.error).toContain('message');
+  });
+
+  it('POST /api/chat should 400 when provider not configured', async () => {
+    const { aiConfig } = await import('../../src/api/routes/ai.js');
+    aiConfig.config.current_provider = 'nonexistent-provider';
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/chat',
+      payload: { message: 'hello' },
+    });
+    expect(response.statusCode).toBe(400);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(false);
+    expect(body.error).toContain('Provider 未配置');
+  });
+
+  it('POST /api/chat should 400 when API key missing for non-local provider', async () => {
+    const { aiConfig } = await import('../../src/api/routes/ai.js');
+    const providerId = saveProvider({
+      id: 'p-openai-test',
+      type: 'openai',
+      name: 'openai',
+      baseUrl: 'https://api.openai.com',
+      enabled: true,
+      isDefault: false,
+    });
+    saveApiKey(providerId, { id: 'k-openai', name: 'default', key: '' });
+    saveModel(providerId, { id: 'm-gpt4', modelId: 'gpt-4', name: 'gpt-4', enabled: true });
+    aiConfig.config.current_provider = 'openai';
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/chat',
+      payload: { message: 'hello' },
+    });
+    expect(response.statusCode).toBe(400);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(false);
+    expect(body.error).toContain('AI API Key 未设置');
   });
 
   it('GET /api/providers should list providers', async () => {
@@ -1517,8 +1546,7 @@ describe('API Integration Tests', () => {
   });
 
   it('POST /api/providers/:providerId/models should add a model', async () => {
-    const providers = await app.inject({ method: 'GET', url: '/api/providers' });
-    const providerId = JSON.parse(providers.body).providers[0].id;
+    const providerId = saveProvider({ type: 'openai', name: 'ModelProvider', baseUrl: '', enabled: true });
 
     const response = await app.inject({
       method: 'POST',
@@ -1533,8 +1561,7 @@ describe('API Integration Tests', () => {
   });
 
   it('POST /api/providers/:providerId/apikeys should add an api key', async () => {
-    const providers = await app.inject({ method: 'GET', url: '/api/providers' });
-    const providerId = JSON.parse(providers.body).providers[0].id;
+    const providerId = saveProvider({ type: 'openai', name: 'KeyProvider', baseUrl: '', enabled: true });
 
     const response = await app.inject({
       method: 'POST',
@@ -1549,8 +1576,7 @@ describe('API Integration Tests', () => {
   });
 
   it('POST /api/providers/:providerId/default should set default', async () => {
-    const providers = await app.inject({ method: 'GET', url: '/api/providers' });
-    const providerId = JSON.parse(providers.body).providers[0].id;
+    const providerId = saveProvider({ type: 'openai', name: 'DefaultProvider', baseUrl: '', enabled: true });
 
     const response = await app.inject({
       method: 'POST',
@@ -1562,8 +1588,7 @@ describe('API Integration Tests', () => {
   });
 
   it('POST /api/providers/:providerId/enabled should toggle enabled', async () => {
-    const providers = await app.inject({ method: 'GET', url: '/api/providers' });
-    const providerId = JSON.parse(providers.body).providers[0].id;
+    const providerId = saveProvider({ type: 'openai', name: 'ToggleProvider', baseUrl: '', enabled: true });
 
     const response = await app.inject({
       method: 'POST',
@@ -1624,8 +1649,7 @@ describe('API Integration Tests', () => {
   });
 
   it('PUT /api/providers/:providerId/models/:modelId should update model', async () => {
-    const providers = await app.inject({ method: 'GET', url: '/api/providers' });
-    const providerId = JSON.parse(providers.body).providers[0].id;
+    const providerId = saveProvider({ type: 'openai', name: 'UpdProvider', baseUrl: '', enabled: true });
 
     const model = await app.inject({
       method: 'POST',
@@ -1645,8 +1669,7 @@ describe('API Integration Tests', () => {
   });
 
   it('DELETE /api/providers/:providerId/models/:modelId should delete model', async () => {
-    const providers = await app.inject({ method: 'GET', url: '/api/providers' });
-    const providerId = JSON.parse(providers.body).providers[0].id;
+    const providerId = saveProvider({ type: 'openai', name: 'DelModelProvider', baseUrl: '', enabled: true });
 
     const model = await app.inject({
       method: 'POST',
@@ -1665,8 +1688,7 @@ describe('API Integration Tests', () => {
   });
 
   it('DELETE /api/providers/:providerId/apikeys/:keyId should delete api key', async () => {
-    const providers = await app.inject({ method: 'GET', url: '/api/providers' });
-    const providerId = JSON.parse(providers.body).providers[0].id;
+    const providerId = saveProvider({ type: 'openai', name: 'DelKeyProvider', baseUrl: '', enabled: true });
 
     const key = await app.inject({
       method: 'POST',
@@ -2308,6 +2330,7 @@ describe('API Integration Tests', () => {
     const callId = JSON.parse(submit.body).call?.call_id;
     expect(callId).toBeTruthy();
 
+    const { CardTools } = await import('../../src/ai/tools.js');
     const original = CardTools.prototype.executeTool;
     CardTools.prototype.executeTool = () => { throw new Error('tool crash'); };
 
@@ -2331,6 +2354,7 @@ describe('API Integration Tests', () => {
       payload: { mode: 'auto', auto_execute_tools: [] },
     });
 
+    const { CardTools } = await import('../../src/ai/tools.js');
     const original = CardTools.prototype.executeTool;
     CardTools.prototype.executeTool = () => { throw new Error('auto crash'); };
 

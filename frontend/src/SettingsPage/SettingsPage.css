@@ -472,6 +472,7 @@
   border-radius: 8px;
   margin-bottom: 4px;
   transition: all 0.2s;
+  -webkit-user-select: none;
   user-select: none;
 }
 

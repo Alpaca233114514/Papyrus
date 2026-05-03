@@ -79,6 +79,7 @@ const PROVIDER_PORT_OPTIONS = [
 
 const NAV_ITEMS = [
   { key: 'general-section', label: '通用设置', icon: IconMessage },
+  { key: 'tools-section', label: '工具调用管理', icon: IconTool },
   { key: 'user-section', label: '用户设置', icon: IconUser },
   { key: 'providers-section', label: '供应商管理', icon: IconSafe },
   { key: 'models-section', label: '模型管理', icon: IconRobot },
@@ -204,6 +205,13 @@ const ChatView = ({ onBack }: ChatViewProps) => {
   const [completionTriggerDelay, setCompletionTriggerDelay] = useState(500);
   const [completionMaxTokens, setCompletionMaxTokens] = useState(50);
   const [completionSaving, setCompletionSaving] = useState(false);
+
+  // Tools config
+  const [toolsMode, setToolsMode] = useState<string>('manual');
+  const [autoExecuteTools, setAutoExecuteTools] = useState<string[]>([]);
+  const [toolsConfigLoading, setToolsConfigLoading] = useState(false);
+  const [toolsConfigSaving, setToolsConfigSaving] = useState(false);
+  const [toolCatalog, setToolCatalog] = useState<Array<{ name: string; category: string; side_effect: string; description: string }>>([]);
   
   const [providers, setProviders] = useState<Provider[]>([]);
   const [providersLoading, setProvidersLoading] = useState(false);
@@ -217,6 +225,8 @@ const ChatView = ({ onBack }: ChatViewProps) => {
   const [modelModalVisible, setModelModalVisible] = useState(false);
   const [modelForm] = Form.useForm();
   const [modelFormProviderId, setModelFormProviderId] = useState<string>('');
+  const [addLoading, setAddLoading] = useState(false);
+  const [saveModelLoading, setSaveModelLoading] = useState(false);
 
   const selected = providers.find(p => p.enabled);
   
@@ -277,6 +287,67 @@ const ChatView = ({ onBack }: ChatViewProps) => {
     loadProviders();
   }, []);
 
+  useEffect(() => {
+    loadToolsConfig();
+    loadToolCatalog();
+  }, []);
+
+  const loadToolsConfig = () => {
+    setToolsConfigLoading(true);
+    api.getToolsConfig()
+      .then(data => {
+        if (data.success && data.config) {
+          setToolsMode(data.config.mode);
+          setAutoExecuteTools(data.config.auto_execute_tools);
+        }
+      })
+      .catch(console.error)
+      .finally(() => setToolsConfigLoading(false));
+  };
+
+  const loadToolCatalog = () => {
+    api.getToolsCatalog()
+      .then(data => {
+        if (data.success && data.tools) {
+          setToolCatalog(data.tools);
+        }
+      })
+      .catch(console.error);
+  };
+
+  const saveToolsConfig = () => {
+    setToolsConfigSaving(true);
+    api.saveToolsConfig({
+      mode: toolsMode,
+      auto_execute_tools: autoExecuteTools,
+    })
+      .then(data => {
+        if (data.success) {
+          Message.success('工具配置已保存');
+        } else {
+          Message.error('保存失败');
+        }
+      })
+      .catch(() => Message.error('保存失败'))
+      .finally(() => setToolsConfigSaving(false));
+  };
+
+  const resetToolsConfig = () => {
+    setToolsMode('manual');
+    setAutoExecuteTools([
+      'search_cards', 'get_card_stats', 'search_notes', 'get_note',
+      'list_relations', 'read_file', 'list_files', 'read_data_stats',
+      'list_extensions', 'get_settings',
+    ]);
+  };
+
+  const toggleAutoTool = (toolName: string, sideEffect: string) => {
+    if (sideEffect === 'write') return;
+    setAutoExecuteTools(prev =>
+      prev.includes(toolName) ? prev.filter(t => t !== toolName) : [...prev, toolName]
+    );
+  };
+
   const loadProviders = () => {
     setProvidersLoading(true);
     api.listProviders()
@@ -304,9 +375,10 @@ const ChatView = ({ onBack }: ChatViewProps) => {
   };
 
   const addProvider = () => {
+    if (addLoading) return;
     addForm.validate().then((values: { name?: string; baseUrl?: string }) => {
       const preset = PROVIDER_PRESETS[newProviderType];
-      
+
       const validApiKeys = apiKeys
         .filter(k => k.key.trim() !== '')
         .map((k, index) => ({
@@ -314,9 +386,9 @@ const ChatView = ({ onBack }: ChatViewProps) => {
           name: k.name.trim() || `key-${index + 1}`,
           key: k.key.trim()
         }));
-      
+
       const finalApiKeys = validApiKeys.length > 0 ? validApiKeys : [{id: crypto.randomUUID(), name: 'default', key: ''}];
-      
+
       const newProvider: Provider = {
         id: crypto.randomUUID(),
         type: newProviderType,
@@ -328,6 +400,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
         isDefault: false,
       };
 
+      setAddLoading(true);
       api.createProvider(newProvider)
         .then(data => {
           if (data.success) {
@@ -336,6 +409,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
             addForm.resetFields();
             setApiKeys([{ id: '1', key: '', name: '' }]);
             loadProviders();
+            notifyAIConfigChanged();
             const firstKey = validApiKeys.find(k => k.key.trim() !== '');
             if (firstKey) {
               syncKeyToAIConfig(newProviderType, firstKey.key);
@@ -346,7 +420,15 @@ const ChatView = ({ onBack }: ChatViewProps) => {
         })
         .catch(err => {
           console.error('添加供应商失败:', err);
-          Message.error('添加供应商失败');
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes('已存在')) {
+            Message.warning('该配置已存在，无需重复添加');
+          } else {
+            Message.error('添加供应商失败');
+          }
+        })
+        .finally(() => {
+          setAddLoading(false);
         });
 
     });
@@ -358,6 +440,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
         if (data.success) {
           Message.success('供应商已删除');
           loadProviders();
+          notifyAIConfigChanged();
         } else {
           Message.error(data.error || '删除失败');
         }
@@ -390,6 +473,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
         if (data.success) {
           Message.success('模型已删除');
           loadProviders();
+          notifyAIConfigChanged();
         } else {
           Message.error(data.error || '删除失败');
         }
@@ -431,6 +515,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
   };
 
   const saveModel = () => {
+    if (saveModelLoading) return;
     modelForm.validate().then((values: {
       name: string;
       modelId: string;
@@ -444,14 +529,12 @@ const ChatView = ({ onBack }: ChatViewProps) => {
       const targetProviderId = values.providerId || '';
       const trimmedModelId = values.modelId.trim();
 
-      // 验证 providerId 有效
       const targetProvider = providers.find(p => p.id === targetProviderId);
       if (!targetProvider) {
         Message.error('所选供应商不存在，请刷新页面后重试');
         return;
       }
 
-      // 验证 modelId 非空
       if (!trimmedModelId) {
         Message.error('模型 ID 不能为空');
         return;
@@ -463,7 +546,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
       if (values.cap_reasoning) capabilities.push('reasoning');
 
       const modelData = {
-        id: trimmedModelId,
+        id: editingModel ? editingModel.id : crypto.randomUUID(),
         name: values.name.trim(),
         modelId: trimmedModelId,
         port: values.port,
@@ -479,12 +562,14 @@ const ChatView = ({ onBack }: ChatViewProps) => {
         setModelFormProviderId('');
       };
 
+      setSaveModelLoading(true);
       if (editingModel) {
         api.updateModel(targetProviderId, editingModel.id, modelData)
           .then(data => {
             if (data.success) {
               Message.success('模型已更新');
               loadProviders();
+              notifyAIConfigChanged();
               closeModal();
             } else {
               Message.error(data.error || '更新失败');
@@ -493,6 +578,9 @@ const ChatView = ({ onBack }: ChatViewProps) => {
           .catch(err => {
             console.error('更新模型失败:', err);
             Message.error('更新模型失败');
+          })
+          .finally(() => {
+            setSaveModelLoading(false);
           });
       } else {
         api.addModel(targetProviderId, modelData)
@@ -500,6 +588,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
             if (data.success) {
               Message.success('模型已添加');
               loadProviders();
+              notifyAIConfigChanged();
               closeModal();
             } else {
               Message.error(data.error || '添加失败');
@@ -507,9 +596,20 @@ const ChatView = ({ onBack }: ChatViewProps) => {
           })
           .catch(err => {
             console.error('添加模型失败:', err);
-            Message.error('添加模型失败');
+            const msg = err instanceof Error ? err.message : String(err);
+            if (msg.includes('已存在')) {
+              Message.warning('该模型已存在于当前供应商');
+            } else {
+              Message.error('添加模型失败');
+            }
+          })
+          .finally(() => {
+            setSaveModelLoading(false);
           });
       }
+    }).catch((err: unknown) => {
+      console.error('模型表单验证失败:', err);
+      Message.error('模型表单验证失败，请检查输入');
     });
   };
 
@@ -556,18 +656,13 @@ const ChatView = ({ onBack }: ChatViewProps) => {
     setAgentModeEnabledState(enabled);
     saveAgentSettings({ agentModeEnabled: enabled });
     try {
-      const data = await api.getAIConfig() as unknown as { success: boolean; config: import('../../api').AIConfig };
-      if (data.success && data.config) {
-        const updatedConfig = {
-          ...data.config,
-          features: {
-            ...data.config.features,
-            agent_enabled: enabled,
-          },
-        };
-        await api.saveAIConfig(updatedConfig);
-        notifyAIConfigChanged();
-      }
+      // Provider 配置仅通过 /api/providers 管理，这里只同步 agent_enabled
+      await api.saveAIConfig({
+        features: {
+          agent_enabled: enabled,
+        },
+      } as Partial<import('../../api').AIConfig>);
+      notifyAIConfigChanged();
     } catch (err) {
       console.error('保存 Agent 模式配置失败:', err);
     }
@@ -580,21 +675,17 @@ const ChatView = ({ onBack }: ChatViewProps) => {
   const saveDefaultModel = async (modelId: string) => {
     setCurrentModelId(modelId);
     try {
-      const data = await api.getAIConfig() as unknown as { success: boolean; config: import('../../api').AIConfig };
-      if (data.success && data.config) {
-        const provider = providers.find(p => p.models.some(m => m.id === modelId));
-        const model = provider?.models.find(m => m.id === modelId);
-        // 只同步 current_provider / current_model，不再同步 providers（数据库为唯一来源）
-        const updated = {
-          ...data.config,
-          current_model: model?.modelId || modelId,
-        };
-        if (provider) {
-          updated.current_provider = provider.type;
-        }
-        await api.saveAIConfig(updated);
-        notifyAIConfigChanged();
+      const provider = providers.find(p => p.models.some(m => m.id === modelId));
+      const model = provider?.models.find(m => m.id === modelId);
+      // Provider 配置仅通过 /api/providers 管理，这里只同步 current_provider / current_model
+      const updated: Partial<import('../../api').AIConfig> = {
+        current_model: model?.modelId || modelId,
+      };
+      if (provider) {
+        updated.current_provider = provider.type;
       }
+      await api.saveAIConfig(updated);
+      notifyAIConfigChanged();
     } catch (err) {
       console.error('同步模型配置到后端失败:', err);
       Message.error('同步模型配置到后端失败');
@@ -747,6 +838,95 @@ const ChatView = ({ onBack }: ChatViewProps) => {
           </div>
         </div>
 
+        <div id="tools-section" style={{ marginBottom: 48, scrollMarginTop: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>工具调用管理</Title>
+          </div>
+
+          <div className="settings-section" style={{
+            background: 'var(--color-bg-2)',
+            borderRadius: 8,
+            padding: '16px 20px',
+            marginBottom: 24,
+          }}>
+            <SettingItem title="审批模式" desc="自动模式：所有工具自动执行；手动模式：仅白名单内工具自动执行">
+              <Tag color={toolsMode === 'auto' ? 'green' : 'orangered'}>
+                {toolsMode === 'auto' ? '自动' : '手动'}
+              </Tag>
+              <Button
+                size="mini"
+                type="text"
+                style={{ marginLeft: 8 }}
+                onClick={() => setToolsMode(toolsMode === 'auto' ? 'manual' : 'auto')}
+              >
+                {toolsMode === 'auto' ? '切换为手动' : '切换为自动'}
+              </Button>
+            </SettingItem>
+
+            <Divider style={{ margin: '8px 0' }} />
+            <Text type="secondary" style={{ fontSize: 13, display: 'block', marginBottom: 12 }}>
+              白名单工具（开关 ON = 自动执行，无需审批）
+            </Text>
+
+            {Object.entries(
+              toolCatalog.reduce<Record<string, typeof toolCatalog>>((acc, t) => {
+                if (!acc[t.category]) acc[t.category] = [];
+                acc[t.category].push(t);
+                return acc;
+              }, {})
+            ).map(([category, items]) => (
+              <div key={category} style={{ marginBottom: 12 }}>
+                <Text bold style={{ fontSize: 12, color: 'var(--color-text-2)', display: 'block', marginBottom: 4 }}>
+                  {(() => {
+                    const labels: Record<string, string> = { cards: '卡片', notes: '笔记', relations: '关联', files: '文件库', data: '数据', extensions: '扩展', settings: '设置' };
+                    return labels[category] || category;
+                  })()}
+                </Text>
+                {items.map(tool => (
+                  <div key={tool.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--color-border-1)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Tag size="small" color={tool.side_effect === 'write' ? 'orangered' : 'green'}>
+                        {tool.side_effect === 'write' ? '写' : '读'}
+                      </Tag>
+                      <Text style={{ fontSize: 13 }}>{tool.name}</Text>
+                      <Text type="secondary" style={{ fontSize: 12, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {tool.description}
+                      </Text>
+                    </div>
+                    <Tooltip content={tool.side_effect === 'write' ? '写操作不允许加入白名单' : undefined}>
+                      <Switch
+                        size="small"
+                        checked={autoExecuteTools.includes(tool.name)}
+                        disabled={tool.side_effect === 'write'}
+                        onChange={() => toggleAutoTool(tool.name, tool.side_effect)}
+                      />
+                    </Tooltip>
+                  </div>
+                ))}
+              </div>
+            ))}
+
+            <Divider style={{ margin: '12px 0' }} />
+            <Space>
+              <Button
+                type="primary"
+                size="small"
+                onClick={saveToolsConfig}
+                loading={toolsConfigSaving}
+              >
+                保存配置
+              </Button>
+              <Button
+                type="secondary"
+                size="small"
+                onClick={resetToolsConfig}
+              >
+                重置为默认
+              </Button>
+            </Space>
+          </div>
+        </div>
+
         <div id="user-section" style={{ marginBottom: 48, scrollMarginTop: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
             <Title heading={4} style={{ margin: 0, fontSize: 20 }}>用户设置</Title>
@@ -825,6 +1005,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
                       accept="image/*"
                       style={{ display: 'none' }}
                       onChange={handleAvatarChange}
+                      aria-label="选择头像图片"
                     />
                   </div>
                 </div>
@@ -998,6 +1179,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
         title="添加 Provider"
         visible={addModalVisible}
         onOk={addProvider}
+        confirmLoading={addLoading}
         onCancel={() => { setAddModalVisible(false); addForm.resetFields(); setApiKeys([{ id: '1', key: '', name: '' }]); }}
         autoFocus={false}
         focusLock
@@ -1076,6 +1258,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
         title={editingModel ? '编辑模型' : '添加模型'}
         visible={modelModalVisible}
         onOk={saveModel}
+        confirmLoading={saveModelLoading}
         onCancel={() => { setModelModalVisible(false); modelForm.resetFields(); setEditingModel(null); setModelFormProviderId(''); }}
         autoFocus={false}
         focusLock
@@ -1161,6 +1344,7 @@ const ProvidersSection = ({ providers, loadProviders, deleteProvider, setDefault
 }) => {
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set());
   const [editingProviders, setEditingProviders] = useState<Provider[]>(providers);
+  const [saveProviderLoading, setSaveProviderLoading] = useState<Set<string>>(new Set());
   
   useEffect(() => {
     setEditingProviders(providers);
@@ -1210,9 +1394,11 @@ const ProvidersSection = ({ providers, loadProviders, deleteProvider, setDefault
   };
   
   const saveProviderChanges = (providerId: string) => {
+    if (saveProviderLoading.has(providerId)) return;
     const provider = editingProviders.find(p => p.id === providerId);
     if (!provider) return;
 
+    setSaveProviderLoading(prev => new Set(prev).add(providerId));
     api.updateProvider(providerId, {
       name: provider.name,
       baseUrl: provider.baseUrl,
@@ -1223,6 +1409,7 @@ const ProvidersSection = ({ providers, loadProviders, deleteProvider, setDefault
         if (data.success) {
           Message.success('供应商配置已保存');
           loadProviders();
+          window.dispatchEvent(new CustomEvent('papyrus_ai_config_changed'));
           const firstKey = provider.apiKeys.find(k => k.key.trim() !== '');
           if (firstKey) {
             syncKeyToAIConfig(provider.type, firstKey.key);
@@ -1234,6 +1421,13 @@ const ProvidersSection = ({ providers, loadProviders, deleteProvider, setDefault
       .catch(err => {
         console.error('保存供应商配置失败:', err);
         Message.error('保存供应商配置失败');
+      })
+      .finally(() => {
+        setSaveProviderLoading(prev => {
+          const next = new Set(prev);
+          next.delete(providerId);
+          return next;
+        });
       });
   };
   
@@ -1271,6 +1465,7 @@ const ProvidersSection = ({ providers, loadProviders, deleteProvider, setDefault
                     .then(data => {
                       if (data.success) {
                         loadProviders();
+                        window.dispatchEvent(new CustomEvent('papyrus_ai_config_changed'));
                       } else {
                         Message.error(data.error || '更新失败');
                         loadProviders();

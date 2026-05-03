@@ -483,14 +483,13 @@ const DoneCard = ({ scenery }: { scenery: SceneryContent | null }) => {
       <img
         src={image}
         alt={`窗景图片：${poem} —— ${source}`}
-        className={`scenery-img${hovered ? ' expanded' : ''}`}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-        }}
+        className={[
+          'tw-absolute tw-top-0 tw-right-0 tw-bottom-0 tw-h-full',
+          'tw-object-cover tw-object-[right_center]',
+          'tw-transition-[width] tw-duration-[6000ms] tw-ease-[cubic-bezier(0.83,0,0.17,1)]',
+          'tw-scenery-mask',
+          hovered ? 'tw-w-[61.8%]' : 'tw-w-[38.2%]',
+        ].join(' ')}
       />
 
       <div
@@ -664,24 +663,6 @@ const StartPage = ({ onDoneChange, onNavigate }: StartPageProps) => {
       </div>
 
       <style>{`
-        @property --mask-start {
-          syntax: '<percentage>';
-          inherits: false;
-          initial-value: 61.8%;
-        }
-
-        .scenery-img {
-          --mask-start: 61.8%;
-          -webkit-mask-image: linear-gradient(to right, transparent var(--mask-start), black 100%);
-          mask-image: linear-gradient(to right, transparent var(--mask-start), black 100%);
-          transition: transform 6s cubic-bezier(0.4, 0, 0.2, 1), --mask-start 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-          transform: scale(1);
-        }
-        .scenery-img.expanded {
-          --mask-start: 38.2%;
-          transform: scale(1.05);
-        }
-
         .scenery-sub-text {
           color: var(--color-text-3);
         }

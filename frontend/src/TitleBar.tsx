@@ -434,7 +434,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
     <>
       <div className="titlebar">
         <div className="titlebar-logo">
-          <img src="./icon.ico" alt="Papyrus" className="titlebar-logo-icon" />
+          <img src="./icon.png" alt="Papyrus" className="titlebar-logo-icon" />
         </div>
 
         <Space className="titlebar-menus no-drag" size={0}>
@@ -532,6 +532,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
               accept="image/*"
               className="tw-hidden"
               onChange={handleFileChange}
+              aria-label="选择头像图片"
             />
             <span className="tw-text-sm tw-text-arco-text-3">
               点击上传头像（最大 2MB）
