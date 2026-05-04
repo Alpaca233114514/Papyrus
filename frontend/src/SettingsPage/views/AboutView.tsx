@@ -14,28 +14,14 @@ import {
   IconCheckCircle,
   IconExclamationCircle,
 } from '@arco-design/web-react/icon';
+import { api } from '../../api';
+import type { VersionInfo } from '../../api';
 import './AboutView.css';
 
 const { Title, Text, Paragraph } = Typography;
 
 interface AboutViewProps {
   onBack: () => void;
-}
-
-interface VersionInfo {
-  current_version: string;
-  latest_version: string;
-  has_update: boolean;
-  release_url: string;
-  download_url: string | null;
-  release_notes: string | null;
-  published_at: string | null;
-}
-
-interface UpdateCheckResponse {
-  success: boolean;
-  data: VersionInfo | null;
-  message: string;
 }
 
 declare const __APP_VERSION__: string;
@@ -55,20 +41,16 @@ const AboutView = ({ onBack }: AboutViewProps) => {
 
   const fetchCurrentVersion = async () => {
     try {
-      const response = await fetch('/api/update/version');
-      if (response.ok) {
-        const data = await response.json();
-        // 初始设置版本信息，后续检查更新会更新 has_update 字段
-        setVersionInfo({
-          current_version: data.version,
-          latest_version: data.version,
-          has_update: false,
-          release_url: data.repository,
-          download_url: null,
-          release_notes: null,
-          published_at: null,
-        });
-      }
+      const data = await api.getVersion();
+      setVersionInfo({
+        current_version: data.version,
+        latest_version: data.version,
+        has_update: false,
+        release_url: data.repository,
+        download_url: '',
+        release_notes: null,
+        published_at: null,
+      });
     } catch (error) {
       console.error('获取版本信息失败:', error);
     }
@@ -80,8 +62,7 @@ const AboutView = ({ onBack }: AboutViewProps) => {
     setErrorMessage('');
 
     try {
-      const response = await fetch('/api/update/check');
-      const result: UpdateCheckResponse = await response.json();
+      const result = await api.checkUpdate();
 
       if (result.success && result.data) {
         setVersionInfo(result.data);

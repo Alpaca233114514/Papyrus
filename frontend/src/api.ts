@@ -203,6 +203,28 @@ export type LogsConfig = {
   max_log_files: number;
 };
 
+// ========== Update Types ==========
+export type VersionInfo = {
+  current_version: string;
+  latest_version: string;
+  has_update: boolean;
+  release_url: string;
+  download_url: string;
+  release_notes: string | null;
+  published_at: string | null;
+};
+
+export type UpdateCheckRes = {
+  success: boolean;
+  data: VersionInfo | null;
+  message: string;
+};
+
+export type VersionRes = {
+  version: string;
+  repository: string;
+};
+
 // ========== File Types ==========
 export type FileItemData = {
   id: string;
@@ -541,4 +563,8 @@ export const api = {
     }),
   getExtensionsList: () =>
     request<{ success: boolean; extensions: Array<{ id: string; name: string; description: string; version: string; author: string; rating: number; downloads: number; isEnabled: boolean; updateAvailable?: boolean; tags: string[] }>; count: number }>('/extensions'),
+
+  // Update
+  getVersion: () => request<VersionRes>('/update/version'),
+  checkUpdate: () => request<UpdateCheckRes>('/update/check'),
 };

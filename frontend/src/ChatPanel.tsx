@@ -152,6 +152,22 @@ function restoreApiMessage(blocks: ApiChatBlock[], fallbackContent: string): Res
   };
 }
 
+async function hydrateMessagesForSession(sessionId: string): Promise<Message[]> {
+  await api.switchChatSession(sessionId);
+  const data = await api.getChatMessages(sessionId);
+  if (!data.success) return [];
+  return data.messages.map((m) => {
+    const restored = restoreApiMessage(m.blocks ?? [], m.content);
+    return {
+      id: m.id,
+      role: m.role === 'user' ? 'user' : 'assistant',
+      content: restored.content,
+      blocks: restored.blocks,
+      model: m.role === 'assistant' ? m.model : undefined,
+    };
+  });
+}
+
 /** 已选文件 */
 interface SelectedFile {
   id: string;
@@ -391,6 +407,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   }, [open, initializeChatConfig]);
 
   // 初始化会话：优先用 localStorage 的会话；其次后端 active 会话；都不行才创建新会话
+  // 沿用旧会话时必须把历史消息也加载回 messages，否则 UI 显示空白但底层带着旧上下文
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -402,20 +419,23 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
         const stored = loadStoredSessionId();
         const storedValid = stored && sessionsList.some((s) => s.id === stored);
         if (storedValid) {
-          if (!currentSessionId || currentSessionId !== stored) {
-            await api.switchChatSession(stored).catch(() => undefined);
-            if (cancelled) return;
-            setCurrentSessionId(stored);
-          }
+          const restored = await hydrateMessagesForSession(stored);
+          if (cancelled) return;
+          setMessages(restored);
+          setCurrentSessionId(stored);
           return;
         }
         if (listRes.activeSessionId && sessionsList.some((s) => s.id === listRes.activeSessionId)) {
+          const activeId = listRes.activeSessionId;
+          const restored = await hydrateMessagesForSession(activeId);
           if (cancelled) return;
-          setCurrentSessionId(listRes.activeSessionId);
+          setMessages(restored);
+          setCurrentSessionId(activeId);
           return;
         }
         const createRes = await api.createChatSession();
         if (cancelled || !createRes.success) return;
+        setMessages([]);
         setCurrentSessionId(createRes.session.id);
       } catch (err) {
         if (!cancelled) console.error('Failed to initialize chat session:', err);
@@ -1014,8 +1034,11 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
           throw new Error(errMsg);
         }
         const data = await response.json();
-        if (!data.success) {
-          throw new Error(data.message || '工具执行失败');
+        const toolResult = data.result as Record<string, unknown> | undefined;
+        if (!data.success || (toolResult && toolResult.success === false)) {
+          throw new Error(
+            (toolResult?.error as string) || data.message || '工具执行失败'
+          );
         }
         // 更新为执行成功
         setMessages((prev) => {
@@ -1254,27 +1277,8 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   // 切换会话并加载历史消息（完整还原 blocks/model/attachments）
   const switchSession = useCallback(async (sessionId: string) => {
     try {
-      const switchRes = await api.switchChatSession(sessionId);
-      if (!switchRes.success) {
-        ArcoMessage.error('切换会话失败');
-        return;
-      }
-      const data = await api.getChatMessages(sessionId);
-      if (!data.success) {
-        ArcoMessage.error('加载会话消息失败');
-        return;
-      }
-      const loadedMessages: Message[] = data.messages.map((m) => {
-        const restored = restoreApiMessage(m.blocks ?? [], m.content);
-        return {
-          id: m.id,
-          role: m.role === 'user' ? 'user' : 'assistant',
-          content: restored.content,
-          blocks: restored.blocks,
-          model: m.role === 'assistant' ? m.model : undefined,
-        };
-      });
-      setMessages(loadedMessages);
+      const restored = await hydrateMessagesForSession(sessionId);
+      setMessages(restored);
       setCurrentSessionId(sessionId);
     } catch (err) {
       console.error('Failed to switch session:', err);

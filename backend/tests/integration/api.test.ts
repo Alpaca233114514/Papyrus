@@ -624,6 +624,9 @@ describe('API Integration Tests', () => {
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
       expect(body.success).toBe(false);
+      expect(body.data).toBeNull();
+      expect(typeof body.message).toBe('string');
+      expect(body.message.length).toBeGreaterThan(0);
 
     } finally {
       global.fetch = savedFetch;
@@ -643,6 +646,9 @@ describe('API Integration Tests', () => {
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
       expect(body.success).toBe(false);
+      expect(body.data).toBeNull();
+      expect(typeof body.message).toBe('string');
+      expect(body.message.length).toBeGreaterThan(0);
 
     } finally {
       global.fetch = savedFetch;
@@ -655,7 +661,13 @@ describe('API Integration Tests', () => {
       global.fetch = () => Promise.resolve({
         ok: true,
         status: 200,
-        json: () => Promise.resolve({ tag_name: 'v999.0.0', html_url: 'https://example.com', assets: [] }),
+        json: () => Promise.resolve({
+          tag_name: 'v999.0.0',
+          html_url: 'https://example.com/release',
+          body: 'Release notes here',
+          published_at: '2026-01-01T00:00:00Z',
+          assets: [{ browser_download_url: 'https://example.com/download' }],
+        }),
       } as unknown as Response);
 
       const response = await app.inject({
@@ -667,6 +679,12 @@ describe('API Integration Tests', () => {
       const body = JSON.parse(response.body);
       expect(body.success).toBe(true);
       expect(body.data.has_update).toBe(true);
+      expect(body.data.latest_version).toBe('v999.0.0');
+      expect(body.data.current_version).toBeDefined();
+      expect(body.data.release_url).toBe('https://example.com/release');
+      expect(body.data.download_url).toBe('https://example.com/download');
+      expect(body.data.release_notes).toBe('Release notes here');
+      expect(body.data.published_at).toBe('2026-01-01T00:00:00Z');
 
     } finally {
       global.fetch = savedFetch;

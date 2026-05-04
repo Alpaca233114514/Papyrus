@@ -27,7 +27,7 @@ export const ReasoningChain: React.FC<ReasoningChainProps> = ({
       <Collapse
         bordered={false}
         activeKey={isExpanded ? ['1'] : []}
-        onChange={(keys) => setIsExpanded(keys.includes('1'))}
+        onChange={(_key, keys) => setIsExpanded(keys.includes('1'))}
         className="reasoning-collapse"
       >
         <CollapseItem

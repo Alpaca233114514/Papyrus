@@ -887,8 +887,18 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
     }
     manager.markExecuting(callId);
     try {
-      const result = papyrusTools.executeTool(call.tool_name, call.params);
-      manager.completeCall(callId, result as unknown as Record<string, unknown>);
+      const result = papyrusTools.executeTool(call.tool_name, call.params) as Record<string, unknown>;
+      if (result && result.success === false) {
+        const errorMsg = String(result.error || '工具执行失败');
+        manager.failCall(callId, errorMsg);
+        reply.send({
+          success: false,
+          call: convertCallToResponse(call),
+          message: errorMsg,
+        });
+        return;
+      }
+      manager.completeCall(callId, result);
       reply.send({
         success: true,
         call: convertCallToResponse(call),

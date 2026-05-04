@@ -631,6 +631,19 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
           <Button
             shape='round'
             size='large'
+            icon={<IconPlus />}
+            onClick={() => setCreateCardModalVisible(true)}
+            style={{
+              height: '40px',
+              padding: '0 20px',
+              fontSize: '14px',
+            }}
+          >
+            添加卷轴
+          </Button>
+          <Button
+            shape='round'
+            size='large'
             icon={<IconEdit />}
             onClick={() => {
               setBatchSelectedIds(new Set());
@@ -692,47 +705,41 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
 
       <section style={{ marginBottom: '40px' }}>
         <ShelfTitle>卷帙</ShelfTitle>
-        {collections.length === 0 ? (
-          <Empty description="暂无卷帙" />
-        ) : (
-          <div style={shelfContainerStyle}>
-            {collections.map(c => (
-              <CollectionCard 
-                key={c.id} 
-                collection={c} 
-                onClick={() => startStudy(c.id)}
-                onManage={(e) => {
-                  e.stopPropagation();
-                  setManageCollectionId(c.id);
-                  setManageModalVisible(true);
-                }}
-              />
-            ))}
-            <div onClick={() => setCreateModalVisible(true)}>
-              <AddCard label='新建卷帙' />
-            </div>
+        <div style={shelfContainerStyle}>
+          {collections.map(c => (
+            <CollectionCard
+              key={c.id}
+              collection={c}
+              onClick={() => startStudy(c.id)}
+              onManage={(e) => {
+                e.stopPropagation();
+                setManageCollectionId(c.id);
+                setManageModalVisible(true);
+              }}
+            />
+          ))}
+          {collections.length === 0 && <Empty description="暂无卷帙" />}
+          <div onClick={() => setCreateModalVisible(true)}>
+            <AddCard label='新建卷帙' />
           </div>
-        )}
+        </div>
       </section>
 
       <section>
         <ShelfTitle>最近使用</ShelfTitle>
-        {scrolls.length === 0 ? (
-          <Empty description="暂无卷轴" />
-        ) : (
-          <div style={shelfContainerStyle}>
-            {scrolls.map(s => (
-              <ScrollCard 
-                key={s.id} 
-                scroll={s} 
-                onStudy={s.dueCount > 0 ? startStudy : undefined}
-              />
-            ))}
-            <div onClick={() => setCreateCardModalVisible(true)}>
-              <AddCard label='新建卷轴' />
-            </div>
+        <div style={shelfContainerStyle}>
+          {scrolls.map(s => (
+            <ScrollCard
+              key={s.id}
+              scroll={s}
+              onStudy={s.dueCount > 0 ? startStudy : undefined}
+            />
+          ))}
+          {scrolls.length === 0 && <Empty description="暂无卷轴" />}
+          <div onClick={() => setCreateCardModalVisible(true)}>
+            <AddCard label='新建卷轴' />
           </div>
-        )}
+        </div>
       </section>
 
       <div style={{ height: '32px' }} />

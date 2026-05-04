@@ -264,9 +264,19 @@ const FilesPage = () => {
     'application/zip', 'application/x-7z-compressed', 'application/x-tar', 'application/gzip',
     'text/plain', 'text/markdown', 'application/json',
   ];
+  const ALLOWED_UPLOAD_EXTENSIONS = [
+    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'md', 'json',
+    'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg',
+    'mp4', 'webm', 'mov', 'mp3', 'wav', 'ogg',
+    'zip', 'rar', '7z', 'tar', 'gz',
+  ];
 
   const isAllowedFileType = (file: File): boolean => {
-    return ALLOWED_UPLOAD_TYPES.some(type => file.type.startsWith(type) || file.type === type);
+    if (file.type) {
+      return ALLOWED_UPLOAD_TYPES.some(type => file.type.startsWith(type) || file.type === type);
+    }
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+    return ALLOWED_UPLOAD_EXTENSIONS.includes(ext);
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -349,7 +359,7 @@ const FilesPage = () => {
     if (['image', 'video', 'audio'].includes(file.type)) return true;
     if (file.type === 'document') {
       const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
-      return ['txt', 'md', 'json', 'pdf'].includes(ext);
+      return ['txt', 'md', 'json', 'pdf', 'docx'].includes(ext);
     }
     return false;
   }

@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Modal, Message, Button, Spin } from '@arco-design/web-react';
 import { IconDownload } from '@arco-design/web-react/icon';
+import DOMPurify from 'dompurify';
+import mammoth from 'mammoth/mammoth.browser';
 import { getFileUrl } from '../api';
 import type { FileItemData } from '../api';
 
@@ -16,7 +18,7 @@ function getFileExtension(name: string): string {
 function isPreviewableDocument(file: FileItemData): boolean {
   if (file.type !== 'document') return false;
   const ext = getFileExtension(file.name);
-  return ['txt', 'md', 'json', 'pdf'].includes(ext);
+  return ['txt', 'md', 'json', 'pdf', 'docx'].includes(ext);
 }
 
 function isPreviewable(file: FileItemData): boolean {
@@ -30,6 +32,9 @@ export default function FilePreviewModal({ file, onClose }: FilePreviewModalProp
   const [textContent, setTextContent] = useState<string>('');
   const [textLoading, setTextLoading] = useState(false);
   const [textError, setTextError] = useState(false);
+  const [docxHtml, setDocxHtml] = useState<string>('');
+  const [docxLoading, setDocxLoading] = useState(false);
+  const [docxError, setDocxError] = useState(false);
   const [imageLoading, setImageLoading] = useState(false);
   const [mediaError, setMediaError] = useState(false);
   const [mediaErrorType, setMediaErrorType] = useState<string>('');
@@ -49,6 +54,8 @@ export default function FilePreviewModal({ file, onClose }: FilePreviewModalProp
     if (!file) {
       setTextContent('');
       setTextError(false);
+      setDocxHtml('');
+      setDocxError(false);
       setImageLoading(false);
       setMediaError(false);
       setMediaErrorType('');
@@ -56,6 +63,7 @@ export default function FilePreviewModal({ file, onClose }: FilePreviewModalProp
       return;
     }
 
+    let cancelled = false;
     const ext = getFileExtension(file.name);
     if (['txt', 'md', 'json'].includes(ext)) {
       setTextLoading(true);
@@ -66,16 +74,41 @@ export default function FilePreviewModal({ file, onClose }: FilePreviewModalProp
           return res.text();
         })
         .then(text => {
-          setTextContent(text);
+          if (!cancelled) setTextContent(text);
         })
         .catch(() => {
+          if (cancelled) return;
           setTextError(true);
           Message.error('文件内容加载失败');
         })
         .finally(() => {
-          setTextLoading(false);
+          if (!cancelled) setTextLoading(false);
+        });
+    } else if (ext === 'docx') {
+      setDocxLoading(true);
+      setDocxError(false);
+      fetch(previewUrl)
+        .then(res => {
+          if (!res.ok) throw new Error('加载失败');
+          return res.arrayBuffer();
+        })
+        .then(buf => mammoth.convertToHtml({ arrayBuffer: buf }))
+        .then(({ value }) => {
+          if (!cancelled) setDocxHtml(DOMPurify.sanitize(value));
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setDocxError(true);
+          Message.error('DOCX 解析失败');
+        })
+        .finally(() => {
+          if (!cancelled) setDocxLoading(false);
         });
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [file, previewUrl]);
 
   if (!file) return null;
@@ -245,6 +278,41 @@ export default function FilePreviewModal({ file, onClose }: FilePreviewModalProp
             >
               {textContent}
             </pre>
+          );
+        }
+        if (ext === 'docx') {
+          if (docxLoading) {
+            return (
+              <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--color-text-3)' }}>
+                加载中...
+              </div>
+            );
+          }
+          if (docxError) {
+            return (
+              <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                <div style={{ fontSize: '16px', color: 'var(--color-text-2)', marginBottom: '16px' }}>
+                  DOCX 加载失败（文件可能不存在或格式损坏）
+                </div>
+                <Button type="primary" icon={<IconDownload />} href={downloadUrl} target="_blank">
+                  下载文件
+                </Button>
+              </div>
+            );
+          }
+          return (
+            <div
+              style={{
+                maxHeight: '70vh',
+                overflow: 'auto',
+                padding: '24px',
+                background: 'var(--color-bg-2)',
+                borderRadius: '8px',
+                fontSize: '14px',
+                lineHeight: 1.7,
+              }}
+              dangerouslySetInnerHTML={{ __html: docxHtml }}
+            />
           );
         }
         return null;
