@@ -166,10 +166,10 @@ const AboutView = ({ onBack }: AboutViewProps) => {
       <div className="settings-section about-hero">
         <img
           src="./icon.png"
-          alt="Papyrus"
+          alt="Papyrus Desktop"
           className="about-logo"
         />
-        <Title heading={3} className="about-app-name">Papyrus</Title>
+        <Title heading={3} className="about-app-name">Papyrus Desktop</Title>
         <Text type="secondary" className="about-version">
           版本 {versionInfo?.current_version || APP_VERSION}
         </Text>
@@ -265,7 +265,7 @@ const AboutView = ({ onBack }: AboutViewProps) => {
       <div className="settings-section">
         <Title heading={4} className="settings-section-title">致谢</Title>
         <Paragraph type="secondary" className="about-paragraph">
-          感谢使用 Papyrus！本应用使用了以下开源项目：
+          感谢使用 Papyrus Desktop！本应用使用了以下开源项目：
         </Paragraph>
         <div className="about-tech-tags">
           {['React', 'Arco Design', 'Electron', 'Node.js'].map(tech => (
@@ -277,7 +277,7 @@ const AboutView = ({ onBack }: AboutViewProps) => {
       <div className="settings-section">
         <Title heading={4} className="settings-section-title">许可证</Title>
         <Paragraph type="secondary" className="about-paragraph">
-          Papyrus 采用 MIT 许可证开源。您可以自由使用、修改和分发本软件。
+          Papyrus Desktop 采用 MIT 许可证开源。您可以自由使用、修改和分发本软件。
         </Paragraph>
       </div>
 
