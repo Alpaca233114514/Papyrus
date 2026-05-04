@@ -52,7 +52,7 @@ echo }
 ) > "%OUTPUT_DIR%\resources\app\package.json"
 
 echo Renaming executable...
-rename "%OUTPUT_DIR%\electron.exe" "Papyrus.exe"
+rename "%OUTPUT_DIR%\electron.exe" "Papyrus Desktop.exe"
 
 echo.
 echo ========================================

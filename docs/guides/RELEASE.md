@@ -196,9 +196,9 @@ GitHub Actions 启动
 
 | 平台 | 产物 | 文件名示例 |
 |------|------|-----------|
-| Windows | NSIS 安装包 | `Papyrus-Setup-2.0.0.exe` |
-| macOS | DMG + ZIP | `Papyrus-Apple Silicon-arm64.dmg` |
-| Linux | AppImage, deb, tar.gz | `Papyrus-Linux-x64.AppImage` |
+| Windows | NSIS 安装包 | `Papyrus Desktop-Setup-2.0.0.exe` |
+| macOS | DMG + ZIP | `Papyrus Desktop-Apple-Silicon-arm64.dmg` |
+| Linux | AppImage, deb, tar.gz | `Papyrus Desktop-Linux-x64.AppImage` |
 
 ---
 

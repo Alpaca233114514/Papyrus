@@ -30,13 +30,13 @@ node scripts/download-artifacts.js 1234567890
 
 ```
 downloaded-artifacts/
-├── Papyrus-Win-x64/
-│   └── Papyrus-Setup-2.0.0.exe
-├── Papyrus-Apple-Silicon-arm64/
-│   └── Papyrus-Apple-Silicon-arm64.dmg
-└── Papyrus-Linux-x64/
-    ├── Papyrus-Linux-x64.AppImage
-    └── Papyrus-Linux-x64.deb
+├── PapyrusDesktop-Win-x64/
+│   └── Papyrus Desktop-Setup-2.0.0.exe
+├── PapyrusDesktop-Apple-Silicon-arm64/
+│   └── Papyrus Desktop-Apple-Silicon-arm64.dmg
+└── PapyrusDesktop-Linux-x64/
+    ├── Papyrus Desktop-Linux-x64.AppImage
+    └── Papyrus Desktop-Linux-x64.deb
 ```
 
 ---

@@ -1,6 +1,6 @@
 {
-  "appId": "com.papyrus.app",
-  "productName": "Papyrus-Debug",
+  "appId": "com.papyrus.desktop",
+  "productName": "Papyrus Desktop Debug",
   "directories": {
     "output": "dist-electron-debug",
     "buildResources": "build"

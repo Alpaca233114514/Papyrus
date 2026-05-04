@@ -6,7 +6,8 @@
 !macroend
 
 !macro customInstall
-  ; Runs after files are installed
+  ; Override DisplayName to ensure it never includes version number
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_REGISTRY_KEY}" "DisplayName" "Papyrus Desktop"
 !macroend
 
 !macro customUninstall

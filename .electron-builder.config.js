@@ -15,8 +15,8 @@ const certificateFile = path.join(os.homedir(), '.papyrus-certs', 'code-signing.
 const hasCertificate = fs.existsSync(certificateFile);
 
 module.exports = {
-  appId: 'com.papyrus.app',
-  productName: 'Papyrus',
+  appId: 'com.papyrus.desktop',
+  productName: 'Papyrus Desktop',
   copyright: 'Copyright © 2026 Papyrus Team',
   
   directories: {
@@ -61,19 +61,21 @@ module.exports = {
     icon: 'assets/icon.ico',
     publisherName: 'Papyrus Team',
     verifyUpdateCodeSignature: true,
+    executableName: 'Papyrus Desktop',
     // Only sign locally (CI builds are unsigned)
     ...(hasCertificate && !isCI ? {
       certificateFile: certificateFile,
       certificatePassword: process.env.CERTIFICATE_PASSWORD,
     } : {}),
   },
-  
+
   nsis: {
     oneClick: false,
     allowToChangeInstallationDirectory: true,
     createDesktopShortcut: true,
     createStartMenuShortcut: true,
-    shortcutName: 'Papyrus',
+    shortcutName: 'Papyrus Desktop',
+    uninstallDisplayName: 'Papyrus Desktop',
     include: 'build/installer.nsh',
     deleteAppDataOnUninstall: false,
     artifactName: '${productName}-Setup.${ext}',
@@ -96,7 +98,7 @@ module.exports = {
   
   dmg: {
     sign: false,
-    artifactName: '${productName}-Apple Silicon-${arch}.${ext}',
+    artifactName: '${productName}-Apple-Silicon-${arch}.${ext}',
     contents: [
       { x: 130, y: 220 },
       { x: 410, y: 220, type: 'link', path: '/Applications' },
@@ -122,10 +124,10 @@ module.exports = {
     synopsis: 'Modern note-taking and learning application',
     description: 'Papyrus is a modern note-taking and learning application with AI integration and spaced repetition.',
     desktop: {
-      Name: 'Papyrus',
+      Name: 'Papyrus Desktop',
       Comment: 'Note-taking and learning application',
       Categories: 'Office;Education;',
-      StartupWMClass: 'Papyrus',
+      StartupWMClass: 'Papyrus Desktop',
     },
   },
   

@@ -9,6 +9,9 @@
  */
 
 const { app, BrowserWindow, Tray, Menu, ipcMain, shell, dialog } = require('electron');
+
+// Preserve user data directory compatibility across productName changes
+app.setName('papyrus');
 const path = require('path');
 const fs = require('fs');
 const { spawn, exec, execSync } = require('child_process');
@@ -282,7 +285,7 @@ function createWindow() {
     minHeight: 600,
     show: false, // Don't show until ready
     icon: paths.iconPath,
-    title: 'Papyrus',
+    title: 'Papyrus Desktop',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -354,8 +357,8 @@ function createWindow() {
         mainWindow.hide();
         tray.displayBalloon({
           iconType: 'info',
-          title: 'Papyrus',
-          content: 'Papyrus is running in the background. Click the tray icon to restore.',
+          title: 'Papyrus Desktop',
+          content: 'Papyrus Desktop is running in the background. Click the tray icon to restore.',
         });
       } catch (trayErr) {
         log(`Tray operation failed, allowing normal close: ${trayErr.message}`, 'error');
@@ -395,7 +398,7 @@ function createTray() {
     
     const contextMenu = Menu.buildFromTemplate([
       {
-        label: 'Show Papyrus',
+        label: 'Show Papyrus Desktop',
         click: () => {
           if (mainWindow) {
             if (mainWindow.isMinimized()) mainWindow.restore();
@@ -424,7 +427,7 @@ function createTray() {
       }
     ]);
 
-    tray.setToolTip('Papyrus');
+    tray.setToolTip('Papyrus Desktop');
     tray.setContextMenu(contextMenu);
     
     tray.on('click', () => {
@@ -739,10 +742,10 @@ function killAllPapyrusProcesses() {
   
   try {
     log('Killing any existing Papyrus processes...');
-    // Kill Papyrus.exe (main app)
+    // Kill Papyrus Desktop.exe (main app)
     try {
-      execSync('taskkill /F /IM Papyrus.exe 2>nul', { stdio: 'pipe' });
-      log('Killed Papyrus.exe processes');
+      execSync('taskkill /F /IM "Papyrus Desktop.exe" 2>nul', { stdio: 'pipe' });
+      log('Killed Papyrus Desktop.exe processes');
     } catch (e) {
       // No processes found or already killed
     }

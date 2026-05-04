@@ -27,7 +27,7 @@ if not exist "frontend\dist" (
 if exist "%WIN_ELECTRON%" (
     echo [1/3] Building Windows version...
     call :build_windows
-    echo     Done: dist-electron\Papyrus-win32-x64
+    echo     Done: dist-electron\PapyrusDesktop-win32-x64
 ) else (
     echo [SKIP] Windows Electron not found at %WIN_ELECTRON%
 )
@@ -61,15 +61,15 @@ echo ========================================
 echo.
 echo Output directory: dist-electron\
 echo.
-if exist "%WIN_ELECTRON%" echo [Windows]   Papyrus-win32-x64\Papyrus.exe
-if exist "%MAC_ELECTRON%" echo [macOS]     Papyrus-darwin-x64\Papyrus.app
-if exist "%LINUX_ELECTRON%" echo [Linux]     Papyrus-linux-x64\papyrus
+if exist "%WIN_ELECTRON%" echo [Windows]   PapyrusDesktop-win32-x64\Papyrus Desktop.exe
+if exist "%MAC_ELECTRON%" echo [macOS]     PapyrusDesktop-darwin-x64\Papyrus Desktop.app
+if exist "%LINUX_ELECTRON%" echo [Linux]     PapyrusDesktop-linux-x64\papyrus-desktop
 echo.
 pause
 goto :eof
 
 :build_windows
-set OUTPUT=dist-electron\Papyrus-win32-x64
+set OUTPUT=dist-electron\PapyrusDesktop-win32-x64
 if exist "dist-electron" rmdir /s /q "dist-electron"
 mkdir "%OUTPUT%"
 xcopy /E /I /Q "%WIN_ELECTRON%\*" "%OUTPUT%\"
@@ -83,11 +83,11 @@ echo   "version": "%VERSION%",
 echo   "main": "electron/main.js"
 echo }
 ) > "%OUTPUT%\resources\app\package.json"
-rename "%OUTPUT%\electron.exe" "Papyrus.exe"
+rename "%OUTPUT%\electron.exe" "Papyrus Desktop.exe"
 goto :eof
 
 :build_mac
-set OUTPUT=dist-electron\Papyrus-darwin-x64
+set OUTPUT=dist-electron\PapyrusDesktop-darwin-x64
 mkdir "%OUTPUT%"
 xcopy /E /I /Q "%MAC_ELECTRON%\*" "%OUTPUT%\"
 mkdir "%OUTPUT%\Electron.app\Contents\Resources\app"
@@ -100,11 +100,11 @@ echo   "version": "%VERSION%",
 echo   "main": "electron/main.js"
 echo }
 ) > "%OUTPUT%\Electron.app\Contents\Resources\app\package.json"
-rename "%OUTPUT%\Electron.app" "Papyrus.app"
+rename "%OUTPUT%\Electron.app" "Papyrus Desktop.app"
 goto :eof
 
 :build_linux
-set OUTPUT=dist-electron\Papyrus-linux-x64
+set OUTPUT=dist-electron\PapyrusDesktop-linux-x64
 mkdir "%OUTPUT%"
 xcopy /E /I /Q "%LINUX_ELECTRON%\*" "%OUTPUT%\"
 mkdir "%OUTPUT%\resources\app"
@@ -117,5 +117,5 @@ echo   "version": "%VERSION%",
 echo   "main": "electron/main.js"
 echo }
 ) > "%OUTPUT%\resources\app\package.json"
-rename "%OUTPUT%\electron" "papyrus"
+rename "%OUTPUT%\electron" "papyrus-desktop"
 goto :eof

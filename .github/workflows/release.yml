@@ -61,7 +61,7 @@ on:
         type: boolean
 
 env:
-  APP_NAME: "Papyrus"
+  APP_NAME: "Papyrus Desktop"
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   ELECTRON_BUILDER_BINARIES_MIRROR: "https://npmmirror.com/mirrors/electron-builder-binaries/"
   ELECTRON_MIRROR: "https://npmmirror.com/mirrors/electron/"
@@ -78,15 +78,15 @@ jobs:
           - platform: "windows"
             target: "win"
             os: windows-latest
-            artifact: "Papyrus-Win-x64"
+            artifact: "PapyrusDesktop-Win-x64"
           - platform: "macos"
             target: "mac"
             os: macos-latest
-            artifact: "Papyrus-Apple-Silicon-arm64"
+            artifact: "PapyrusDesktop-Apple-Silicon-arm64"
           - platform: "linux"
             target: "linux"
             os: ubuntu-latest
-            artifact: "Papyrus-Linux-x64"
+            artifact: "PapyrusDesktop-Linux-x64"
 
     steps:
       - name: Checkout Code
@@ -358,7 +358,7 @@ jobs:
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           path: artifacts
-          pattern: Papyrus-*
+          pattern: PapyrusDesktop-*
 
       - name: Download Release Notes
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -397,10 +397,10 @@ jobs:
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
         with:
           files: |
-            artifacts/Papyrus-Win-x64/**/*-Setup.exe
-            artifacts/Papyrus-Apple-Silicon-arm64/**/*.dmg
-            artifacts/Papyrus-Linux-x64/**/*.AppImage
-            artifacts/Papyrus-Linux-x64/**/*.deb
+            artifacts/PapyrusDesktop-Win-x64/**/*-Setup.exe
+            artifacts/PapyrusDesktop-Apple-Silicon-arm64/**/*.dmg
+            artifacts/PapyrusDesktop-Linux-x64/**/*.AppImage
+            artifacts/PapyrusDesktop-Linux-x64/**/*.deb
           tag_name: ${{ steps.tag.outputs.tag }}
           name: ${{ steps.tag.outputs.tag }}
           body_path: RELEASE_NOTES.md

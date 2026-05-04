@@ -342,7 +342,7 @@ function main() {
   
   log('', 'reset');
   log('╔════════════════════════════════════════════════════════╗', 'cyan');
-  log('║           Papyrus Electron Build Script                ║', 'cyan');
+  log('║        Papyrus Desktop Electron Build Script           ║', 'cyan');
   log('╚════════════════════════════════════════════════════════╝', 'cyan');
   
   switch (command) {

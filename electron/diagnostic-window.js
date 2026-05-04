@@ -40,7 +40,7 @@ function createDiagnosticWindow(logs, paths, error) {
   diagnosticWindow = new BrowserWindow({
     width: 900,
     height: 700,
-    title: 'Papyrus Diagnostic',
+    title: 'Papyrus Desktop Diagnostic',
     webPreferences: {
       // SECURITY: disable nodeIntegration and enable contextIsolation
       nodeIntegration: false,
@@ -54,7 +54,7 @@ function createDiagnosticWindow(logs, paths, error) {
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Papyrus Diagnostic</title>
+  <title>Papyrus Desktop Diagnostic</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -104,7 +104,7 @@ function createDiagnosticWindow(logs, paths, error) {
   </style>
 </head>
 <body>
-  <h1>🔍 Papyrus Diagnostic</h1>
+  <h1>🔍 Papyrus Desktop Diagnostic</h1>
   
   <div class="section">
     <h2>Path Information</h2>
