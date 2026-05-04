@@ -4,12 +4,35 @@ import { IconArrowUp, IconAt, IconFile, IconMessage, IconDown, IconBulb, IconRec
 import IconAgentMode from './icons/IconAgentMode';
 import { ReasoningChain } from './components/ReasoningChain';
 import { ToolCallCard } from './components/ToolCallCard';
+import { ChatHistory } from './components/ChatHistory';
 import type { AIConfig, ProviderModel } from './types/ai';
 import { getAuthToken, BASE, api } from './api';
-import type { ChatSession } from './api';
+import type { ChatSession, ChatBlock as ApiChatBlock } from './api';
 import { MarkdownView } from './components/MarkdownView';
 import { ToolsCatalogPopover } from './components/ToolsCatalogPopover';
 import './ChatPanel.css';
+
+const SESSION_ID_STORAGE_KEY = 'papyrus_chat_session_id';
+
+function loadStoredSessionId(): string {
+  try {
+    return localStorage.getItem(SESSION_ID_STORAGE_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function persistSessionId(sessionId: string): void {
+  try {
+    if (sessionId) {
+      localStorage.setItem(SESSION_ID_STORAGE_KEY, sessionId);
+    } else {
+      localStorage.removeItem(SESSION_ID_STORAGE_KEY);
+    }
+  } catch {
+    // ignore quota / disabled storage
+  }
+}
 
 interface ChatPanelProps {
   open: boolean;
@@ -60,6 +83,75 @@ interface Message {
   model?: string;
 }
 
+function mapApiToolStatus(
+  status: ApiChatBlock['toolStatus'] | undefined,
+): MessageBlock['toolStatus'] {
+  switch (status) {
+    case 'success':
+      return 'success';
+    case 'error':
+    case 'rejected':
+      return 'failed';
+    case 'running':
+      return 'executing';
+    case 'pending':
+    case 'approved':
+    default:
+      return 'pending';
+  }
+}
+
+interface RestoredMessageView {
+  content: string;
+  blocks: MessageBlock[];
+}
+
+function restoreApiMessage(blocks: ApiChatBlock[], fallbackContent: string): RestoredMessageView {
+  const localBlocks: MessageBlock[] = [];
+  let textContent = '';
+  for (const block of blocks) {
+    if (block.type === 'text') {
+      textContent += block.text ?? '';
+    } else if (block.type === 'reasoning') {
+      localBlocks.push({ type: 'reasoning', content: block.text ?? '' });
+    } else if (block.type === 'tool_call') {
+      localBlocks.push({
+        type: 'tool_call',
+        toolName: block.toolName ?? '',
+        toolCallId: block.toolCallId ?? '',
+        toolStatus: mapApiToolStatus(block.toolStatus),
+        toolParams: (block.toolParams ?? {}) as Record<string, unknown>,
+        toolResult: block.toolResult,
+        toolError: block.toolError,
+      });
+    } else if (block.type === 'tool_result') {
+      const targetIndex = [...localBlocks]
+        .reverse()
+        .findIndex(
+          (b) =>
+            b.type === 'tool_call' &&
+            (b.toolCallId === block.toolCallId || (!b.toolCallId && !block.toolCallId)),
+        );
+      if (targetIndex !== -1) {
+        const realIndex = localBlocks.length - 1 - targetIndex;
+        const target = localBlocks[realIndex];
+        if (target) {
+          localBlocks[realIndex] = {
+            ...target,
+            toolStatus: mapApiToolStatus(block.toolStatus),
+            toolResult: block.toolResult ?? target.toolResult,
+            toolError: block.toolError ?? target.toolError,
+          };
+        }
+      }
+    }
+  }
+  return {
+    content: textContent || fallbackContent,
+    blocks: localBlocks,
+  };
+}
+
 /** 已选文件 */
 interface SelectedFile {
   id: string;
@@ -71,7 +163,7 @@ interface SelectedFile {
 
 /** SSE 事件类型 */
 interface SSEEvent {
-  type: 'text' | 'reasoning' | 'tool_call' | 'tool_result' | 'error' | 'done';
+  type: 'text' | 'reasoning' | 'tool_call' | 'tool_result' | 'error' | 'done' | 'user_saved';
   data: any;
 }
 
@@ -138,7 +230,8 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   const [availableModels, setAvailableModels] = useState<ProviderModel[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
-  const [currentSessionId, setCurrentSessionId] = useState<string>('');
+  const [currentSessionId, setCurrentSessionId] = useState<string>(loadStoredSessionId());
+  const [historyDrawerVisible, setHistoryDrawerVisible] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState('');
   const dragStartY = useRef<number>(0);
@@ -159,6 +252,10 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   useEffect(() => {
     modelRef.current = model;
   }, [model]);
+
+  useEffect(() => {
+    persistSessionId(currentSessionId);
+  }, [currentSessionId]);
 
   // 监听 localStorage 变化（用于设置页面修改后实时更新）
   useEffect(() => {
@@ -267,7 +364,10 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
             ? currentModels.find((m) => m.key.endsWith(`:${configuredModel}`))?.key
             : undefined;
           if (configuredCompositeKey && currentModels.some((m) => m.key === configuredCompositeKey)) {
-            setModel(configuredCompositeKey);
+            // 只有当用户没有已选模型，或已选模型不在可用列表中时，才使用后端配置
+            if (!currentModelRef || !currentModels.some((m) => m.key === currentModelRef)) {
+              setModel(configuredCompositeKey);
+            }
           } else if (currentModels.length > 0 && !currentModelRef) {
             setModel(currentModels[0].key);
           }
@@ -287,19 +387,41 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
     }
   }, [open, initializeChatConfig]);
 
-  // 初始化会话：当面板打开且没有当前会话时，创建新会话
+  // 初始化会话：优先用 localStorage 的会话；其次后端 active 会话；都不行才创建新会话
   useEffect(() => {
-    if (open && !currentSessionId) {
-      authFetch('/sessions', { method: 'POST' })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success && data.session) {
-            setCurrentSessionId(data.session.id);
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const listRes = await api.listChatSessions();
+        if (cancelled || !listRes.success) return;
+        const sessionsList = listRes.sessions;
+        const stored = loadStoredSessionId();
+        const storedValid = stored && sessionsList.some((s) => s.id === stored);
+        if (storedValid) {
+          if (!currentSessionId || currentSessionId !== stored) {
+            await api.switchChatSession(stored).catch(() => undefined);
+            if (cancelled) return;
+            setCurrentSessionId(stored);
           }
-        })
-        .catch(() => { /* ignore */ });
-    }
-  }, [open, currentSessionId]);
+          return;
+        }
+        if (listRes.activeSessionId && sessionsList.some((s) => s.id === listRes.activeSessionId)) {
+          if (cancelled) return;
+          setCurrentSessionId(listRes.activeSessionId);
+          return;
+        }
+        const createRes = await api.createChatSession();
+        if (cancelled || !createRes.success) return;
+        setCurrentSessionId(createRes.session.id);
+      } catch (err) {
+        if (!cancelled) console.error('Failed to initialize chat session:', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps -- one-shot init when panel opens
 
   // 监听设置页 AI 配置变化，实时刷新
   useEffect(() => {
@@ -461,10 +583,15 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   }, []);
 
   // 处理 SSE 流
-  const handleSSEStream = useCallback(async (response: Response, messageId: string) => {
+  const handleSSEStream = useCallback(async (
+    response: Response,
+    optimisticAssistantId: string,
+    optimisticUserId: string,
+  ) => {
     const reader = response.body?.getReader();
     if (!reader) return;
 
+    let assistantId = optimisticAssistantId;
     const decoder = new TextDecoder();
     let buffer = '';
 
@@ -490,13 +617,30 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
 
               const event: SSEEvent = JSON.parse(jsonStr);
 
+              if (event.type === 'user_saved') {
+                const realUserId = event.data?.messageId;
+                const sessionId = event.data?.sessionId;
+                if (typeof sessionId === 'string' && sessionId) {
+                  setCurrentSessionId(sessionId);
+                }
+                if (typeof realUserId === 'string' && realUserId) {
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === optimisticUserId ? { ...m, id: realUserId } : m,
+                    ),
+                  );
+                }
+                continue;
+              }
+
               setMessages((prev) => {
-                const msgIndex = prev.findIndex((m) => m.id === messageId);
+                const msgIndex = prev.findIndex((m) => m.id === assistantId);
                 if (msgIndex === -1) return prev;
 
                 const lastMsg = prev[msgIndex]!;
                 let newBlocks = lastMsg.blocks ? [...lastMsg.blocks] : [];
                 let newContent = lastMsg.content;
+                let newId = lastMsg.id;
 
                 switch (event.type) {
                   case 'text':
@@ -538,12 +682,17 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
                     break;
 
                   case 'tool_result': {
-                    const toolIndex = newBlocks.findIndex(
-                      (b) =>
-                        b.type === 'tool_call' &&
-                        b.toolName === event.data.name &&
-                        b.toolStatus === 'pending'
-                    );
+                    const callId = event.data?.callId;
+                    const toolIndex = callId
+                      ? newBlocks.findIndex(
+                          (b) => b.type === 'tool_call' && b.toolCallId === callId,
+                        )
+                      : newBlocks.findIndex(
+                          (b) =>
+                            b.type === 'tool_call' &&
+                            b.toolName === event.data.name &&
+                            b.toolStatus === 'pending',
+                        );
                     if (toolIndex !== -1) {
                       newBlocks = newBlocks.map((b, idx) =>
                         idx === toolIndex
@@ -562,6 +711,15 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
                   }
 
                   case 'done': {
+                    const realAssistantId = event.data?.messageId;
+                    const sessionId = event.data?.sessionId;
+                    if (typeof sessionId === 'string' && sessionId) {
+                      setCurrentSessionId(sessionId);
+                    }
+                    if (typeof realAssistantId === 'string' && realAssistantId) {
+                      newId = realAssistantId;
+                      assistantId = realAssistantId;
+                    }
                     const toolPattern = /```json\s*(\{[\s\S]*?"tool"[\s\S]*?\})\s*```/g;
                     let match = toolPattern.exec(newContent);
                     while (match !== null) {
@@ -607,6 +765,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
                 const newMessages = [...prev];
                 newMessages[msgIndex] = {
                   ...lastMsg,
+                  id: newId,
                   content: newContent,
                   blocks: newBlocks,
                 };
@@ -634,7 +793,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
     if ((!trimmedText && selectedFiles.length === 0) || isGenerating) return;
 
     // 检查 model 是否已选择
-    if (!model) {
+    if (!modelRef.current) {
       ArcoMessage.error('请先选择 AI 模型');
       return;
     }
@@ -699,7 +858,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
       role: 'assistant',
       content: '',
       blocks: [],
-      model,
+      model: modelRef.current,
     };
 
     setMessages((prev) => [...prev, userMessage, assistantMessage]);
@@ -711,7 +870,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
 
     try {
       // 从 composite key 中提取真实的 modelId
-      const actualModelId = model.includes(':') ? model.split(':').slice(1).join(':') : model;
+      const actualModelId = modelRef.current.includes(':') ? modelRef.current.split(':').slice(1).join(':') : modelRef.current;
       const chatBody: Record<string, unknown> = {
         message: messageText,
         model: actualModelId,
@@ -746,7 +905,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
       // 检查是否是 SSE 响应
       const contentType = response.headers.get('content-type');
       if (contentType?.includes('text/event-stream')) {
-        await handleSSEStream(response, assistantMessage.id);
+        await handleSSEStream(response, assistantMessage.id, userMessage.id);
       } else {
         // 普通 JSON 响应
         const data = await response.json();
@@ -809,7 +968,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
       setIsGenerating(false);
       abortControllerRef.current = null;
     }
-  }, [text, isGenerating, model, mode, reasoning, selectedFiles, handleSSEStream]);
+  }, [text, isGenerating, mode, reasoning, selectedFiles, handleSSEStream]);
 
   // 停止生成
   const stopGeneration = useCallback(() => {
@@ -1041,12 +1200,9 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   const loadSessions = useCallback(async () => {
     setSessionsLoading(true);
     try {
-      const res = await authFetch('/sessions');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.sessions) {
-          setSessions(data.sessions);
-        }
+      const data = await api.listChatSessions();
+      if (data.success) {
+        setSessions(data.sessions);
       }
     } catch (err) {
       console.error('Failed to load sessions:', err);
@@ -1055,37 +1211,73 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
     }
   }, []);
 
-  // 切换会话并加载历史消息
+  // 创建新会话
+  const createNewSession = useCallback(async () => {
+    try {
+      const data = await api.createChatSession();
+      if (data.success) {
+        setMessages([]);
+        setCurrentSessionId(data.session.id);
+      }
+    } catch (err) {
+      console.error('Failed to create session:', err);
+      ArcoMessage.error('创建会话失败');
+    }
+  }, []);
+
+  // 清空所有会话（清空后自动新建一个空会话）
+  const clearAllSessions = useCallback(async () => {
+    try {
+      const data = await api.clearAllChatSessions();
+      if (data.success) {
+        setMessages([]);
+        setSessions([]);
+        if (data.activeSessionId) {
+          setCurrentSessionId(data.activeSessionId);
+        } else {
+          const created = await api.createChatSession();
+          if (created.success) {
+            setCurrentSessionId(created.session.id);
+          }
+        }
+        ArcoMessage.success(`已清空 ${data.deletedCount} 个会话`);
+      }
+    } catch (err) {
+      console.error('Failed to clear sessions:', err);
+      ArcoMessage.error('清空会话失败');
+    }
+  }, []);
+
+  // 切换会话并加载历史消息（完整还原 blocks/model/attachments）
   const switchSession = useCallback(async (sessionId: string) => {
     try {
-      const res = await authFetch(`/sessions/${sessionId}/switch`, {
-        method: 'POST',
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        ArcoMessage.error(data.error || '切换会话失败');
+      const switchRes = await api.switchChatSession(sessionId);
+      if (!switchRes.success) {
+        ArcoMessage.error('切换会话失败');
         return;
       }
-      // 加载会话消息
-      const msgRes = await authFetch(`/sessions/${sessionId}/messages`);
-      if (msgRes.ok) {
-        const data = await msgRes.json();
-        if (data.success && data.session) {
-          const loadedMessages: Message[] = data.session.messages.map((m: { role: string; content: string }, index: number) => ({
-            id: `${sessionId}-${index}`,
-            role: m.role as 'user' | 'assistant',
-            content: m.content,
-            model: m.role === 'assistant' ? model : undefined,
-          }));
-          setMessages(loadedMessages);
-          setCurrentSessionId(sessionId);
-        }
+      const data = await api.getChatMessages(sessionId);
+      if (!data.success) {
+        ArcoMessage.error('加载会话消息失败');
+        return;
       }
+      const loadedMessages: Message[] = data.messages.map((m) => {
+        const restored = restoreApiMessage(m.blocks ?? [], m.content);
+        return {
+          id: m.id,
+          role: m.role === 'user' ? 'user' : 'assistant',
+          content: restored.content,
+          blocks: restored.blocks,
+          model: m.role === 'assistant' ? m.model : undefined,
+        };
+      });
+      setMessages(loadedMessages);
+      setCurrentSessionId(sessionId);
     } catch (err) {
       console.error('Failed to switch session:', err);
       ArcoMessage.error('切换会话失败');
     }
-  }, [model]);
+  }, []);
 
   // 处理模式切换，检查 Agent 是否被禁用
   const handleModeChange = (newMode: string) => {
@@ -1158,41 +1350,38 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
           </button>
         </Dropdown>
         <div className="chat-panel-header-actions">
-          <Tooltip content="新建对话" mini><button className="chat-panel-header-btn" aria-label="新建对话" onClick={async () => { setMessages([]); try { const res = await authFetch('/sessions', { method: 'POST' }); const data = await res.json(); if (data.success && data.session) { setCurrentSessionId(data.session.id); } } catch { /* ignore */ } }}><IconPlus /></button></Tooltip>
-          <Dropdown
-            trigger="click"
-            droplist={
-              sessionsLoading ? (
-                <Menu>
-                  <Menu.Item key="loading">加载中...</Menu.Item>
-                </Menu>
-              ) : sessions.length === 0 ? (
-                <Menu>
-                  <Menu.Item key="empty">暂无历史会话</Menu.Item>
-                </Menu>
-              ) : (
-                <Menu className="chat-session-menu">
-                  {sessions.map((session) => (
-                    <Menu.Item key={session.id} onClick={() => switchSession(session.id)}>
-                      <div className="chat-session-item">
-                        <span className="chat-session-title">{session.title}</span>
-                        <span className="chat-session-meta">
-                          {new Date(session.updated_at * 1000).toLocaleString('zh-CN')} · {session.message_count} 条消息
-                        </span>
-                      </div>
-                    </Menu.Item>
-                  ))}
-                </Menu>
-              )
-            }
-          >
-            <Tooltip content="历史记录" mini>
-              <button className="chat-panel-header-btn" aria-label="历史记录" onClick={() => { if (sessions.length === 0) loadSessions(); }}><IconHistory /></button>
-            </Tooltip>
-          </Dropdown>
+          <Tooltip content="新建对话" mini>
+            <button
+              className="chat-panel-header-btn"
+              aria-label="新建对话"
+              onClick={createNewSession}
+            >
+              <IconPlus />
+            </button>
+          </Tooltip>
+          <Tooltip content="历史记录" mini>
+            <button
+              className="chat-panel-header-btn"
+              aria-label="历史记录"
+              onClick={() => setHistoryDrawerVisible(true)}
+            >
+              <IconHistory />
+            </button>
+          </Tooltip>
           <Tooltip content="关闭" mini><button className="chat-panel-header-btn" aria-label="关闭" onClick={onClose}><IconClose /></button></Tooltip>
         </div>
       </div>
+      <ChatHistory
+        visible={historyDrawerVisible}
+        onClose={() => setHistoryDrawerVisible(false)}
+        currentSessionId={currentSessionId}
+        sessions={sessions}
+        loading={sessionsLoading}
+        onRefresh={loadSessions}
+        onSwitchSession={switchSession}
+        onCreateSession={createNewSession}
+        onClearAll={clearAllSessions}
+      />
       <div className="chat-panel-body" ref={messagesContainerRef}>
         {messages.length === 0 ? (
           <div className="tw-flex-1 tw-flex tw-flex-col tw-items-center tw-justify-center tw-p-8">
@@ -1426,7 +1615,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
               onClick={() => setReasoning(!reasoning)}
               title="推理模式"
               aria-label={reasoning ? '关闭推理模式' : '开启推理模式'}
-              aria-pressed={reasoning}
+              aria-pressed={reasoning ? 'true' : 'false'}
             >
               <IconBulb aria-hidden="true" />
             </button>

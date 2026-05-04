@@ -59,7 +59,7 @@ function useStartPageData(): StartPageData & { refresh: () => void } {
   const [stats, setStats] = useState<StartPageStats>({
     cardsDue: 0,
     totalCards: 0,
-    streakDays: 7,
+    streakDays: 0,
     todayProgress: 0,
   });
   const [loading, setLoading] = useState(true);
@@ -67,10 +67,11 @@ function useStartPageData(): StartPageData & { refresh: () => void } {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [remoteSolarTerm, nextScenery, nextDueRes] = await Promise.all([
+      const [remoteSolarTerm, nextScenery, nextDueRes, streakRes] = await Promise.all([
         fetchSolarTerm(today),
         fetchSceneryContent(),
         api.nextDue(),
+        api.streak(),
       ]);
 
       if (remoteSolarTerm) {
@@ -79,19 +80,11 @@ function useStartPageData(): StartPageData & { refresh: () => void } {
 
       setScenery(nextScenery);
 
-      // 获取真实统计数据 — 后端字段缺失时回落 0,避免渲染 undefined 导致空白
-      if (nextDueRes.success) {
-        const dueCount = nextDueRes.due_count ?? 0;
-        const totalCount = nextDueRes.total_count ?? 0;
-        setStats({
-          cardsDue: dueCount,
-          totalCards: totalCount,
-          streakDays: 7,
-          todayProgress: totalCount > 0
-            ? Math.round(((totalCount - dueCount) / totalCount) * 100)
-            : 100,
-        });
-      }
+      const dueCount = nextDueRes.success ? (nextDueRes.due_count ?? 0) : 0;
+      const totalCount = nextDueRes.success ? (nextDueRes.total_count ?? 0) : 0;
+      const streakDays = streakRes.success ? (streakRes.current_streak ?? 0) : 0;
+      const todayProgress = streakRes.success ? (streakRes.progress_percent ?? 0) : 0;
+      setStats({ cardsDue: dueCount, totalCards: totalCount, streakDays, todayProgress });
     } catch (err) {
       setScenery(null);
       const msg = err instanceof Error ? err.message : '获取数据失败';

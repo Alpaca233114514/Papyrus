@@ -19,7 +19,8 @@
     "build:frontend": "cd frontend && npm run build",
     "build:backend": "cd backend && npm run build",
     "postinstall": "cd frontend && npm install && cd ../backend && npm install",
-    "build:installer": "npm run build:backend && npm run build:frontend && electron-builder --win nsis --x64 --publish=never --config .electron-builder.config.js",
+    "sync-version": "node scripts/sync-version.js",
+    "build:installer": "npm run sync-version && npm run build:backend && npm run build:frontend && electron-builder --win nsis --x64 --publish=never --config .electron-builder.config.js",
     "generate-cert": "powershell -ExecutionPolicy Bypass -File build/create-cert.ps1"
   },
   "devDependencies": {

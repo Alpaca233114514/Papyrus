@@ -108,7 +108,12 @@ function applyAllowedSettings(input: Record<string, unknown>): ApplyResult {
         errors.push(`${path} 必须是非空字符串`);
         continue;
       }
-      aiConfig.config.current_model = value.trim();
+      const trimmed = value.trim();
+      if (trimmed.includes('..') || trimmed.includes('/') || trimmed.includes('\\') || trimmed.includes('\x00')) {
+        errors.push(`${path} 包含非法字符`);
+        continue;
+      }
+      aiConfig.config.current_model = trimmed;
       applied.push(path);
     }
   }

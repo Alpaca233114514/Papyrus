@@ -24,6 +24,9 @@ function writeTokenFile(token: string): void {
   try {
     fs.mkdirSync(paths.dataDir, { recursive: true });
     fs.writeFileSync(TOKEN_FILE, token, { mode: 0o600 });
+    if (process.platform === 'win32') {
+      try { fs.chmodSync(TOKEN_FILE, 0o600); } catch { /* Windows may not fully support chmod */ }
+    }
   } catch (e) {
     console.error(`写入认证令牌文件失败: ${e instanceof Error ? e.message : String(e)}`);
   }

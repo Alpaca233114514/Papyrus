@@ -1,4 +1,6 @@
 import type { FastifyInstance } from 'fastify';
+import path from 'node:path';
+import os from 'node:os';
 import { getAllNotes, createNote, updateNote, deleteNote, deleteNotes, getNoteById } from '../../core/notes.js';
 import { importObsidianVault } from '../../core/notes.js';
 import { recordNoteCreated } from '../../core/progress.js';
@@ -79,8 +81,19 @@ export default async function notesRoutes(fastify: FastifyInstance): Promise<voi
       reply.status(400).send({ success: false, error: 'vault_path is required' });
       return;
     }
+    const vaultPath = path.normalize(body.vault_path);
+    if (vaultPath.includes('..') || vaultPath.includes('\x00')) {
+      reply.status(400).send({ success: false, error: '非法路径' });
+      return;
+    }
+    const resolvedVaultPath = path.resolve(vaultPath);
+    const homeDir = path.resolve(os.homedir());
+    if (!resolvedVaultPath.startsWith(homeDir + path.sep) && resolvedVaultPath !== homeDir) {
+      reply.status(400).send({ success: false, error: 'Obsidian vault 路径必须在用户主目录下' });
+      return;
+    }
     try {
-      const result = importObsidianVault(body.vault_path, body.exclude_folders);
+      const result = importObsidianVault(resolvedVaultPath, body.exclude_folders);
       if (result.error) {
         reply.status(400).send({ success: false, error: result.error, imported: 0, errors: 0 });
         return;

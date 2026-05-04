@@ -38,6 +38,10 @@ interface UpdateCheckResponse {
   message: string;
 }
 
+declare const __APP_VERSION__: string;
+
+const APP_VERSION = __APP_VERSION__;
+
 const AboutView = ({ onBack }: AboutViewProps) => {
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
   const [isChecking, setIsChecking] = useState(false);
@@ -103,11 +107,23 @@ const AboutView = ({ onBack }: AboutViewProps) => {
     }
   };
 
+  const ALLOWED_EXTERNAL_DOMAINS = ['github.com', 'githubusercontent.com', 'papyrus.liyuanstudio.com'];
+
+  const isAllowedExternalUrl = (url: string): boolean => {
+    try {
+      const parsed = new URL(url);
+      return ALLOWED_EXTERNAL_DOMAINS.some(domain => parsed.hostname === domain || parsed.hostname.endsWith('.' + domain));
+    } catch {
+      return false;
+    }
+  };
+
   const handleDownload = () => {
-    if (versionInfo?.download_url) {
-      window.open(versionInfo.download_url, '_blank');
-    } else if (versionInfo?.release_url) {
-      window.open(versionInfo.release_url, '_blank');
+    const url = versionInfo?.download_url || versionInfo?.release_url;
+    if (url && isAllowedExternalUrl(url)) {
+      window.open(url, '_blank');
+    } else if (url) {
+      Message.warning('未知的下载来源，已阻止打开');
     }
   };
 
@@ -155,7 +171,7 @@ const AboutView = ({ onBack }: AboutViewProps) => {
         />
         <Title heading={3} className="about-app-name">Papyrus</Title>
         <Text type="secondary" className="about-version">
-          版本 {versionInfo?.current_version || 'v2.0.0-beta.5'}
+          版本 {versionInfo?.current_version || APP_VERSION}
         </Text>
         <Paragraph type="secondary" className="about-description">
           SRS 复习引擎 - 基于间隔重复算法的智能记忆卡片应用
@@ -185,7 +201,11 @@ const AboutView = ({ onBack }: AboutViewProps) => {
           )}
           <Button
             shape="round"
-            onClick={() => window.open('https://github.com/PapyrusOR/Papyrus_Desktop', '_blank')}
+            onClick={() => {
+              if (isAllowedExternalUrl('https://github.com/PapyrusOR/Papyrus_Desktop')) {
+                window.open('https://github.com/PapyrusOR/Papyrus_Desktop', '_blank');
+              }
+            }}
           >
             <IconGithub className="about-github-icon" />
             GitHub

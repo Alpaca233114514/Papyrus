@@ -134,6 +134,8 @@ body[arco-theme='dark'] .tool-call-collapse > .arco-collapse-item > .arco-collap
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+  flex: 0 1 auto;
 }
 
 .tool-call-status-tag {
@@ -152,6 +154,7 @@ body[arco-theme='dark'] .tool-call-collapse > .arco-collapse-item > .arco-collap
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+  flex-wrap: nowrap;
 }
 
 .tool-call-btn {
@@ -257,7 +260,7 @@ body[arco-theme='dark'] .tool-call-collapse > .arco-collapse-item > .arco-collap
 
 /* 参数预览 */
 .tool-call-param-preview {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -314,8 +317,19 @@ body[arco-theme='dark'] .tool-call-collapse > .arco-collapse-item > .arco-collap
   .tool-call-card {
     border-width: 2px;
   }
-  
+
   .tool-call-section-body {
     border-width: 2px;
+  }
+}
+
+/* 极窄面板兜底：< 360px 时 header 允许换行，actions 整体下移到第二行 */
+@media (max-width: 360px) {
+  .tool-call-header {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .tool-call-actions {
+    margin-left: auto;
   }
 }

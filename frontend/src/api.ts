@@ -95,6 +95,16 @@ export type ListCardsRes = { success: boolean; cards: Card[]; count: number };
 export type NextDueRes = { success: boolean; card: Card | null; due_count: number; total_count: number };
 export type RateRes = { success: boolean; card: Card; interval_days: number; ef: number; next: NextDueRes | null };
 export type UpdateCardRes = { success: boolean; card: Card };
+export type StreakRes = {
+  success: boolean;
+  current_streak: number;
+  longest_streak: number;
+  total_days: number;
+  today_completed: boolean;
+  today_cards: number;
+  daily_target: number;
+  progress_percent: number;
+};
 
 // ========== Note Types ==========
 export type Note = {
@@ -211,34 +221,101 @@ export type FileItemData = {
 export type ListFilesRes = { success: boolean; files: FileItemData[]; count: number };
 
 // ========== Chat Session Types ==========
+export type ChatBlockType = 'text' | 'reasoning' | 'tool_call' | 'tool_result';
+
+export type ChatBlock = {
+  type: ChatBlockType;
+  text?: string;
+  toolCallId?: string;
+  toolName?: string;
+  toolStatus?: 'pending' | 'approved' | 'rejected' | 'running' | 'success' | 'error';
+  toolParams?: Record<string, unknown>;
+  toolResult?: unknown;
+  toolError?: string;
+};
+
+export type ChatAttachment = {
+  id: string;
+  name: string;
+  stored_name: string;
+  path: string;
+  type: 'image' | 'document';
+  mime_type: string;
+  size: number;
+  created_at: number;
+};
+
+export type ChatTokenUsage = {
+  prompt?: number;
+  completion?: number;
+  total?: number;
+};
+
 export type ChatSession = {
   id: string;
   title: string;
-  created_at: number;
-  updated_at: number;
-  message_count: number;
+  model: string;
+  provider: string;
+  isActive: boolean;
+  messageCount: number;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type ChatMessage = {
+  id: string;
+  sessionId: string;
+  role: 'user' | 'assistant' | 'system' | 'tool';
+  content: string;
+  blocks: ChatBlock[];
+  attachments: ChatAttachment[];
+  model: string;
+  provider: string;
+  tokenUsage: ChatTokenUsage;
+  parentMessageId: string | null;
+  createdAt: number;
 };
 
 export type ListChatSessionsRes = {
   success: boolean;
   sessions: ChatSession[];
+  activeSessionId: string | null;
 };
 
 export type CreateChatSessionRes = {
   success: boolean;
   session: ChatSession;
+  activeSessionId: string;
 };
 
 export type SwitchChatSessionRes = {
   success: boolean;
-  session: ChatSession;
+  activeSessionId: string;
 };
 
 export type RenameChatSessionRes = {
   success: boolean;
+  session: ChatSession;
 };
 
 export type DeleteChatSessionRes = {
+  success: boolean;
+  activeSessionId: string | null;
+};
+
+export type ClearAllChatSessionsRes = {
+  success: boolean;
+  deletedCount: number;
+  activeSessionId: string | null;
+};
+
+export type GetChatMessagesRes = {
+  success: boolean;
+  session: ChatSession;
+  messages: ChatMessage[];
+};
+
+export type DeleteChatMessageRes = {
   success: boolean;
 };
 
@@ -280,10 +357,11 @@ export const api = {
       body: JSON.stringify(data) 
     }),
   nextDue: (tag?: string) => request<NextDueRes>(tag ? `/review/next?tag=${encodeURIComponent(tag)}` : '/review/next'),
-  rateCard: (id: string, grade: 1 | 2 | 3, tag?: string) => request<RateRes>(tag ? `/review/${id}/rate?tag=${encodeURIComponent(tag)}` : `/review/${id}/rate`, { 
-    method: 'POST', 
-    body: JSON.stringify({ grade }) 
+  rateCard: (id: string, grade: 1 | 2 | 3, tag?: string) => request<RateRes>(tag ? `/review/${id}/rate?tag=${encodeURIComponent(tag)}` : `/review/${id}/rate`, {
+    method: 'POST',
+    body: JSON.stringify({ grade })
   }),
+  streak: () => request<StreakRes>('/progress/streak'),
   importTxt: (content: string) => request<{ success: boolean; count: number }>('/cards/import/txt', {
     method: 'POST',
     body: JSON.stringify({ content })
@@ -379,8 +457,11 @@ export const api = {
   // Chat Sessions
   listChatSessions: () =>
     request<ListChatSessionsRes>('/sessions'),
-  createChatSession: () =>
-    request<CreateChatSessionRes>('/sessions', { method: 'POST' }),
+  createChatSession: (title?: string) =>
+    request<CreateChatSessionRes>('/sessions', {
+      method: 'POST',
+      body: JSON.stringify(title ? { title } : {}),
+    }),
   switchChatSession: (id: string) =>
     request<SwitchChatSessionRes>(`/sessions/${id}/switch`, { method: 'POST' }),
   renameChatSession: (id: string, title: string) =>
@@ -390,6 +471,12 @@ export const api = {
     }),
   deleteChatSession: (id: string) =>
     request<DeleteChatSessionRes>(`/sessions/${id}`, { method: 'DELETE' }),
+  clearAllChatSessions: () =>
+    request<ClearAllChatSessionsRes>('/sessions', { method: 'DELETE' }),
+  getChatMessages: (sessionId: string) =>
+    request<GetChatMessagesRes>(`/sessions/${sessionId}/messages`),
+  deleteChatMessage: (messageId: string) =>
+    request<DeleteChatMessageRes>(`/messages/${messageId}`, { method: 'DELETE' }),
 
   // Providers
   listProviders: () => request<ListProvidersRes>('/providers'),

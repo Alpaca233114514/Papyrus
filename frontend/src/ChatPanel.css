@@ -190,6 +190,11 @@ body[arco-theme="dark"] .chat-message-user .chat-message-bubble {
   display: flex;
   flex-direction: column;
   position: relative;
+  transition: box-shadow 0.15s ease;
+}
+
+.chat-input-area:has(.chat-textarea:focus) {
+  box-shadow: 0 0 0 2px var(--color-primary);
 }
 
 .chat-textarea {
@@ -197,7 +202,6 @@ body[arco-theme="dark"] .chat-message-user .chat-message-bubble {
   width: 100%;
   resize: none;
   border: none;
-  outline: none;
   background: transparent;
   color: var(--color-text-1);
   font-size: 15px;
@@ -212,7 +216,18 @@ body[arco-theme="dark"] .chat-message-user .chat-message-bubble {
   color: var(--color-text-3);
 }
 
-.chat-textarea:focus-visible {
+.chat-input-area .chat-textarea,
+.chat-input-area .chat-textarea:hover,
+.chat-input-area .chat-textarea:focus,
+.chat-input-area .chat-textarea:focus-visible,
+.chat-input-area .chat-textarea:active {
+  outline: 0 !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+}
+
+.chat-edit-textarea-user:focus-visible,
+.chat-edit-textarea-assistant:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: -2px;
 }

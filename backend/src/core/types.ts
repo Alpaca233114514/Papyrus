@@ -64,3 +64,58 @@ export interface Model {
   apiKeyId: string | null;
   enabled: boolean;
 }
+
+export type ChatBlockType = 'text' | 'reasoning' | 'tool_call' | 'tool_result';
+
+export interface ChatBlock {
+  type: ChatBlockType;
+  text?: string;
+  toolCallId?: string;
+  toolName?: string;
+  toolStatus?: 'pending' | 'approved' | 'rejected' | 'running' | 'success' | 'error';
+  toolParams?: Record<string, unknown>;
+  toolResult?: unknown;
+  toolError?: string;
+}
+
+export interface ChatAttachment {
+  id: string;
+  name: string;
+  stored_name: string;
+  path: string;
+  type: 'image' | 'document';
+  mime_type: string;
+  size: number;
+  created_at: number;
+}
+
+export interface ChatTokenUsage {
+  prompt?: number;
+  completion?: number;
+  total?: number;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  model: string;
+  provider: string;
+  isActive: boolean;
+  messageCount: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  sessionId: string;
+  role: 'user' | 'assistant' | 'system' | 'tool';
+  content: string;
+  blocks: ChatBlock[];
+  attachments: ChatAttachment[];
+  model: string;
+  provider: string;
+  tokenUsage: ChatTokenUsage;
+  parentMessageId: string | null;
+  createdAt: number;
+}

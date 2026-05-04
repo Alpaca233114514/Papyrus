@@ -1,9 +1,19 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { readFileSync } from 'fs'
+import { resolve } from 'path'
+
+const rootPkg = JSON.parse(
+  readFileSync(resolve(__dirname, '..', 'package.json'), 'utf8')
+)
+const appVersion = rootPkg.version ?? 'unknown'
 
 // TS + React 19 + Arco scaffold
 export default defineConfig({
   base: './', // Required for Electron to load files locally
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   plugins: [
     react({
       // keep classic runtime if you still want `import React from 'react'`

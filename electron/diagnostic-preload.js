@@ -6,7 +6,6 @@ const path = require('path');
 function isAllowedPath(dir) {
   const allowed = [
     app.getPath('userData'),
-    app.getPath('home'),
     path.join(app.getPath('home'), 'PapyrusData'),
     path.join(app.getPath('home'), '.papyrusData'),
     path.join(app.getPath('home'), '.papyrus'),

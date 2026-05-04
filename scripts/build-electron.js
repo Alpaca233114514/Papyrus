@@ -184,17 +184,24 @@ function buildBackend() {
 
 // Kill process on port (cross-platform)
 function killPort(port) {
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    log(`Invalid port: ${port}`, 'red');
+    return;
+  }
   try {
     if (process.platform === 'win32') {
       // Windows: find PID using netstat and kill with taskkill
-      const output = execSync(`netstat -ano | findstr :${port} | findstr LISTENING`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
-      const lines = output.trim().split('\n');
+      const { spawnSync } = require('child_process');
+      const netstatResult = spawnSync('netstat', ['-ano'], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+      const findstrResult = spawnSync('findstr', [`:${port}`], { encoding: 'utf8', input: netstatResult.stdout, stdio: ['pipe', 'pipe', 'ignore'] });
+      const lines = (findstrResult.stdout || '').trim().split('\n');
       for (const line of lines) {
+        if (!line.includes('LISTENING')) continue;
         const match = line.trim().match(/\s+(\d+)\s*$/);
         if (match) {
           const pid = match[1];
           try {
-            execSync(`taskkill /PID ${pid} /F`, { stdio: 'ignore' });
+            spawnSync('taskkill', ['/PID', pid, '/F'], { stdio: 'ignore' });
             log(`Released port ${port} (PID: ${pid})`, 'green');
           } catch (e) {
             log(`Failed to kill process ${pid}`, 'yellow');
@@ -203,12 +210,13 @@ function killPort(port) {
       }
     } else {
       // macOS/Linux: use lsof to find and kill processes
+      const { spawnSync } = require('child_process');
       try {
-        const output = execSync(`lsof -ti:${port}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
-        const pids = output.trim().split('\n');
+        const lsofResult = spawnSync('lsof', ['-ti', `:${port}`], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+        const pids = (lsofResult.stdout || '').trim().split('\n');
         for (const pid of pids) {
           if (pid) {
-            execSync(`kill -9 ${pid}`, { stdio: 'ignore' });
+            spawnSync('kill', ['-9', pid], { stdio: 'ignore' });
             log(`Released port ${port} (PID: ${pid})`, 'green');
           }
         }
@@ -314,6 +322,19 @@ function buildElectron(target) {
   log(`Output location: ${path.join('dist-electron')}`, 'dim');
 }
 
+// Sync version before building
+function syncVersion() {
+  log('Syncing version...', 'dim');
+  const syncScript = path.join(__dirname, 'sync-version.js');
+  if (fs.existsSync(syncScript)) {
+    try {
+      execSync('node "' + syncScript + '"', { stdio: 'inherit', shell: true });
+    } catch (e) {
+      log('Version sync failed, continuing build...', 'yellow');
+    }
+  }
+}
+
 // Main function
 function main() {
   const args = process.argv.slice(2);
@@ -327,11 +348,13 @@ function main() {
   switch (command) {
     case 'dev':
       checkPrerequisites();
+      syncVersion();
       devMode();
       break;
-      
+
     case 'build':
       checkPrerequisites();
+      syncVersion();
       buildFrontend();
       buildBackend();
       buildElectron();
@@ -340,6 +363,7 @@ function main() {
     case 'build:win':
     case 'build:windows':
       checkPrerequisites();
+      syncVersion();
       buildFrontend();
       buildBackend();
       buildElectron('win');
@@ -349,6 +373,7 @@ function main() {
     case 'build:macos':
     case 'build:darwin':
       checkPrerequisites();
+      syncVersion();
       buildFrontend();
       buildBackend();
       buildElectron('mac');
@@ -356,6 +381,7 @@ function main() {
 
     case 'build:linux':
       checkPrerequisites();
+      syncVersion();
       buildFrontend();
       buildBackend();
       buildElectron('linux');
@@ -363,6 +389,7 @@ function main() {
 
     case 'build:all':
       checkPrerequisites();
+      syncVersion();
       buildFrontend();
       buildBackend();
       buildElectron('all');

@@ -17,7 +17,7 @@ SettingsPage/
     ├── AppearanceView.tsx    # 外观与窗景
     ├── GeneralView.tsx       # 通用设置
     ├── ChatView.tsx          # 聊天设置
-    ├── McpView.tsx           # MCP 服务
+    ├── ToolView.tsx          # 工具设置
     ├── ShortcutsView.tsx     # 快捷键
     ├── AccessibilityView.tsx # 无障碍
     ├── DataView.tsx          # 数据设置
@@ -33,6 +33,7 @@ SettingsPage/
 
 ### 2. 聊天设置 (ChatView)
 - **通用设置** - Agent 模式、时间戳、自动滚动、Enter 发送
+- **用户设置** - 用户标识、头像
 - **供应商管理** - 添加、编辑、删除 AI 供应商
 - **模型管理** - 管理各供应商下的模型
 - **自动补全** - 补全开关、二次确认、触发延迟、最大长度
@@ -43,9 +44,9 @@ SettingsPage/
 - **启动与通知** - 开机自启、托盘设置、复习提醒
 - **语言与地区** - 界面语言、日期格式
 
-### 4. MCP 服务 (McpView)
-- **服务列表** - 启用/禁用、添加、删除服务
-- **高级设置** - 超时时间等
+### 4. 工具设置 (ToolView)
+- **工具调用管理** - 审批模式（自动/手动）、白名单工具开关
+- **工具分类** - 卡片、笔记、关联、文件库、数据、扩展、设置
 
 ### 5. 快捷键 (ShortcutsView)
 - **通用快捷键** - 打开聊天、新建笔记、搜索等

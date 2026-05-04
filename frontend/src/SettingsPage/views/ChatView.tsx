@@ -79,7 +79,6 @@ const PROVIDER_PORT_OPTIONS = [
 
 const NAV_ITEMS = [
   { key: 'general-section', label: '通用设置', icon: IconMessage },
-  { key: 'tools-section', label: '工具调用管理', icon: IconTool },
   { key: 'user-section', label: '用户设置', icon: IconUser },
   { key: 'providers-section', label: '供应商管理', icon: IconSafe },
   { key: 'models-section', label: '模型管理', icon: IconRobot },
@@ -206,13 +205,6 @@ const ChatView = ({ onBack }: ChatViewProps) => {
   const [completionMaxTokens, setCompletionMaxTokens] = useState(50);
   const [completionSaving, setCompletionSaving] = useState(false);
 
-  // Tools config
-  const [toolsMode, setToolsMode] = useState<string>('manual');
-  const [autoExecuteTools, setAutoExecuteTools] = useState<string[]>([]);
-  const [toolsConfigLoading, setToolsConfigLoading] = useState(false);
-  const [toolsConfigSaving, setToolsConfigSaving] = useState(false);
-  const [toolCatalog, setToolCatalog] = useState<Array<{ name: string; category: string; side_effect: string; description: string }>>([]);
-  
   const [providers, setProviders] = useState<Provider[]>([]);
   const [providersLoading, setProvidersLoading] = useState(false);
   const [currentModelId, setCurrentModelId] = useState<string>('');
@@ -286,67 +278,6 @@ const ChatView = ({ onBack }: ChatViewProps) => {
   useEffect(() => {
     loadProviders();
   }, []);
-
-  useEffect(() => {
-    loadToolsConfig();
-    loadToolCatalog();
-  }, []);
-
-  const loadToolsConfig = () => {
-    setToolsConfigLoading(true);
-    api.getToolsConfig()
-      .then(data => {
-        if (data.success && data.config) {
-          setToolsMode(data.config.mode);
-          setAutoExecuteTools(data.config.auto_execute_tools);
-        }
-      })
-      .catch(console.error)
-      .finally(() => setToolsConfigLoading(false));
-  };
-
-  const loadToolCatalog = () => {
-    api.getToolsCatalog()
-      .then(data => {
-        if (data.success && data.tools) {
-          setToolCatalog(data.tools);
-        }
-      })
-      .catch(console.error);
-  };
-
-  const saveToolsConfig = () => {
-    setToolsConfigSaving(true);
-    api.saveToolsConfig({
-      mode: toolsMode,
-      auto_execute_tools: autoExecuteTools,
-    })
-      .then(data => {
-        if (data.success) {
-          Message.success('工具配置已保存');
-        } else {
-          Message.error('保存失败');
-        }
-      })
-      .catch(() => Message.error('保存失败'))
-      .finally(() => setToolsConfigSaving(false));
-  };
-
-  const resetToolsConfig = () => {
-    setToolsMode('manual');
-    setAutoExecuteTools([
-      'search_cards', 'get_card_stats', 'search_notes', 'get_note',
-      'list_relations', 'read_file', 'list_files', 'read_data_stats',
-      'list_extensions', 'get_settings',
-    ]);
-  };
-
-  const toggleAutoTool = (toolName: string, sideEffect: string) => {
-    if (sideEffect === 'write') return;
-    setAutoExecuteTools(prev =>
-      prev.includes(toolName) ? prev.filter(t => t !== toolName) : [...prev, toolName]
-    );
-  };
 
   const loadProviders = () => {
     setProvidersLoading(true);
@@ -835,95 +766,6 @@ const ChatView = ({ onBack }: ChatViewProps) => {
             <SettingItem title="Enter 发送" desc="按 Enter 键发送消息，Shift+Enter 换行" divider={false}>
               <Switch checked={sendOnEnter} onChange={setSendOnEnter} />
             </SettingItem>
-          </div>
-        </div>
-
-        <div id="tools-section" style={{ marginBottom: 48, scrollMarginTop: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>工具调用管理</Title>
-          </div>
-
-          <div className="settings-section" style={{
-            background: 'var(--color-bg-2)',
-            borderRadius: 8,
-            padding: '16px 20px',
-            marginBottom: 24,
-          }}>
-            <SettingItem title="审批模式" desc="自动模式：所有工具自动执行；手动模式：仅白名单内工具自动执行">
-              <Tag color={toolsMode === 'auto' ? 'green' : 'orangered'}>
-                {toolsMode === 'auto' ? '自动' : '手动'}
-              </Tag>
-              <Button
-                size="mini"
-                type="text"
-                style={{ marginLeft: 8 }}
-                onClick={() => setToolsMode(toolsMode === 'auto' ? 'manual' : 'auto')}
-              >
-                {toolsMode === 'auto' ? '切换为手动' : '切换为自动'}
-              </Button>
-            </SettingItem>
-
-            <Divider style={{ margin: '8px 0' }} />
-            <Text type="secondary" style={{ fontSize: 13, display: 'block', marginBottom: 12 }}>
-              白名单工具（开关 ON = 自动执行，无需审批）
-            </Text>
-
-            {Object.entries(
-              toolCatalog.reduce<Record<string, typeof toolCatalog>>((acc, t) => {
-                if (!acc[t.category]) acc[t.category] = [];
-                acc[t.category].push(t);
-                return acc;
-              }, {})
-            ).map(([category, items]) => (
-              <div key={category} style={{ marginBottom: 12 }}>
-                <Text bold style={{ fontSize: 12, color: 'var(--color-text-2)', display: 'block', marginBottom: 4 }}>
-                  {(() => {
-                    const labels: Record<string, string> = { cards: '卡片', notes: '笔记', relations: '关联', files: '文件库', data: '数据', extensions: '扩展', settings: '设置' };
-                    return labels[category] || category;
-                  })()}
-                </Text>
-                {items.map(tool => (
-                  <div key={tool.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--color-border-1)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Tag size="small" color={tool.side_effect === 'write' ? 'orangered' : 'green'}>
-                        {tool.side_effect === 'write' ? '写' : '读'}
-                      </Tag>
-                      <Text style={{ fontSize: 13 }}>{tool.name}</Text>
-                      <Text type="secondary" style={{ fontSize: 12, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {tool.description}
-                      </Text>
-                    </div>
-                    <Tooltip content={tool.side_effect === 'write' ? '写操作不允许加入白名单' : undefined}>
-                      <Switch
-                        size="small"
-                        checked={autoExecuteTools.includes(tool.name)}
-                        disabled={tool.side_effect === 'write'}
-                        onChange={() => toggleAutoTool(tool.name, tool.side_effect)}
-                      />
-                    </Tooltip>
-                  </div>
-                ))}
-              </div>
-            ))}
-
-            <Divider style={{ margin: '12px 0' }} />
-            <Space>
-              <Button
-                type="primary"
-                size="small"
-                onClick={saveToolsConfig}
-                loading={toolsConfigSaving}
-              >
-                保存配置
-              </Button>
-              <Button
-                type="secondary"
-                size="small"
-                onClick={resetToolsConfig}
-              >
-                重置为默认
-              </Button>
-            </Space>
           </div>
         </div>
 

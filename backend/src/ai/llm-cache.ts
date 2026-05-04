@@ -43,6 +43,7 @@ export class LLMCache {
     params: { temperature?: number; max_tokens?: number; top_p?: number; presence_penalty?: number; frequency_penalty?: number },
     systemPrompt?: string,
     sessionId?: string,
+    mode?: string,
   ): string {
     const payload = JSON.stringify({
       provider,
@@ -57,6 +58,7 @@ export class LLMCache {
       },
       systemPrompt,
       sessionId,
+      mode,
     });
     return createHash('sha256').update(payload).digest('hex');
   }

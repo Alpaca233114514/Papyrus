@@ -14,7 +14,8 @@ import type { FileRecord } from './types.js';
 import type { PapyrusLogger } from '../utils/logger.js';
 
 function sanitizeFilename(name: string): string {
-  return name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').slice(0, 200);
+  const withoutTraversal = name.replace(/\.\./g, '_');
+  return withoutTraversal.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').slice(0, 200);
 }
 
 export function listFiles(logger?: PapyrusLogger): FileRecord[] {
@@ -89,6 +90,24 @@ function getMimeType(ext: string): string {
   return mimeMap[ext] ?? 'application/octet-stream';
 }
 
+function validateFileContent(buffer: Buffer, ext: string): boolean {
+  if (buffer.length < 8) return true;
+  const signatures: Record<string, number[][]> = {
+    png: [[0x89, 0x50, 0x4E, 0x47]],
+    jpg: [[0xFF, 0xD8, 0xFF]],
+    jpeg: [[0xFF, 0xD8, 0xFF]],
+    gif: [[0x47, 0x49, 0x46, 0x38]],
+    pdf: [[0x25, 0x50, 0x44, 0x46]],
+    zip: [[0x50, 0x4B, 0x03, 0x04]],
+    '7z': [[0x37, 0x7A, 0xBC, 0xAF]],
+    mp4: [[0x00, 0x00, 0x00], [0x66, 0x74, 0x79, 0x70]],
+    webp: [[0x52, 0x49, 0x46, 0x46]],
+  };
+  const sigList = signatures[ext];
+  if (!sigList) return true;
+  return sigList.some(sig => sig.every((byte, i) => buffer[i] === byte));
+}
+
 function inferType(ext: string): string {
   if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(ext)) return 'image';
   if (['mp4', 'webm', 'mov'].includes(ext)) return 'video';
@@ -137,6 +156,9 @@ export function saveFile(
   try {
     // Decode and write file content
     const buffer = Buffer.from(base64Content, 'base64');
+    if (!validateFileContent(buffer, ext)) {
+      throw new Error(`文件内容与实际扩展名 ${ext} 不匹配，可能为伪造文件`);
+    }
     const storagePath = path.join(vaultDir, storageName);
     fs.writeFileSync(storagePath, buffer);
 

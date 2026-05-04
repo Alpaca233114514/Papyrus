@@ -473,12 +473,19 @@ export class AIManager {
       const itemPath = typeof item === 'string' ? item : (item.path ?? '');
       if (!itemPath) continue;
 
+      // Reject path traversal attempts
+      if (itemPath.includes('..') || itemPath.includes('\x00')) {
+        throw new Error(`非法文件路径: ${itemPath}`);
+      }
+
       let resolvedPath = itemPath;
       if (!fs.existsSync(itemPath)) {
         const vaultDir = path.join(this.dataDir, 'vault');
         if (fs.existsSync(vaultDir)) {
+          // Use basename matching to avoid partial path issues
           const files = fs.readdirSync(vaultDir);
-          const matched = files.find((f) => f.startsWith(itemPath + '_'));
+          const safeItem = path.basename(itemPath);
+          const matched = files.find((f) => f.startsWith(safeItem + '_'));
           if (matched) {
             resolvedPath = path.join(vaultDir, matched);
           }
@@ -488,12 +495,11 @@ export class AIManager {
       if (!fs.existsSync(resolvedPath)) {
         throw new Error(`文件不存在: ${itemPath}`);
       }
-      if (this.config.config.current_provider === 'liyuan-deepseek') {
-        const resolved = path.resolve(resolvedPath);
-        const dataDir = path.resolve(this.dataDir);
-        if (!resolved.startsWith(dataDir + path.sep) && resolved !== dataDir) {
-          throw new Error('LiYuan 免费额度仅支持处理 Papyrus 工作区内的文件');
-        }
+      const resolved = path.resolve(resolvedPath);
+      const dataDir = path.resolve(this.dataDir);
+      // Always enforce path containment for attachments
+      if (!resolved.startsWith(dataDir + path.sep) && resolved !== dataDir) {
+        throw new Error('附件必须位于 Papyrus 工作区内');
       }
       const ext = path.extname(resolvedPath).toLowerCase();
       if (!IMAGE_EXTENSIONS.has(ext) && !DOCUMENT_EXTENSIONS.has(ext)) {
@@ -787,7 +793,7 @@ export class AIManager {
       },
     };
 
-    const cacheKey = this.llmCache.buildCacheKey(providerName, model, messages, params, systemPrompt, targetSessionId);
+    const cacheKey = this.llmCache.buildCacheKey(providerName, model, messages, params, systemPrompt, targetSessionId, mode);
     const cached = this.llmCache.get(cacheKey);
     if (cached) {
       try {
@@ -924,6 +930,12 @@ export class AIManager {
 
     if (isPrivateUrl(rawBaseUrl)) {
       throw new Error('SSRF: 禁止通过非本地 provider 访问私有地址');
+    }
+
+    // Enforce HTTPS for non-local providers to protect API keys in transit
+    const isLocalProvider = ['ollama', 'lm-studio', 'localai', 'tabbyapi', 'koboldcpp', 'text-generation-webui', 'llamacpp'].includes(providerName);
+    if (!isLocalProvider && rawBaseUrl.startsWith('http:')) {
+      throw new Error('非本地 Provider 必须使用 HTTPS 以保护 API Key 传输安全');
     }
 
     const client = new OpenAI({

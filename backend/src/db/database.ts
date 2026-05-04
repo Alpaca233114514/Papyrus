@@ -39,8 +39,18 @@ function resetDb(): void {
   closeDb();
 }
 
+function isValidSnapshotPath(snapshotPath: string): boolean {
+  if (!snapshotPath || typeof snapshotPath !== 'string') return false;
+  if (snapshotPath.includes('\x00') || snapshotPath.includes("'") || snapshotPath.includes('..')) return false;
+  if (!path.isAbsolute(snapshotPath)) return false;
+  return true;
+}
+
 /** 使用 VACUUM INTO 创建数据库快照（包含 schema + seed 数据的干净副本，无 WAL） */
 export function createDbSnapshot(snapshotPath: string): void {
+  if (!isValidSnapshotPath(snapshotPath)) {
+    throw new Error('Invalid snapshot path: must be absolute, and cannot contain \x00, quotes, or .. sequences');
+  }
   const database = getDb();
   database.exec(`VACUUM INTO '${snapshotPath}'`);
 }
@@ -299,25 +309,37 @@ function deduplicateData(database: DatabaseSync): void {
 }
 
 function seedDefaults(database: DatabaseSync): void {
-  const count = (database.prepare('SELECT COUNT(*) as c FROM providers').get() as { c: number }).c;
-  if (count > 0) return;
-
   const now = Date.now();
   const pid = 'p-liyuan-deepseek';
-  database.prepare(
-    `INSERT INTO providers (id, type, name, base_url, enabled, is_default, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(pid, 'liyuan-deepseek', 'LiYuan For DeepSeek', 'https://papyrus.liyuanstudio.com/v1', 1, 1, now, now);
 
-  database.prepare(
-    `INSERT INTO provider_models (id, provider_id, name, model_id, port, enabled)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(`${pid}-deepseek-v4-flash`, pid, 'DeepSeek V4 Flash', 'deepseek-v4-flash', 'openai-compat', 1);
+  // 清理遗留的 openai 供应商（级联删除其模型和 api_keys）
+  const openaiRow = database.prepare('SELECT id FROM providers WHERE type = ?').get('openai') as { id: string } | undefined;
+  if (openaiRow) {
+    database.prepare('DELETE FROM providers WHERE id = ?').run(openaiRow.id);
+  }
 
-  database.prepare(
-    `INSERT INTO provider_models (id, provider_id, name, model_id, port, enabled)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(`${pid}-deepseek-v4-pro`, pid, 'DeepSeek V4 Pro', 'deepseek-v4-pro', 'openai-compat', 1);
+  const existing = database.prepare('SELECT id FROM providers WHERE type = ?').get('liyuan-deepseek') as { id: string } | undefined;
+  if (!existing) {
+    database.prepare(
+      `INSERT INTO providers (id, type, name, base_url, enabled, is_default, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(pid, 'liyuan-deepseek', 'LiYuan For DeepSeek', 'https://papyrus.liyuanstudio.com/v1', 1, 1, now, now);
+  }
+
+  const modelIds = ['deepseek-v4-flash', 'deepseek-v4-pro'];
+  const modelNames = ['DeepSeek V4 Flash', 'DeepSeek V4 Pro'];
+  for (let i = 0; i < modelIds.length; i++) {
+    const modelId = modelIds[i];
+    const modelName = modelNames[i];
+    if (!modelId || !modelName) continue;
+    const modelExists = database.prepare('SELECT id FROM provider_models WHERE provider_id = ? AND model_id = ?').get(pid, modelId) as { id: string } | undefined;
+    if (!modelExists) {
+      database.prepare(
+        `INSERT INTO provider_models (id, provider_id, name, model_id, port, enabled)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      ).run(`${pid}-${modelId}`, pid, modelName, modelId, 'openai-compat', 1);
+    }
+  }
 }
 
 function tagsToJson(tags: string[] | undefined): string {
@@ -1217,12 +1239,20 @@ export function deleteFilesByIds(fileIds: string[], logger?: PapyrusLogger): num
   return Number(result.changes);
 }
 
+const ALLOWED_FILE_COLUMNS = new Set([
+  'name', 'type', 'size', 'mime_type', 'parent_id', 'file_storage_path', 'is_folder', 'created_at', 'updated_at',
+]);
+
 export function updateFile(file: Partial<FileRecord> & { id: string }, logger?: PapyrusLogger): boolean {
   const database = getDb();
   const sets: string[] = [];
   const values: (string | number | null)[] = [];
   for (const [key, value] of Object.entries(file)) {
     if (key !== 'id' && value !== undefined) {
+      if (!ALLOWED_FILE_COLUMNS.has(key)) {
+        logger?.warning(`updateFile ignored disallowed column: ${key}`);
+        continue;
+      }
       sets.push(`${key} = ?`);
       values.push(value as string | number | null);
     }

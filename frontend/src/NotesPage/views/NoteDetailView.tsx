@@ -37,10 +37,10 @@ const md = new MarkdownIt({
   typographer: true,
 });
 
-const ALLOWED_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'ftp:']);
+const ALLOWED_SCHEMES = new Set(['http', 'https', 'mailto', 'tel']);
 md.validateLink = (url: string): boolean => {
-  const str = url.trim().toLowerCase();
-  return ALLOWED_SCHEMES.has(str);
+  const scheme = url.trim().toLowerCase().split(':', 1)[0];
+  return ALLOWED_SCHEMES.has(scheme);
 };
 
 export const NoteDetailView = ({

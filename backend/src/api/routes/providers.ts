@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import {
   loadAllProviders,
   saveProvider,
@@ -14,6 +15,33 @@ import {
 import { getDb } from '../../db/database.js';
 import type { Provider } from '../../core/types.js';
 
+const ApiKeySchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1),
+  key: z.string(),
+});
+
+const ModelSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1),
+  modelId: z.string().min(1),
+  port: z.string().optional(),
+  capabilities: z.array(z.string()).optional(),
+  apiKeyId: z.string().nullable().optional(),
+  enabled: z.boolean().optional(),
+});
+
+const ProviderSchema = z.object({
+  id: z.string().optional(),
+  type: z.string().optional(),
+  name: z.string().min(1),
+  baseUrl: z.string().optional(),
+  enabled: z.boolean().optional(),
+  isDefault: z.boolean().optional(),
+  apiKeys: z.array(ApiKeySchema).optional(),
+  models: z.array(ModelSchema).optional(),
+}).passthrough();
+
 export default async function providersRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get('/', async (request, reply) => {
     try {
@@ -27,7 +55,12 @@ export default async function providersRoutes(fastify: FastifyInstance): Promise
   });
 
   fastify.post('/', async (request, reply) => {
-    const body = request.body as Partial<Provider>;
+    const parseResult = ProviderSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      reply.status(400).send({ success: false, error: parseResult.error.errors.map(e => e.message).join('; ') });
+      return;
+    }
+    const body = parseResult.data as Partial<Provider>;
     try {
       const id = runInTransaction(() => {
         const providerId = saveProvider(body);
@@ -59,7 +92,12 @@ export default async function providersRoutes(fastify: FastifyInstance): Promise
 
   fastify.put('/:providerId', async (request, reply) => {
     const { providerId } = request.params as { providerId: string };
-    const body = request.body as Partial<Provider>;
+    const parseResult = ProviderSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      reply.status(400).send({ success: false, error: parseResult.error.errors.map(e => e.message).join('; ') });
+      return;
+    }
+    const body = parseResult.data as Partial<Provider>;
     try {
       runInTransaction(() => {
         saveProvider({ ...body, id: providerId });
@@ -118,11 +156,17 @@ export default async function providersRoutes(fastify: FastifyInstance): Promise
     }
   });
 
+  const EnabledSchema = z.object({ enabled: z.boolean() });
+
   fastify.post('/:providerId/enabled', async (request, reply) => {
     try {
       const { providerId } = request.params as { providerId: string };
-      const body = request.body as { enabled?: boolean };
-      updateProviderEnabled(providerId, body.enabled ?? false);
+      const parseResult = EnabledSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        reply.status(400).send({ success: false, error: parseResult.error.errors.map(e => e.message).join('; ') });
+        return;
+      }
+      updateProviderEnabled(providerId, parseResult.data.enabled);
       reply.send({ success: true, message: 'Provider enabled status updated' });
     } catch (err) {
       const message = err instanceof Error ? err.message : '服务器内部错误';
@@ -133,7 +177,12 @@ export default async function providersRoutes(fastify: FastifyInstance): Promise
 
   fastify.post('/:providerId/models', async (request, reply) => {
     const { providerId } = request.params as { providerId: string };
-    const body = request.body as { name: string; modelId: string; port?: string; capabilities?: string[]; apiKeyId?: string; enabled?: boolean };
+    const parseResult = ModelSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      reply.status(400).send({ success: false, error: parseResult.error.errors.map(e => e.message).join('; ') });
+      return;
+    }
+    const body = parseResult.data;
     try {
       const modelId = saveModel(providerId, body);
       reply.send({ success: true, modelId, message: 'Model added' });
@@ -153,7 +202,12 @@ export default async function providersRoutes(fastify: FastifyInstance): Promise
 
   fastify.put('/:providerId/models/:modelId', async (request, reply) => {
     const { providerId, modelId } = request.params as { providerId: string; modelId: string };
-    const body = request.body as { name?: string; modelId?: string; port?: string; capabilities?: string[]; apiKeyId?: string; enabled?: boolean };
+    const parseResult = ModelSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      reply.status(400).send({ success: false, error: parseResult.error.errors.map(e => e.message).join('; ') });
+      return;
+    }
+    const body = parseResult.data;
     try {
       saveModel(providerId, { ...body, id: modelId });
       reply.send({ success: true, message: 'Model updated' });
@@ -186,7 +240,12 @@ export default async function providersRoutes(fastify: FastifyInstance): Promise
   fastify.post('/:providerId/apikeys', async (request, reply) => {
     try {
       const { providerId } = request.params as { providerId: string };
-      const body = request.body as { id?: string; name: string; key: string };
+      const parseResult = ApiKeySchema.safeParse(request.body);
+      if (!parseResult.success) {
+        reply.status(400).send({ success: false, error: parseResult.error.errors.map(e => e.message).join('; ') });
+        return;
+      }
+      const body = parseResult.data;
       const keyId = saveApiKey(providerId, body);
       reply.send({ success: true, keyId, message: 'API key added' });
     } catch (err) {

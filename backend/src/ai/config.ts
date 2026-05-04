@@ -88,10 +88,34 @@ export function isPrivateUrl(urlStr: string): boolean {
   try {
     const parsed = new URL(urlStr);
     const hostname = parsed.hostname.toLowerCase();
-    if (['localhost', '127.0.0.1', '0.0.0.0', '::1'].includes(hostname)) {
+
+    // Reject localhost variants
+    if (['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]', '[::ffff:127.0.0.1]'].includes(hostname)) {
       return true;
     }
-    if (/^(127\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.|0\.|::1$)/.test(hostname)) {
+
+    // Reject shorthand localhost forms
+    if (/^127\.\d+\.\d+\.\d+$/.test(hostname)) {
+      return true;
+    }
+
+    // Reject hexadecimal IP addresses
+    if (/^0x[0-9a-f]+$/i.test(hostname)) {
+      return true;
+    }
+
+    // Reject decimal IP addresses that resolve to loopback
+    if (/^2130706433$/.test(hostname) || /^3232235521$/.test(hostname)) {
+      return true;
+    }
+
+    // Reject private IPv4 ranges: 10.x.x.x, 172.16-31.x.x, 192.168.x.x, 169.254.x.x, 0.x.x.x
+    if (/^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.|0\.)/.test(hostname)) {
+      return true;
+    }
+
+    // Reject IPv6 loopback and link-local
+    if (/^\[?::1\]?$/.test(hostname) || /^\[?fe80:/i.test(hostname)) {
       return true;
     }
   } catch {

@@ -6,9 +6,11 @@
     <true/>
     <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
     <true/>
+    <!-- allow-dyld-environment-variables removed: not required for normal operation, reduces dylib hijacking risk -->
+    <!-- disable-library-validation removed: library validation should remain enabled for security -->
     <key>com.apple.security.cs.allow-dyld-environment-variables</key>
-    <true/>
+    <false/>
     <key>com.apple.security.cs.disable-library-validation</key>
-    <true/>
+    <false/>
 </dict>
 </plist>

@@ -235,9 +235,10 @@ function stopBackend() {
   log(`Stopping backend process (PID: ${pid})...`);
 
   if (process.platform === 'win32') {
-    // Use execSync so the kill completes before we continue
+    // Use spawn with array arguments to avoid shell injection
+    const { spawnSync } = require('child_process');
     try {
-      execSync(`taskkill /pid ${pid} /T /F`, { stdio: 'pipe' });
+      spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'pipe' });
     } catch (e) {
       log(`taskkill failed, falling back to SIGTERM: ${e.message}`, 'error');
       try {
@@ -247,13 +248,12 @@ function stopBackend() {
       }
     }
     // Verify the process is actually gone
-    try {
-      execSync(`tasklist /FI "PID eq ${pid}" 2>nul | findstr /i "${pid}"`, { stdio: 'pipe' });
-      // If we get here, the process is still alive — force kill
+    const checkResult = spawnSync('tasklist', ['/FI', `PID eq ${pid}`], { stdio: 'pipe' });
+    const checkOutput = checkResult.stdout?.toString() || '';
+    if (checkOutput.includes(String(pid))) {
+      // Process is still alive — force kill
       log(`Process ${pid} still alive after first kill, retrying...`, 'error');
-      execSync(`taskkill /pid ${pid} /T /F`, { stdio: 'pipe' });
-    } catch {
-      // findstr failed = process is dead, which is what we want
+      spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'pipe' });
     }
   } else {
     backendProcess.kill('SIGTERM');
@@ -304,7 +304,7 @@ function createWindow() {
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
-          "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:* http://localhost:* https:; img-src 'self' data: https: blob:; font-src 'self' data:",
+          "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:8000 http://localhost:8000 https:; img-src 'self' data: https: blob:; font-src 'self' data:; frame-src 'self';",
         ],
       },
     });
@@ -470,6 +470,18 @@ function setupIPC() {
   ipcMain.handle('shell:openExternal', async (event, url) => {
     // SECURITY: whitelist protocols to prevent RCE via dangerous protocols
     const allowedProtocols = ['http:', 'https:', 'mailto:'];
+    const allowedDomains = [
+      'github.com',
+      'githubusercontent.com',
+      'papyrus.liyuanstudio.com',
+      'openai.com',
+      'anthropic.com',
+      'google.com',
+      'googleapis.com',
+      'deepseek.com',
+      'siliconflow.cn',
+      'moonshot.cn',
+    ];
     let parsed;
     try {
       parsed = new URL(url);
@@ -478,6 +490,13 @@ function setupIPC() {
     }
     if (!allowedProtocols.includes(parsed.protocol)) {
       throw new Error('Disallowed protocol');
+    }
+    if (parsed.protocol !== 'mailto:') {
+      const hostname = parsed.hostname.toLowerCase();
+      const isAllowed = allowedDomains.some(domain => hostname === domain || hostname.endsWith('.' + domain));
+      if (!isAllowed) {
+        throw new Error('Disallowed domain: ' + hostname);
+      }
     }
     await shell.openExternal(url);
   });
@@ -496,9 +515,12 @@ function setupIPC() {
     const resolved = path.resolve(folderPath);
     const dataDir = app.getPath('userData');
     const homeDir = os.homedir();
+    const documentsDir = path.join(homeDir, 'Documents');
+    const downloadsDir = path.join(homeDir, 'Downloads');
     const isUnderDataDir = resolved === dataDir || resolved.startsWith(dataDir + path.sep);
-    const isUnderHomeDir = resolved === homeDir || resolved.startsWith(homeDir + path.sep);
-    if (!isUnderDataDir && !isUnderHomeDir) {
+    const isUnderDocuments = resolved === documentsDir || resolved.startsWith(documentsDir + path.sep);
+    const isUnderDownloads = resolved === downloadsDir || resolved.startsWith(downloadsDir + path.sep);
+    if (!isUnderDataDir && !isUnderDocuments && !isUnderDownloads) {
       throw new Error('Path outside allowed directories');
     }
     await shell.openPath(resolved);

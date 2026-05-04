@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { AIManager } from '../../ai/provider.js';
+import type { StreamChunk } from '../../ai/provider.js';
 import { PapyrusTools, AIResponseParser } from '../../ai/tools.js';
 import { aiConfig } from '../../ai/config-instance.js';
 import { getToolManager } from '../../ai/tool-manager.js';
@@ -7,6 +8,7 @@ import type { ToolCallRecord } from '../../ai/tool-manager.js';
 import { isPrivateUrl } from '../../ai/config.js';
 import { getProviderApiKeyFromDB, getProviderConfigFromDB } from '../../ai/db-sync.js';
 import { loadAllProviders } from '../../db/database.js';
+import type { ChatBlock } from '../../core/types.js';
 
 export { aiConfig };
 const aiManager = new AIManager(aiConfig);
@@ -67,6 +69,221 @@ function convertCallToResponse(call: ToolCallRecord): Record<string, unknown> {
     executed_at: call.executed_at,
     error: call.error,
   };
+}
+
+interface PendingToolCallTracker {
+  name: string;
+  args: string;
+  parsedArgs: Record<string, unknown>;
+  id: string;
+  callId: string | undefined;
+}
+
+interface ChatStreamReply {
+  raw: { write: (chunk: string) => void; end: () => void };
+}
+
+async function processChatStream(
+  stream: AsyncGenerator<StreamChunk>,
+  reply: ChatStreamReply,
+): Promise<void> {
+  let textBuf = '';
+  let reasoningBuf = '';
+  let savedSessionId: string | null = null;
+  let savedParentMessageId: string | null = null;
+  let savedModel = '';
+  let savedProvider = '';
+  let userMessageId: string | null = null;
+  let streamErrored = false;
+  const pendingToolCalls: PendingToolCallTracker[] = [];
+
+  try {
+    for await (const chunk of stream) {
+      if (chunk.type === 'user_saved') {
+        const data = chunk.data as Record<string, unknown>;
+        userMessageId = typeof data.messageId === 'string' ? data.messageId : null;
+        savedSessionId = typeof data.sessionId === 'string' ? data.sessionId : null;
+        savedModel = typeof data.model === 'string' ? data.model : '';
+        savedProvider = typeof data.provider === 'string' ? data.provider : '';
+        reply.raw.write(`data: ${JSON.stringify({
+          type: 'user_saved',
+          data: {
+            messageId: userMessageId,
+            sessionId: savedSessionId,
+            attachments: Array.isArray(data.attachments) ? data.attachments : [],
+            regenerated: data.regenerated === true,
+          },
+        })}\n\n`);
+      } else if (chunk.type === 'content') {
+        const text = typeof chunk.data === 'string' ? chunk.data : '';
+        textBuf += text;
+        reply.raw.write(`data: ${JSON.stringify({ type: 'text', data: text })}\n\n`);
+      } else if (chunk.type === 'reasoning') {
+        const text = typeof chunk.data === 'string' ? chunk.data : '';
+        reasoningBuf += text;
+        reply.raw.write(`data: ${JSON.stringify({ type: 'reasoning', data: text })}\n\n`);
+      } else if (chunk.type === 'tool_start') {
+        const toolData = chunk.data as Record<string, unknown>;
+        const func = toolData.function as Record<string, unknown> | undefined;
+        let callId: string | undefined;
+        let toolName = '';
+        let parsedArgs: Record<string, unknown> = {};
+        let argStr = '';
+        if (func) {
+          toolName = String(func.name ?? '');
+          argStr = String(func.arguments ?? '');
+          if (argStr.trim()) {
+            try {
+              const parsed = JSON.parse(argStr) as unknown;
+              if (parsed !== null && typeof parsed === 'object') {
+                parsedArgs = parsed as Record<string, unknown>;
+              }
+            } catch {
+              // JSON parse error: params stays empty
+            }
+          }
+          const toolManager = getToolManager();
+          if (toolManager.shouldAutoExecute(toolName)) {
+            callId = toolManager.createPendingCall(toolName, parsedArgs);
+            toolManager.approveCall(callId);
+            toolManager.markExecuting(callId);
+          } else {
+            callId = toolManager.createPendingCall(toolName, parsedArgs);
+          }
+          pendingToolCalls.push({
+            name: toolName,
+            args: argStr,
+            parsedArgs,
+            id: String(toolData.id ?? ''),
+            callId,
+          });
+        }
+        const enrichedData = callId ? { ...toolData, callId } : toolData;
+        reply.raw.write(`data: ${JSON.stringify({ type: 'tool_call', data: enrichedData })}\n\n`);
+      } else if (chunk.type === 'stream_end') {
+        const data = chunk.data as Record<string, unknown>;
+        savedParentMessageId = typeof data.parentMessageId === 'string' ? data.parentMessageId : null;
+        if (typeof data.model === 'string' && data.model) savedModel = data.model;
+        if (typeof data.provider === 'string' && data.provider) savedProvider = data.provider;
+        if (typeof data.sessionId === 'string' && data.sessionId) savedSessionId = data.sessionId;
+      } else if (chunk.type === 'error') {
+        streamErrored = true;
+        const text = typeof chunk.data === 'string' ? chunk.data : 'Unknown error';
+        reply.raw.write(`data: ${JSON.stringify({ type: 'error', data: text })}\n\n`);
+      }
+    }
+
+    const assistantBlocks: ChatBlock[] = [];
+    if (reasoningBuf) assistantBlocks.push({ type: 'reasoning', text: reasoningBuf });
+    if (textBuf) assistantBlocks.push({ type: 'text', text: textBuf });
+
+    for (const toolCall of pendingToolCalls) {
+      const toolManager = getToolManager();
+      if (toolManager.shouldAutoExecute(toolCall.name) && toolCall.args) {
+        try {
+          const result = papyrusTools.executeTool(toolCall.name, toolCall.parsedArgs);
+          if (toolCall.callId) {
+            toolManager.completeCall(toolCall.callId, result as unknown as Record<string, unknown>);
+          }
+          reply.raw.write(`data: ${JSON.stringify({
+            type: 'tool_result',
+            data: {
+              name: toolCall.name,
+              success: true,
+              result,
+              callId: toolCall.callId,
+            },
+          })}\n\n`);
+          assistantBlocks.push({
+            type: 'tool_call',
+            toolCallId: toolCall.callId,
+            toolName: toolCall.name,
+            toolParams: toolCall.parsedArgs,
+            toolStatus: 'success',
+          });
+          assistantBlocks.push({
+            type: 'tool_result',
+            toolCallId: toolCall.callId,
+            toolName: toolCall.name,
+            toolStatus: 'success',
+            toolResult: result,
+          });
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          if (toolCall.callId) {
+            toolManager.failCall(toolCall.callId, errMsg);
+          }
+          reply.raw.write(`data: ${JSON.stringify({
+            type: 'tool_result',
+            data: {
+              name: toolCall.name,
+              success: false,
+              error: errMsg,
+              callId: toolCall.callId,
+            },
+          })}\n\n`);
+          assistantBlocks.push({
+            type: 'tool_call',
+            toolCallId: toolCall.callId,
+            toolName: toolCall.name,
+            toolParams: toolCall.parsedArgs,
+            toolStatus: 'error',
+          });
+          assistantBlocks.push({
+            type: 'tool_result',
+            toolCallId: toolCall.callId,
+            toolName: toolCall.name,
+            toolStatus: 'error',
+            toolError: errMsg,
+          });
+        }
+      } else {
+        assistantBlocks.push({
+          type: 'tool_call',
+          toolCallId: toolCall.callId,
+          toolName: toolCall.name,
+          toolParams: toolCall.parsedArgs,
+          toolStatus: 'pending',
+        });
+      }
+    }
+
+    let assistantMessageId: string | null = null;
+    const hasContent = textBuf.length > 0 || reasoningBuf.length > 0 || pendingToolCalls.length > 0;
+    if (savedSessionId && hasContent && (!streamErrored || pendingToolCalls.length === 0)) {
+      try {
+        assistantMessageId = await aiManager.persistAssistantMessage({
+          sessionId: savedSessionId,
+          content: textBuf,
+          blocks: assistantBlocks,
+          model: savedModel,
+          provider: savedProvider,
+          parentMessageId: savedParentMessageId ?? userMessageId,
+        });
+      } catch (e) {
+        reply.raw.write(`data: ${JSON.stringify({
+          type: 'error',
+          data: `保存助手消息失败: ${e instanceof Error ? e.message : String(e)}`,
+        })}\n\n`);
+      }
+    }
+
+    reply.raw.write(`data: ${JSON.stringify({
+      type: 'done',
+      data: {
+        messageId: assistantMessageId,
+        sessionId: savedSessionId,
+        parentMessageId: savedParentMessageId ?? userMessageId,
+      },
+    })}\n\n`);
+  } catch (e) {
+    reply.raw.write(`data: ${JSON.stringify({
+      type: 'error',
+      data: e instanceof Error ? e.message : String(e),
+    })}\n\n`);
+  } finally {
+    reply.raw.end();
+  }
 }
 
 export default async function aiRoutes(fastify: FastifyInstance): Promise<void> {
@@ -218,13 +435,27 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
     reply.send({ success: true, config: _completionConfig });
   });
 
+  const ALLOWED_COMPLETION_KEYS = new Set(['enabled', 'require_confirm', 'trigger_delay', 'max_tokens']);
+
   fastify.post('/completion/config', async (request, reply) => {
     const payload = request.body as Record<string, unknown>;
     if ('enabled' in payload && typeof payload.enabled !== 'boolean') {
       reply.status(400).send({ success: false, error: 'enabled 字段必须为布尔值' });
       return;
     }
-    Object.assign(_completionConfig, payload);
+    for (const key of Object.keys(payload)) {
+      if (!ALLOWED_COMPLETION_KEYS.has(key)) {
+        reply.status(400).send({ success: false, error: `不允许的配置项: ${key}` });
+        return;
+      }
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+        reply.status(400).send({ success: false, error: '非法配置项名称' });
+        return;
+      }
+    }
+    for (const [key, value] of Object.entries(payload)) {
+      _completionConfig[key] = value;
+    }
     reply.send({ success: true });
   });
 
@@ -406,20 +637,40 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
 
   // Sessions
   fastify.get('/sessions', async (_request, reply) => {
-    reply.send({ success: true, sessions: aiManager.listSessions() });
+    reply.send({
+      success: true,
+      sessions: aiManager.listSessions(),
+      activeSessionId: aiManager.getActiveSessionId(),
+    });
   });
 
   fastify.post('/sessions', async (request, reply) => {
-    const payload = request.body as { title?: string };
+    const payload = (request.body ?? {}) as { title?: string };
     const session = aiManager.createSession(payload.title, true);
-    reply.send({ success: true, session });
+    reply.send({
+      success: true,
+      session,
+      activeSessionId: session.id,
+    });
+  });
+
+  fastify.delete('/sessions', async (_request, reply) => {
+    const result = aiManager.clearAllSessions();
+    reply.send({
+      success: true,
+      deletedCount: result.deletedCount,
+      activeSessionId: result.activeSessionId,
+    });
   });
 
   fastify.post('/sessions/:sessionId/switch', async (request, reply) => {
     const { sessionId } = request.params as { sessionId: string };
     try {
-      const session = aiManager.switchSession(sessionId);
-      reply.send({ success: true, session });
+      aiManager.switchSession(sessionId);
+      reply.send({
+        success: true,
+        activeSessionId: sessionId,
+      });
     } catch (e) {
       reply.status(400).send({ success: false, error: e instanceof Error ? e.message : String(e) });
     }
@@ -427,10 +678,14 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
 
   fastify.patch('/sessions/:sessionId', async (request, reply) => {
     const { sessionId } = request.params as { sessionId: string };
-    const payload = request.body as { title: string };
+    const payload = (request.body ?? {}) as { title?: string };
+    if (typeof payload.title !== 'string') {
+      reply.status(400).send({ success: false, error: 'title 字段必须为字符串' });
+      return;
+    }
     try {
-      aiManager.renameSession(sessionId, payload.title);
-      reply.send({ success: true });
+      const session = aiManager.renameSession(sessionId, payload.title);
+      reply.send({ success: true, session });
     } catch (e) {
       reply.status(400).send({ success: false, error: e instanceof Error ? e.message : String(e) });
     }
@@ -439,8 +694,11 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
   fastify.delete('/sessions/:sessionId', async (request, reply) => {
     const { sessionId } = request.params as { sessionId: string };
     try {
-      aiManager.deleteSession(sessionId);
-      reply.send({ success: true });
+      const result = aiManager.deleteSession(sessionId);
+      reply.send({
+        success: true,
+        activeSessionId: result.activeSessionId,
+      });
     } catch (e) {
       reply.status(400).send({ success: false, error: e instanceof Error ? e.message : String(e) });
     }
@@ -453,16 +711,69 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
       reply.status(404).send({ success: false, error: '会话不存在' });
       return;
     }
+    const messages = aiManager.listMessages(sessionId);
     reply.send({
       success: true,
-      session: {
-        id: session.id,
-        title: session.title,
-        messages: session.messages,
-        created_at: session.created_at,
-        updated_at: session.updated_at,
-      },
+      session,
+      messages,
     });
+  });
+
+  // Messages
+  fastify.delete('/messages/:messageId', async (request, reply) => {
+    const { messageId } = request.params as { messageId: string };
+    const ok = aiManager.deleteMessage(messageId);
+    if (!ok) {
+      reply.status(404).send({ success: false, error: '消息不存在' });
+      return;
+    }
+    reply.send({ success: true });
+  });
+
+  fastify.post('/messages/:messageId/regenerate', async (request, reply) => {
+    const { messageId } = request.params as { messageId: string };
+    const payload = (request.body ?? {}) as {
+      model?: string;
+      mode?: string;
+      reasoning?: boolean | string;
+    };
+
+    const prepared = aiManager.prepareRegenerate(messageId);
+    if (!prepared) {
+      reply.status(404).send({ success: false, error: '消息不存在或不是助手消息' });
+      return;
+    }
+
+    const providerName = aiConfig.config.current_provider;
+    const providerConfig = getProviderConfigFromDB(providerName);
+    if (!providerConfig) {
+      reply.status(400).send({ success: false, error: 'Provider 未配置' });
+      return;
+    }
+    if (!providerConfig.api_key) {
+      const dbKey = getProviderApiKeyFromDB(providerName);
+      if (dbKey) providerConfig.api_key = dbKey;
+    }
+    if (!providerConfig.api_key && !isKeylessProvider(providerName)) {
+      reply.status(400).send({ success: false, error: 'AI API Key 未设置' });
+      return;
+    }
+
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+
+    const stream = aiManager.regenerateStream(
+      prepared.parentMessageId ?? messageId,
+      payload.model,
+      payload.mode,
+      payload.reasoning,
+    );
+    await processChatStream(stream, reply);
   });
 
   // Chat streaming
@@ -489,7 +800,6 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
       return;
     }
 
-    // 如果数据库中没有 key，尝试 fallback（部分 provider 无需 key，仍需走 keyless 判断）
     if (!providerConfig.api_key) {
       const dbKey = getProviderApiKeyFromDB(providerName);
       if (dbKey) providerConfig.api_key = dbKey;
@@ -508,124 +818,16 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
       'X-Accel-Buffering': 'no',
     });
 
-    try {
-      const stream = aiManager.chatStream(
-        payload.message,
-        payload.system_prompt,
-        payload.attachments,
-        payload.model,
-        payload.mode,
-        payload.reasoning,
-        payload.session_id,
-      );
-
-      let assistantContent = '';
-      let reasoningContent = '';
-      const pendingToolCalls: Array<{ name: string; args: string; id?: string; callId?: string }> = [];
-      for await (const chunk of stream) {
-        if (chunk.type === 'content') {
-          const text = typeof chunk.data === 'string' ? chunk.data : '';
-          assistantContent += text;
-          reply.raw.write(`data: ${JSON.stringify({ type: 'text', data: text })}\n\n`);
-        } else if (chunk.type === 'reasoning') {
-          const text = typeof chunk.data === 'string' ? chunk.data : '';
-          reasoningContent += text;
-          reply.raw.write(`data: ${JSON.stringify({ type: 'reasoning', data: text })}\n\n`);
-        } else if (chunk.type === 'tool_start') {
-          const toolData = chunk.data as Record<string, unknown>;
-          const func = toolData.function as Record<string, unknown> | undefined;
-          let callId: string | undefined;
-          if (func) {
-            const toolName = String(func.name ?? '');
-            let params: Record<string, unknown> = {};
-            const argStr = String(func.arguments ?? '');
-            if (argStr.trim()) {
-              try {
-                const parsed = JSON.parse(argStr) as unknown;
-                if (parsed !== null && typeof parsed === 'object') {
-                  params = parsed as Record<string, unknown>;
-                }
-              } catch {
-                // JSON parse error: params stays empty, will fail gracefully downstream
-              }
-            }
-            const toolManager = getToolManager();
-            if (toolManager.shouldAutoExecute(toolName)) {
-              callId = toolManager.createPendingCall(toolName, params);
-              toolManager.approveCall(callId);
-              toolManager.markExecuting(callId);
-            } else {
-              callId = toolManager.createPendingCall(toolName, params);
-            }
-            pendingToolCalls.push({
-              name: toolName,
-              args: argStr,
-              id: String(toolData.id ?? ''),
-              callId,
-            });
-          }
-          const enrichedData = callId ? { ...toolData, callId } : toolData;
-          reply.raw.write(`data: ${JSON.stringify({ type: 'tool_call', data: enrichedData })}\n\n`);
-        } else if (chunk.type === 'done') {
-          reply.raw.write(`data: ${JSON.stringify({ type: 'done', data: '' })}\n\n`);
-        } else if (chunk.type === 'error') {
-          const text = typeof chunk.data === 'string' ? chunk.data : 'Unknown error';
-          reply.raw.write(`data: ${JSON.stringify({ type: 'error', data: text })}\n\n`);
-        }
-      }
-
-      // Save assistant response to session (include reasoning if no regular content)
-      const finalContent = assistantContent || reasoningContent;
-      if (finalContent) {
-        await aiManager.appendAssistantMessage(finalContent);
-      }
-
-      // Auto-execute tools and send tool_result events
-      for (const toolCall of pendingToolCalls) {
-        try {
-          const toolManager = getToolManager();
-          if (!toolManager.shouldAutoExecute(toolCall.name)) continue;
-          if (!toolCall.args) continue;
-
-          const params = JSON.parse(toolCall.args);
-          const result = papyrusTools.executeTool(toolCall.name, params);
-
-          if (toolCall.callId) {
-            toolManager.completeCall(toolCall.callId, result as unknown as Record<string, unknown>);
-          }
-
-          reply.raw.write(`data: ${JSON.stringify({
-            type: 'tool_result',
-            data: {
-              name: toolCall.name,
-              success: true,
-              result,
-              callId: toolCall.callId,
-            },
-          })}\n\n`);
-        } catch (err) {
-          if (toolCall.callId) {
-            const toolManager = getToolManager();
-            toolManager.failCall(toolCall.callId, err instanceof Error ? err.message : String(err));
-          }
-
-          reply.raw.write(`data: ${JSON.stringify({
-            type: 'tool_result',
-            data: {
-              name: toolCall.name,
-              success: false,
-              error: err instanceof Error ? err.message : String(err),
-              callId: toolCall.callId,
-            },
-          })}\n\n`);
-        }
-      }
-
-      reply.raw.end();
-    } catch (e) {
-      reply.raw.write(`data: ${JSON.stringify({ type: 'error', data: e instanceof Error ? e.message : String(e) })}\n\n`);
-      reply.raw.end();
-    }
+    const stream = aiManager.chatStream(
+      payload.message,
+      payload.system_prompt,
+      payload.attachments,
+      payload.model,
+      payload.mode,
+      payload.reasoning,
+      payload.session_id,
+    );
+    await processChatStream(stream, reply);
   });
 
   // Tools catalog — send tool list to UI

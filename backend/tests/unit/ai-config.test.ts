@@ -16,8 +16,8 @@ describe('AIConfig', () => {
 
   it('should create default config when file does not exist', () => {
     const config = new AIConfig(tempDir);
-    expect(config.config.current_provider).toBe('openai');
-    expect(config.config.current_model).toBe('gpt-4o');
+    expect(config.config.current_provider).toBe('liyuan-deepseek');
+    expect(config.config.current_model).toBe('deepseek-v4-pro');
     // providers are no longer hardcoded; database is the source of truth
     expect(config.config.providers).toEqual({});
   });
@@ -143,6 +143,6 @@ describe('AIConfig', () => {
     }), 'utf8');
 
     const config = new AIConfig(tempDir);
-    expect(config.config.current_provider).toBe('openai');
+    expect(config.config.current_provider).toBe('liyuan-deepseek');
   });
 });

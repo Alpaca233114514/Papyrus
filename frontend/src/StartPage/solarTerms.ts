@@ -48,6 +48,22 @@ export async function fetchSolarTerm(date: Date): Promise<string | null> {
   const apiUrl = localStorage.getItem('papyrus_solar_term_api_url');
   const apiKey = localStorage.getItem('papyrus_solar_term_api_key');
   if (!apiUrl) return null;
+
+  // Validate URL: must be http/https and not a private address
+  let validatedUrl: URL;
+  try {
+    validatedUrl = new URL(apiUrl);
+  } catch {
+    return null;
+  }
+  if (validatedUrl.protocol !== 'http:' && validatedUrl.protocol !== 'https:') {
+    return null;
+  }
+  const hostname = validatedUrl.hostname.toLowerCase();
+  if (['localhost', '127.0.0.1', '0.0.0.0', '::1'].includes(hostname) || hostname.startsWith('10.') || hostname.startsWith('192.168.')) {
+    return null;
+  }
+
   try {
     const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     const res = await fetch(`${apiUrl}?date=${dateStr}`, {

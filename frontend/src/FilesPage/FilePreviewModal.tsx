@@ -192,6 +192,7 @@ export default function FilePreviewModal({ file, onClose }: FilePreviewModalProp
                 src={previewUrl}
                 title={file.name}
                 style={{ width: '100%', height: '100%', border: 'none' }}
+                sandbox="allow-scripts allow-same-origin"
                 onLoad={() => {
                   // 延迟检查 iframe 是否正常加载
                   setTimeout(() => {

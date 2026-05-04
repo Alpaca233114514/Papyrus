@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@arco-design/web-react": "2.66.11",
+    "dompurify": "^3.4.2",
     "i18next": "^26.0.8",
     "markdown-it": "^14.0.0",
     "react": "19.2.4",
@@ -19,6 +20,7 @@
     "react-i18next": "^17.0.6"
   },
   "devDependencies": {
+    "@types/dompurify": "^3.0.5",
     "@types/markdown-it": "^14.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

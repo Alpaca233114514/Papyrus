@@ -257,6 +257,17 @@ const FilesPage = () => {
   };
 
   const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+  const ALLOWED_UPLOAD_TYPES = [
+    'image/', 'video/', 'audio/', 'application/pdf',
+    'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/zip', 'application/x-7z-compressed', 'application/x-tar', 'application/gzip',
+    'text/plain', 'text/markdown', 'application/json',
+  ];
+
+  const isAllowedFileType = (file: File): boolean => {
+    return ALLOWED_UPLOAD_TYPES.some(type => file.type.startsWith(type) || file.type === type);
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = e.target.files;
@@ -269,6 +280,9 @@ const FilesPage = () => {
         const f = selectedFiles[i];
         if (f.size > MAX_FILE_SIZE) {
           throw new Error(`文件 "${f.name}" 过大（${formatSize(f.size)}），请压缩后上传（最大 ${formatSize(MAX_FILE_SIZE)}）`);
+        }
+        if (!isAllowedFileType(f)) {
+          throw new Error(`文件 "${f.name}" 类型不支持（${f.type || '未知'}），请上传常见的文档、图片、音视频或压缩包`);
         }
         const base64 = await fileToBase64(f);
         uploadTasks.push({ name: f.name, content: base64, mimeType: f.type });

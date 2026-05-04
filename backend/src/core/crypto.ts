@@ -33,6 +33,7 @@ function getOrCreateMasterKey(): Buffer | null {
 
     if (process.platform === 'win32') {
       fs.writeFileSync(keyPath, key);
+      try { fs.chmodSync(keyPath, 0o400); } catch { /* Windows may not fully support chmod */ }
     } else {
       try {
         fs.writeFileSync(keyPath, key, { mode: 0o400 });
@@ -59,6 +60,7 @@ function getOrCreateSalt(): Buffer {
 
     if (process.platform === 'win32') {
       fs.writeFileSync(saltPath, salt);
+      try { fs.chmodSync(saltPath, 0o600); } catch { /* Windows may not fully support chmod */ }
     } else {
       try {
         fs.writeFileSync(saltPath, salt, { mode: 0o600 });
@@ -109,10 +111,12 @@ export function decryptApiKey(encryptedKey: string): string {
   if (!encryptedKey) return encryptedKey;
 
   if (encryptedKey.startsWith('plain:')) {
+    console.warn('[SECURITY WARNING] API key is stored in plaintext. Please re-save the provider configuration to enable encryption.');
     return encryptedKey.slice(6);
   }
 
   if (!encryptedKey.startsWith('enc:')) {
+    console.warn('[SECURITY WARNING] API key is stored in plaintext (legacy format). Please re-save the provider configuration to enable encryption.');
     return encryptedKey;
   }
 

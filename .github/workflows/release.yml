@@ -1,12 +1,38 @@
 name: Build and Release
 
+# ==================================================================
+# 使用说明
+# ==================================================================
+# 本工作流用于构建 Papyrus 桌面应用并发布 GitHub Release。
+#
+# 【触发方式】
+# 1. 自动触发：push 代码到 main/develop/TS后端重写/v2.0.0beta.x 分支，
+#    或 push v* 开头的 tag（如 v2.0.0）时自动运行。
+# 2. 手动触发：进入 Actions → Build and Release → Run workflow。
+#
+# 【手动发布步骤】
+# 1. 进入 Actions 页面，选择 "Build and Release"
+# 2. 点击右上角 "Run workflow"
+# 3. 勾选 "Create GitHub release"（必须勾选，否则只构建不上传）
+# 4. （可选）填写 "Release tag"，留空则使用当前分支名
+# 5. 选择 "Create as draft release"：
+#    - 勾选（默认）= 创建草稿 Release，需要进 GitHub Releases 页面手动点 Publish
+#    - 取消勾选 = 直接发布正式 Release，对外立即可见
+# 6. 点击 "Run workflow" 等待构建完成
+#
+# 【注意事项】
+# - 自动触发（push tag）时，默认创建草稿 Release
+# - 只有 v2.0.0beta.x 分支的 push 会自动执行 release job
+# - tag 中包含 alpha/beta/rc 时，会自动标记为 prerelease
+# ==================================================================
+
 on:
   push:
     branches:
       - main
       - develop
       - 'TS后端重写'
-      - 'v2.0.0beta.6'
+      - 'v2.0.0beta.7'
     tags:
       - 'v*'
   pull_request:
@@ -14,15 +40,25 @@ on:
       - main
   workflow_dispatch:
     inputs:
+      # 总开关：是否执行 release job（上传产物并创建 GitHub Release）
+      # 默认关闭，防止误触发；勾选后才真正发版
       create_release:
-        description: 'Create GitHub draft release'
+        description: 'Create GitHub release'
         required: false
         default: false
         type: boolean
+      # 手动指定 tag；留空则使用当前分支名或触发事件的 tag
       tag:
         description: 'Release tag (e.g. v2.0.0)'
         required: false
         type: string
+      # Draft 开关：勾选 = 创建草稿 Release（需手动点 Publish）
+      # 取消勾选 = 直接发布正式 Release（对外立即可见）
+      draft:
+        description: 'Create as draft release'
+        required: false
+        default: true
+        type: boolean
 
 env:
   APP_NAME: "Papyrus"
@@ -54,10 +90,10 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
           cache: 'npm'
@@ -109,7 +145,7 @@ jobs:
 
       - name: Upload Test Output on Failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: test-output-${{ matrix.platform }}
           path: backend/test-output.log
@@ -177,7 +213,7 @@ jobs:
           echo "Frontend built successfully"
 
       - name: Cache Electron Builder
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: |
             ~/.cache/electron
@@ -245,7 +281,7 @@ jobs:
         run: node scripts/verify-packaged-deps.js
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: ${{ matrix.artifact }}
           path: |
@@ -265,12 +301,12 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
 
@@ -283,7 +319,7 @@ jobs:
           echo "==============================="
 
       - name: Upload Release Notes
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: release-notes
           path: RELEASE_NOTES.md
@@ -294,16 +330,20 @@ jobs:
   # with create_release=true when ready to publish.
   # ------------------------------------------------------------------
   release:
-    name: Create Draft Release
+    name: Create Release
     needs: [build, generate-notes]
     runs-on: ubuntu-latest
-    if: github.event.inputs.create_release == 'true' || startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/v2.0.0beta.6'
+    # 执行 release 的三种场景：
+    # 1. 手动触发且勾选了 create_release
+    # 2. push 了 v* 开头的 tag
+    # 3. push 到 v2.0.0beta.6 分支（保留兼容）
+    if: github.event.inputs.create_release == 'true' || startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/heads/v')
     permissions:
       contents: write
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           fetch-depth: 0
 
@@ -315,13 +355,13 @@ jobs:
           echo "Using tag: $TAG"
 
       - name: Download All Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           path: artifacts
           pattern: Papyrus-*
 
       - name: Download Release Notes
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: release-notes
           path: .
@@ -341,8 +381,20 @@ jobs:
             echo "is_prerelease=false" >> $GITHUB_OUTPUT
           fi
 
+      # 决定 Release 是否为草稿状态：
+      # - 手动触发时，采用 UI 上 draft 开关的值
+      # - 自动触发（push tag 等）时，默认创建草稿，防止误发布
+      - name: Determine Draft Flag
+        id: draft_flag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "is_draft=${{ github.event.inputs.draft }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_draft=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create Draft Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
         with:
           files: |
             artifacts/Papyrus-Win-x64/**/*-Setup.exe
@@ -352,7 +404,8 @@ jobs:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: ${{ steps.tag.outputs.tag }}
           body_path: RELEASE_NOTES.md
-          draft: true
+          # draft 状态由上面的 Determine Draft Flag step 动态决定
+          draft: ${{ steps.draft_flag.outputs.is_draft == 'true' }}
           prerelease: ${{ steps.release_type.outputs.is_prerelease == 'true' }}
           # 决定release notes的生成方式，默认为true，自动根据提交记录生成release notes，设置为false则使用body_path指定的文件内容作为release notes
           generate_release_notes: true
