@@ -361,7 +361,10 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
           const currentModels = models.length > 0 ? models : prevModels;
           const currentModelRef = modelRef.current;
           const configuredCompositeKey = configuredModel
-            ? currentModels.find((m) => m.key.endsWith(`:${configuredModel}`))?.key
+            ? currentModels.find((m) => {
+                const idx = m.key.indexOf(':');
+                return idx > 0 && m.key.slice(idx + 1) === configuredModel;
+              })?.key
             : undefined;
           if (configuredCompositeKey && currentModels.some((m) => m.key === configuredCompositeKey)) {
             // 只有当用户没有已选模型，或已选模型不在可用列表中时，才使用后端配置
@@ -1289,6 +1292,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   };
 
   const handleModelSelect = async (key: string) => {
+    const prevModel = modelRef.current;
     setModel(key);
     if (isGenerating) {
       abortControllerRef.current?.abort();
@@ -1313,14 +1317,26 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
     };
 
     try {
-      await authFetch('/config/ai', {
+      const resp = await authFetch('/config/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedConfig),
       });
-      window.dispatchEvent(new CustomEvent('papyrus_ai_config_changed'));
+      if (!resp.ok) {
+        let errMsg = `HTTP ${resp.status}`;
+        try {
+          const data = await resp.json();
+          if (data?.error) errMsg = String(data.error);
+        } catch {
+          // ignore JSON parse failure
+        }
+        throw new Error(errMsg);
+      }
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       console.error('Failed to update AI config:', error);
+      setModel(prevModel);
+      ArcoMessage.error('模型切换失败：' + msg);
     }
   };
 

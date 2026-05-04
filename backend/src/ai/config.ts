@@ -245,13 +245,13 @@ export class AIConfig {
       }
 
       let currentProvider = toStr(dict.current_provider, defaultConfig.current_provider);
-      if (!(currentProvider in normalizedProviders)) {
+      if (Object.keys(normalizedProviders).length > 0 && !(currentProvider in normalizedProviders)) {
         currentProvider = defaultConfig.current_provider;
       }
 
       let currentModel = toStr(dict.current_model, defaultConfig.current_model);
       const providerModels = normalizedProviders[currentProvider]?.models ?? [];
-      if (!providerModels.includes(currentModel)) {
+      if (Object.keys(normalizedProviders).length > 0 && providerModels.length > 0 && !providerModels.includes(currentModel)) {
         currentModel = providerModels[0] ?? defaultConfig.current_model;
       }
 

@@ -135,6 +135,9 @@ describe('AIConfig', () => {
   it('should fallback to default provider when current_provider is invalid', () => {
     const configFile = path.join(tempDir, 'ai_config.json');
     fs.writeFileSync(configFile, JSON.stringify({
+      providers: {
+        moonshot: { api_key: '', base_url: 'https://api.moonshot.cn/v1', models: ['kimi-k2.5'] },
+      },
       current_provider: 'nonexistent-provider',
       current_model: 'gpt-3.5-turbo',
       parameters: {},
@@ -144,5 +147,20 @@ describe('AIConfig', () => {
 
     const config = new AIConfig(tempDir);
     expect(config.config.current_provider).toBe('liyuan-deepseek');
+  });
+
+  it('should preserve current_provider/current_model when providers field is empty (DB-managed)', () => {
+    const configFile = path.join(tempDir, 'ai_config.json');
+    fs.writeFileSync(configFile, JSON.stringify({
+      current_provider: 'user-custom-provider',
+      current_model: 'user-custom-model',
+      parameters: {},
+      features: {},
+      log: {},
+    }), 'utf8');
+
+    const config = new AIConfig(tempDir);
+    expect(config.config.current_provider).toBe('user-custom-provider');
+    expect(config.config.current_model).toBe('user-custom-model');
   });
 });

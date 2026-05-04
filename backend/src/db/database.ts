@@ -231,6 +231,11 @@ function initSchema(database: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated ON chat_sessions(updated_at DESC);
   `);
 
+  const providerCount = (database.prepare('SELECT COUNT(*) as c FROM providers').get() as { c: number }).c;
+  if (providerCount === 0) {
+    seedDefaults(database);
+  }
+
   seedDefaults(database);
 
   deduplicateData(database);
@@ -311,12 +316,6 @@ function deduplicateData(database: DatabaseSync): void {
 function seedDefaults(database: DatabaseSync): void {
   const now = Date.now();
   const pid = 'p-liyuan-deepseek';
-
-  // 清理遗留的 openai 供应商（级联删除其模型和 api_keys）
-  const openaiRow = database.prepare('SELECT id FROM providers WHERE type = ?').get('openai') as { id: string } | undefined;
-  if (openaiRow) {
-    database.prepare('DELETE FROM providers WHERE id = ?').run(openaiRow.id);
-  }
 
   const existing = database.prepare('SELECT id FROM providers WHERE type = ?').get('liyuan-deepseek') as { id: string } | undefined;
   if (!existing) {
