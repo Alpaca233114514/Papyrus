@@ -18,7 +18,7 @@ import {
 import { RelationsPanel, RelationGraph } from '../components/Relations';
 import type { Note, CreateNoteParams, UpdateNoteParams } from '../types';
 import { PRIMARY_COLOR } from '../constants';
-import MarkdownIt from 'markdown-it';
+import { renderMarkdown } from '../../utils/markdown';
 
 interface NoteDetailViewProps {
   note: Note | null;
@@ -28,20 +28,6 @@ interface NoteDetailViewProps {
   onSave: (params: UpdateNoteParams | CreateNoteParams, isCreate: boolean, shouldReturnToList?: boolean) => Promise<void>;
   onDelete?: (id: string) => void;
 }
-
-// 初始化 markdown-it 实例
-// SECURITY: html disabled to prevent XSS from user-generated note content
-const md = new MarkdownIt({
-  html: false,
-  linkify: true,
-  typographer: true,
-});
-
-const ALLOWED_SCHEMES = new Set(['http', 'https', 'mailto', 'tel']);
-md.validateLink = (url: string): boolean => {
-  const scheme = url.trim().toLowerCase().split(':', 1)[0];
-  return ALLOWED_SCHEMES.has(scheme);
-};
 
 export const NoteDetailView = ({
   note,
@@ -277,7 +263,7 @@ export const NoteDetailView = ({
 
   // 渲染 Markdown 内容为 HTML
   const renderedContent = useMemo(() => {
-    return md.render(content);
+    return renderMarkdown(content);
   }, [content]);
 
   return (
@@ -564,7 +550,7 @@ export const NoteDetailView = ({
             />
           ) : (
             <div
-              className="markdown-preview"
+              className="markdown-preview chat-markdown"
               style={{
                 fontSize: '15px',
                 lineHeight: '1.8',

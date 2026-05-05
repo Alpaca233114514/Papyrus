@@ -17,7 +17,7 @@ Date: 2026/05/05
 ### 发布功能
 - 现在的重新生成按钮可覆盖当前回答。
 - 将悬停预览等细节统一更换为Papyrus Desktop.
-
+- 适配笔记库的markdown渲染。
 ### bug修复
 - 修复了代理故障导致Connection error的问题。
 
