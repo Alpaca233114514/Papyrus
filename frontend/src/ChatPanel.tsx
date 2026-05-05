@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Dropdown, Menu, Avatar, Tooltip, Empty, Message as ArcoMessage, Tag, Button, Trigger } from '@arco-design/web-react';
+import { Dropdown, Menu, Avatar, Tooltip, Empty, Message as ArcoMessage, Tag, Button, Trigger, Modal } from '@arco-design/web-react';
 import { IconArrowUp, IconAt, IconFile, IconMessage, IconDown, IconBulb, IconRecordStop, IconTool, IconRefresh, IconEdit, IconCopy, IconDelete, IconTranslate, IconSave, IconPlus, IconHistory, IconClose, IconImage, IconFilePdf } from '@arco-design/web-react/icon';
 import IconAgentMode from './icons/IconAgentMode';
 import { ReasoningChain } from './components/ReasoningChain';
@@ -1456,12 +1456,18 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
                     )}
                     <div className="chat-message-actions">
                       <Tooltip content="重新生成" mini><button className="chat-message-action-btn" aria-label="重新生成" disabled={isGenerating} onClick={() => {
-                        const msgIndex = messages.findIndex((m) => m.id === msg.id);
-                        if (msgIndex < messages.length - 1 && messages[msgIndex + 1]?.role === 'assistant') {
-                          setMessages((prev) => prev.slice(0, msgIndex + 1));
-                        }
-                        textOverrideRef.current = msg.content;
-                        sendMessage();
+                        Modal.confirm({
+                          title: '重新生成',
+                          content: '是否重新生成？本操作会覆盖当前回答。',
+                          onOk: () => {
+                            const msgIndex = messages.findIndex((m) => m.id === msg.id);
+                            if (msgIndex < messages.length - 1 && messages[msgIndex + 1]?.role === 'assistant') {
+                              setMessages((prev) => prev.slice(0, msgIndex + 1));
+                            }
+                            textOverrideRef.current = msg.content;
+                            sendMessage();
+                          },
+                        });
                       }}><IconRefresh /></button></Tooltip>
                       <Tooltip content="编辑" mini><button className="chat-message-action-btn" aria-label="编辑" disabled={isGenerating} onClick={() => { setEditingMessageId(msg.id); setEditingDraft(msg.content); }}><IconEdit /></button></Tooltip>
                       <Tooltip content="复制" mini><button className="chat-message-action-btn" aria-label="复制" disabled={isGenerating} onClick={() => {
@@ -1500,12 +1506,18 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
                     )}
                     <div className="chat-message-actions">
                       <Tooltip content="重新生成" mini><button className="chat-message-action-btn" aria-label="重新生成" disabled={isGenerating} onClick={() => {
-                        const msgIndex = messages.findIndex((m) => m.id === msg.id);
-                        if (msgIndex > 0 && messages[msgIndex - 1].role === 'user') {
-                          setMessages((prev) => prev.slice(0, msgIndex));
-                          textOverrideRef.current = messages[msgIndex - 1].content;
-                          sendMessage();
-                        }
+                        Modal.confirm({
+                          title: '重新生成',
+                          content: '是否重新生成？本操作会覆盖当前回答。',
+                          onOk: () => {
+                            const msgIndex = messages.findIndex((m) => m.id === msg.id);
+                            if (msgIndex > 0 && messages[msgIndex - 1].role === 'user') {
+                              setMessages((prev) => prev.slice(0, msgIndex));
+                              textOverrideRef.current = messages[msgIndex - 1].content;
+                              sendMessage();
+                            }
+                          },
+                        });
                       }}><IconRefresh /></button></Tooltip>
                       <Tooltip content="编辑" mini><button className="chat-message-action-btn" aria-label="编辑" disabled={isGenerating} onClick={() => { setEditingMessageId(msg.id); setEditingDraft(msg.content); }}><IconEdit /></button></Tooltip>
                       <Tooltip content="复制" mini><button className="chat-message-action-btn" aria-label="复制" disabled={isGenerating} onClick={() => {

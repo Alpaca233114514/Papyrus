@@ -121,7 +121,7 @@ const App = () => {
 
   // 更新文档标题
   useEffect(() => {
-    document.title = `Papyrus - ${pageTitles[activePage] || '莎草纸'}`;
+    document.title = 'Papyrus Desktop';
   }, [activePage]);
 
   // 渲染当前页面

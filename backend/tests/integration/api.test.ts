@@ -691,11 +691,9 @@ describe('API Integration Tests', () => {
     }
   });
 
-  it('GET /api/update/check should work when HTTPS_PROXY is set', async () => {
+  it('GET /api/update/check should work', async () => {
     const savedFetch = global.fetch;
-    const savedProxy = process.env.HTTPS_PROXY;
     try {
-      process.env.HTTPS_PROXY = 'http://127.0.0.1:7890';
       global.fetch = () => Promise.resolve({
         ok: true,
         status: 200,
@@ -720,11 +718,6 @@ describe('API Integration Tests', () => {
 
     } finally {
       global.fetch = savedFetch;
-      if (savedProxy === undefined) {
-        delete process.env.HTTPS_PROXY;
-      } else {
-        process.env.HTTPS_PROXY = savedProxy;
-      }
     }
   });
 

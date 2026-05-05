@@ -8,6 +8,7 @@ import type { ToolCallRecord } from '../../ai/tool-manager.js';
 import { isPrivateUrl } from '../../ai/config.js';
 import { getProviderApiKeyFromDB, getProviderConfigFromDB } from '../../ai/db-sync.js';
 import { loadAllProviders } from '../../db/database.js';
+import { fetchWithProxy } from '../../utils/proxy.js';
 import type { ChatBlock } from '../../core/types.js';
 
 export { aiConfig };
@@ -409,7 +410,7 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
       try {
         const headers: Record<string, string> = {};
         if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
-        const resp = await fetch(`${baseUrl}/models`, {
+        const resp = await fetchWithProxy(`${baseUrl}/models`, {
           headers,
           signal: AbortSignal.timeout(10000),
         });
@@ -577,7 +578,7 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
-        const resp = await fetch(endpoint, {
+        const resp = await fetchWithProxy(endpoint, {
           method: 'POST',
           headers,
           signal: AbortSignal.timeout(60000),

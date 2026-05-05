@@ -118,7 +118,7 @@ const AccessibilityView = ({ onBack }: AccessibilityViewProps) => {
             </Title>
           </div>
           <Paragraph type="secondary">
-            Papyrus 致力于提供包容性的用户体验。全应用支持 WCAG 2.1 AA 级标准，
+            Papyrus Desktop 致力于提供包容性的用户体验。全应用支持 WCAG 2.1 AA 级标准，
             部分功能支持 AAA 级增强。
           </Paragraph>
         </div>
@@ -268,7 +268,7 @@ const AccessibilityView = ({ onBack }: AccessibilityViewProps) => {
                 系统偏好检测
               </Text>
               <Text type="secondary" style={{ fontSize: 13 }}>
-                当系统设置为"减少动画"时，Papyrus 会自动降低动画效果。您可以在此进一步禁用所有动画。
+                当系统设置为"减少动画"时，Papyrus Desktop 会自动降低动画效果。您可以在此进一步禁用所有动画。
               </Text>
             </div>
           </div>

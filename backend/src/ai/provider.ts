@@ -8,6 +8,7 @@ import { isPrivateUrl } from './config.js';
 import { LLMCache } from './llm-cache.js';
 import { getProviderConfigFromDB } from './db-sync.js';
 import { getClientId } from '../utils/client-id.js';
+import { fetchWithProxy } from '../utils/proxy.js';
 import { CardTools } from './tools.js';
 import type { OpenAIToolDef } from './tools.js';
 import {
@@ -952,7 +953,7 @@ export class AIManager {
           headers.set('X-Papyrus-Client-Id', getClientId());
           headers.set('User-Agent', 'PapyrusDesktop/2.0');
         }
-        return fetch(reqUrl, { ...reqInit, headers });
+        return fetchWithProxy(reqUrl, { ...reqInit, headers });
       }) as unknown as OpenAIFetchParam,
     });
 

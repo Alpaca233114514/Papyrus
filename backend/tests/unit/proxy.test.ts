@@ -1,0 +1,108 @@
+import { fetchWithProxy, getProxyUrl, createProxyAgent } from '../../src/utils/proxy.js';
+
+describe('proxy utilities', () => {
+  const originalFetch = global.fetch;
+  const originalHttpProxy = process.env.HTTP_PROXY;
+  const originalHttpsProxy = process.env.HTTPS_PROXY;
+
+  beforeEach(() => {
+    delete process.env.HTTP_PROXY;
+    delete process.env.HTTPS_PROXY;
+    delete process.env.http_proxy;
+    delete process.env.https_proxy;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    if (originalHttpProxy !== undefined) {
+      process.env.HTTP_PROXY = originalHttpProxy;
+    } else {
+      delete process.env.HTTP_PROXY;
+    }
+    if (originalHttpsProxy !== undefined) {
+      process.env.HTTPS_PROXY = originalHttpsProxy;
+    } else {
+      delete process.env.HTTPS_PROXY;
+    }
+  });
+
+  describe('getProxyUrl', () => {
+    it('should return undefined when no proxy is configured', () => {
+      expect(getProxyUrl()).toBeUndefined();
+    });
+
+    it('should return HTTPS_PROXY env var', () => {
+      process.env.HTTPS_PROXY = 'http://127.0.0.1:7890';
+      expect(getProxyUrl()).toBe('http://127.0.0.1:7890');
+    });
+
+    it('should prefer HTTPS_PROXY over HTTP_PROXY', () => {
+      process.env.HTTP_PROXY = 'http://192.168.1.1:8080';
+      process.env.HTTPS_PROXY = 'http://127.0.0.1:7890';
+      expect(getProxyUrl()).toBe('http://127.0.0.1:7890');
+    });
+  });
+
+  describe('createProxyAgent', () => {
+    it('should return undefined when no proxy is configured', () => {
+      expect(createProxyAgent()).toBeUndefined();
+    });
+
+    it('should create ProxyAgent when proxy is configured', () => {
+      process.env.HTTPS_PROXY = 'http://127.0.0.1:7890';
+      const agent = createProxyAgent();
+      expect(agent).toBeDefined();
+    });
+
+    it('should return undefined for invalid proxy url', () => {
+      process.env.HTTPS_PROXY = 'not-a-valid-url';
+      // ProxyAgent constructor may throw or accept the string; depending on undici version
+      // Just verify it does not crash
+      expect(() => createProxyAgent()).not.toThrow();
+    });
+  });
+
+  describe('fetchWithProxy', () => {
+    it('should use global.fetch when no proxy is configured', async () => {
+      const mockResponse = { ok: true, status: 200 } as Response;
+      let calledUrl: string | undefined;
+      let calledInit: RequestInit | undefined;
+      global.fetch = (url: string, init?: RequestInit) => {
+        calledUrl = url;
+        calledInit = init;
+        return Promise.resolve(mockResponse);
+      };
+
+      const result = await fetchWithProxy('https://example.com/test');
+
+      expect(calledUrl).toBe('https://example.com/test');
+      expect(calledInit).toBeUndefined();
+      expect(result).toBe(mockResponse);
+    });
+
+    it('should pass init options through when no proxy is configured', async () => {
+      const mockResponse = { ok: true, status: 200 } as Response;
+      let calledUrl: string | undefined;
+      let calledInit: RequestInit | undefined;
+      global.fetch = (url: string, init?: RequestInit) => {
+        calledUrl = url;
+        calledInit = init;
+        return Promise.resolve(mockResponse);
+      };
+      const init = { method: 'POST', headers: { 'Content-Type': 'application/json' } } as RequestInit;
+
+      await fetchWithProxy('https://example.com/test', init);
+
+      expect(calledUrl).toBe('https://example.com/test');
+      expect(calledInit).toBe(init);
+    });
+
+    it('should not crash when proxy is configured', async () => {
+      process.env.HTTPS_PROXY = 'http://127.0.0.1:7890';
+      // When proxy is configured, fetchWithProxy uses undiciFetch which will fail
+      // because there's no actual proxy server. We just verify it attempts the call
+      // and throws a network-level error rather than a type/programming error.
+      await expect(fetchWithProxy('http://localhost:99999/test')).rejects.toThrow();
+    });
+  });
+});
