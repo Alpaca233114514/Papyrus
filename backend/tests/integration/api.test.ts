@@ -691,6 +691,43 @@ describe('API Integration Tests', () => {
     }
   });
 
+  it('GET /api/update/check should work when HTTPS_PROXY is set', async () => {
+    const savedFetch = global.fetch;
+    const savedProxy = process.env.HTTPS_PROXY;
+    try {
+      process.env.HTTPS_PROXY = 'http://127.0.0.1:7890';
+      global.fetch = () => Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          tag_name: 'v1.0.0',
+          html_url: 'https://example.com/release',
+          body: null,
+          published_at: null,
+          assets: [],
+        }),
+      } as unknown as Response);
+
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/update/check',
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(body.data.latest_version).toBe('v1.0.0');
+
+    } finally {
+      global.fetch = savedFetch;
+      if (savedProxy === undefined) {
+        delete process.env.HTTPS_PROXY;
+      } else {
+        process.env.HTTPS_PROXY = savedProxy;
+      }
+    }
+  });
+
   it('POST /api/config/ai/test should test ollama connection', async () => {
     const savedFetch = global.fetch;
     try {

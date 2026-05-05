@@ -111,4 +111,8 @@ function syncVersion() {
   log('✅ 版本同步完成', 'green');
 }
 
-syncVersion();
+module.exports = { syncVersion };
+
+if (require.main === module) {
+  syncVersion();
+}

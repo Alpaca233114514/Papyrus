@@ -1,6 +1,6 @@
 {
   "name": "papyrus",
-  "version": "v2.0.0-beta.7",
+  "version": "2.0.0-beta.8",
   "description": "Papyrus - A modern note-taking and learning application",
   "main": "electron/main.js",
   "author": "PapyrusOR",
@@ -20,6 +20,12 @@
     "build:backend": "cd backend && npm run build",
     "postinstall": "cd frontend && npm install && cd ../backend && npm install",
     "sync-version": "node scripts/sync-version.js",
+    "bump:patch": "node scripts/bump-version.js patch",
+    "bump:minor": "node scripts/bump-version.js minor",
+    "bump:major": "node scripts/bump-version.js major",
+    "bump:beta": "node scripts/bump-version.js beta",
+    "bump:release": "node scripts/bump-version.js release",
+    "test:bump": "node --test scripts/__tests__/bump-version.test.js",
     "build:installer": "npm run sync-version && npm run build:backend && npm run build:frontend && electron-builder --win nsis --x64 --publish=never --config .electron-builder.config.js",
     "generate-cert": "powershell -ExecutionPolicy Bypass -File build/create-cert.ps1"
   },
@@ -27,7 +33,8 @@
     "@playwright/test": "^1.59.1",
     "concurrently": "^8.2.2",
     "electron": "^41.1.0",
-    "electron-builder": "^24.13.0"
+    "electron-builder": "^24.13.0",
+    "semver": "^7.7.4"
   },
   "dependencies": {
     "wait-on": "^9.0.5"

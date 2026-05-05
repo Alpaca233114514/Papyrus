@@ -718,7 +718,6 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
               }}
             />
           ))}
-          {collections.length === 0 && <Empty description="暂无卷帙" />}
           <div onClick={() => setCreateModalVisible(true)}>
             <AddCard label='新建卷帙' />
           </div>
@@ -735,7 +734,6 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
               onStudy={s.dueCount > 0 ? startStudy : undefined}
             />
           ))}
-          {scrolls.length === 0 && <Empty description="暂无卷轴" />}
           <div onClick={() => setCreateCardModalVisible(true)}>
             <AddCard label='新建卷轴' />
           </div>

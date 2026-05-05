@@ -6,7 +6,7 @@ name: Build and Release
 # 本工作流用于构建 Papyrus 桌面应用并发布 GitHub Release。
 #
 # 【触发方式】
-# 1. 自动触发：push 代码到 main/develop/TS后端重写/v2.0.0beta.x 分支，
+# 1. 自动触发：push 代码到 main/develop/v2.* 分支,
 #    或 push v* 开头的 tag（如 v2.0.0）时自动运行。
 # 2. 手动触发：进入 Actions → Build and Release → Run workflow。
 #
@@ -22,7 +22,7 @@ name: Build and Release
 #
 # 【注意事项】
 # - 自动触发（push tag）时，默认创建草稿 Release
-# - 只有 v2.0.0beta.x 分支的 push 会自动执行 release job
+# - push 任意 v2.* 分支或 v* tag 都会自动执行 release job
 # - tag 中包含 alpha/beta/rc 时，会自动标记为 prerelease
 # ==================================================================
 
@@ -31,8 +31,7 @@ on:
     branches:
       - main
       - develop
-      - 'TS后端重写'
-      - 'v2.0.0-beta.8'
+      - 'v2.*'
     tags:
       - 'v*'
   pull_request:
@@ -336,7 +335,7 @@ jobs:
     # 执行 release 的三种场景：
     # 1. 手动触发且勾选了 create_release
     # 2. push 了 v* 开头的 tag
-    # 3. push 到 v2.0.0beta.6 分支（保留兼容）
+    # 3. push 到 v* 开头的分支（如 v2.0.0-beta.x）
     if: github.event.inputs.create_release == 'true' || startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/heads/v')
     permissions:
       contents: write
