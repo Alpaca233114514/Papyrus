@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 chcp 65001 >nul
-echo 🚀 启动 Papyrus 开发环境...
+echo 🚀 启动 Papyrus Desktop 开发环境...
 echo.
 
 cd /d "%~dp0"

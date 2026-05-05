@@ -1,4 +1,4 @@
-import { fetchWithProxy, getProxyUrl, createProxyAgent } from '../../src/utils/proxy.js';
+import { fetchWithProxy, getProxyUrl, createProxyAgent, isProxyConnectionError } from '../../src/utils/proxy.js';
 
 describe('proxy utilities', () => {
   const originalFetch = global.fetch;
@@ -103,6 +103,34 @@ describe('proxy utilities', () => {
       // because there's no actual proxy server. We just verify it attempts the call
       // and throws a network-level error rather than a type/programming error.
       await expect(fetchWithProxy('http://localhost:99999/test')).rejects.toThrow();
+    });
+
+    it('should fall back to global.fetch when proxy server is unreachable', async () => {
+      process.env.HTTPS_PROXY = 'http://127.0.0.1:1';
+      const mockResponse = { ok: true, status: 200 } as Response;
+      global.fetch = () => Promise.resolve(mockResponse);
+
+      const result = await fetchWithProxy('https://example.com/test');
+      expect(result).toBe(mockResponse);
+    });
+
+    it('should throw wrapped error when both proxy and direct fail', async () => {
+      process.env.HTTPS_PROXY = 'http://127.0.0.1:1';
+      global.fetch = () => Promise.reject(new Error('Direct fetch failed'));
+
+      await expect(fetchWithProxy('https://example.com/test')).rejects.toThrow(
+        /通过代理 .* 连接失败，已尝试直连仍失败/
+      );
+    });
+
+    it('should not fallback for non-proxy errors', () => {
+      expect(isProxyConnectionError(new Error('Proxy responded with 407'))).toBe(false);
+      expect(isProxyConnectionError(null)).toBe(false);
+
+      const connError = new Error('fetch failed');
+      // @ts-expect-error — 构造与 undici 运行时一致的 mock error shape
+      connError.cause = { code: 'ECONNREFUSED' };
+      expect(isProxyConnectionError(connError)).toBe(true);
     });
   });
 });

@@ -90,10 +90,45 @@ export function createProxyAgent(): ProxyAgent | undefined {
   }
 }
 
+export function isProxyConnectionError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  // Runtime-safe: undici wraps socket-level errors in `cause.code`
+  const causeCode = (error as unknown as { cause?: { code?: string } }).cause?.code;
+  return (
+    causeCode === 'ECONNREFUSED' ||
+    causeCode === 'ETIMEDOUT' ||
+    causeCode === 'ECONNRESET' ||
+    causeCode === 'ECONNABORTED' ||
+    causeCode === 'EHOSTUNREACH' ||
+    causeCode === 'ENETUNREACH'
+  );
+}
+
 export async function fetchWithProxy(url: string, init?: RequestInit): Promise<Response> {
+  const proxyUrl = getProxyUrl();
+  if (!proxyUrl) {
+    return global.fetch(url, init);
+  }
+
   const proxyAgent = createProxyAgent();
   if (!proxyAgent) {
     return global.fetch(url, init);
   }
-  return undiciFetch(url, { ...init, dispatcher: proxyAgent } as unknown as Parameters<typeof undiciFetch>[1]);
+
+  try {
+    return await undiciFetch(
+      url,
+      { ...init, dispatcher: proxyAgent } as unknown as Parameters<typeof undiciFetch>[1],
+    );
+  } catch (error) {
+    if (!isProxyConnectionError(error)) {
+      throw error;
+    }
+    try {
+      return await global.fetch(url, init);
+    } catch (directError) {
+      const reason = directError instanceof Error ? directError.message : String(directError);
+      throw new Error(`通过代理 ${proxyUrl} 连接失败，已尝试直连仍失败：${reason}`);
+    }
+  }
 }

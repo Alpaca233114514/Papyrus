@@ -122,7 +122,7 @@ module.exports = {
     maintainer: 'Papyrus Team',
     vendor: 'Papyrus Team',
     synopsis: 'Modern note-taking and learning application',
-    description: 'Papyrus is a modern note-taking and learning application with AI integration and spaced repetition.',
+    description: 'Papyrus Desktop is a modern note-taking and learning application with AI integration and spaced repetition.',
     desktop: {
       Name: 'Papyrus Desktop',
       Comment: 'Note-taking and learning application',

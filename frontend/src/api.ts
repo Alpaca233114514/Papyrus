@@ -75,7 +75,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     return res.json();
   } catch (err) {
     if (err instanceof Error && err.message.includes('Failed to fetch')) {
-      throw new Error('无法连接到服务器，请检查后端是否已启动');
+      throw new Error('无法连接到服务器，请检查网络或后端是否已启动');
     }
     throw err;
   }

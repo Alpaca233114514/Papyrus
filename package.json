@@ -1,7 +1,7 @@
 {
   "name": "papyrus",
   "version": "2.0.0-beta.9",
-  "description": "Papyrus - A modern note-taking and learning application",
+  "description": "Papyrus Desktop - A modern note-taking and learning application",
   "main": "electron/main.js",
   "author": "PapyrusOR",
   "license": "MIT",

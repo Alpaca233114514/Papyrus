@@ -38,7 +38,7 @@ function build(target) {
   
   const options = {
     dir: '.',
-    name: 'Papyrus',
+    name: 'Papyrus Desktop',
     appVersion: version,
     overwrite: true,
     asar: true,

@@ -28,7 +28,7 @@ const EXTENSIONS_CATALOG: ExtensionInfo[] = [
   {
     id: 'core.obsidian-import',
     name: 'Obsidian 导入',
-    description: '将 Obsidian Vault 中的笔记一键导入 Papyrus',
+    description: '将 Obsidian Vault 中的笔记一键导入 Papyrus Desktop',
     version: '1.0.0',
     author: 'Papyrus Team',
     rating: 4.8,

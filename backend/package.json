@@ -1,7 +1,7 @@
 {
   "name": "papyrus-backend",
   "version": "2.0.0-beta.9",
-  "description": "Papyrus TypeScript backend",
+  "description": "Papyrus Desktop TypeScript backend",
   "type": "module",
   "main": "dist/api/server.js",
   "scripts": {

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Papyrus 扩展示例",
+  "name": "Papyrus Desktop 扩展示例",
   "version": "1.0.0",
-  "description": "展示如何使用 Papyrus MCP API 的浏览器扩展示例",
+  "description": "展示如何使用 Papyrus Desktop MCP API 的浏览器扩展示例",
   "permissions": [
     "activeTab",
     "contextMenus",
