@@ -225,7 +225,7 @@ function commitAndTag(nextVersion) {
 
 function pushTag(tagName) {
   log(`   🚀 推送 tag 到 origin: ${tagName}`, 'cyan');
-  runGit(`push origin ${tagName}`);
+  runGit(`push origin refs/tags/${tagName}`);
   log(`   ✓ tag 已推送,release.yml 将被 'v*' tag 触发器自动唤醒`, 'green');
 }
 
