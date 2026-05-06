@@ -4,7 +4,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 
-export type PageType = 'notes' | 'scroll' | 'files' | 'extensions' | 'charts';
+export type PageType = 'notes' | 'scroll' | 'files' | 'extensions' | 'charts' | 'common';
 
 export interface PageSceneryConfig {
   enabled: boolean;
@@ -36,6 +36,7 @@ const START_PAGE_SCENERY_KEY = 'papyrus_start_page_scenery';
 
 // 默认设置（各页面独立窗景配置）
 const defaultPageSceneries: Record<PageType, PageSceneryConfig> = {
+  common: { enabled: false, image: './scenery/image.png', name: '默认窗景', opacity: 0.35, poem: '且将新火试新茶，诗酒趁年华。', source: '[宋] 苏轼《望江南·超然台作》' },
   notes: { enabled: false, image: './scenery/image.png', name: '默认窗景', opacity: 0.35, poem: '且将新火试新茶，诗酒趁年华。', source: '[宋] 苏轼《望江南·超然台作》' },
   scroll: { enabled: false, image: './scenery/image.png', name: '默认窗景', opacity: 0.35, poem: '且将新火试新茶，诗酒趁年华。', source: '[宋] 苏轼《望江南·超然台作》' },
   files: { enabled: false, image: './scenery/image.png', name: '默认窗景', opacity: 0.35, poem: '且将新火试新茶，诗酒趁年华。', source: '[宋] 苏轼《望江南·超然台作》' },

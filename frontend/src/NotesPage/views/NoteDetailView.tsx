@@ -478,6 +478,7 @@ export const NoteDetailView = ({
                     onChange={setFolder}
                     style={{ width: '120px' }}
                     size='small'
+                    className='notes-meta-input'
                   />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
@@ -500,6 +501,7 @@ export const NoteDetailView = ({
                     placeholder='+ 标签'
                     style={{ width: '80px' }}
                     size='small'
+                    className='notes-meta-input'
                   />
                 </div>
               </>

@@ -10,19 +10,24 @@ function isMaskedKey(key: string): boolean {
  * 从数据库同步全局配置到 AIConfig
  * - 同步 isDefault provider 到 current_provider / current_model
  * - 不再同步 provider 列表（数据库为唯一事实来源）
+ * @param aiConfig AIConfig 实例
+ * @param forceSyncDefault 
+ * - 默认值为 false：仅在当前 provider 无效时才同步数据库中的默认 provider
+ * - 设置为 true：无论当前 provider 是否有效，都强制同步数据库中的默认 provider
+ * - 使用场景：在用户显式设置默认 provider 后，需要立即同步到配置时使用
  */
-export function syncDBToAIConfig(aiConfig: AIConfig): void {
+export function syncDBToAIConfig(aiConfig: AIConfig, forceSyncDefault: boolean = false): void {
   try {
     const dbProviders = loadAllProviders();
     if (dbProviders.length === 0) return;
 
-    // 只在当前 provider 无效时，才同步默认 provider
+    // 检查是否需要同步
     const currentProviderType = aiConfig.config.current_provider;
     const currentProviderValid = dbProviders.some(
       (p) => p.type === currentProviderType && p.enabled
     );
 
-    if (!currentProviderValid) {
+    if (!currentProviderValid || forceSyncDefault) {
       const defaultProvider = dbProviders.find((p) => p.isDefault);
       if (defaultProvider && defaultProvider.type) {
         aiConfig.config.current_provider = defaultProvider.type;

@@ -1,5 +1,5 @@
 import { Typography } from '@arco-design/web-react';
-import { usePageScenery } from '../hooks/useScenery';
+import { usePageScenery, type PageType } from '../hooks/useScenery';
 import { Spin } from '@arco-design/web-react';
 
 const STATS_FONT_SIZE = '24px';
@@ -7,19 +7,19 @@ const STATS_LABEL_FONT_SIZE = '12px';
 const STATS_VALUE_COLOR = '#FFFFFF';
 const STATS_LABEL_COLOR = 'rgba(255, 255, 255, 0.75)';
 
-interface StatItem {
+export interface StatItem {
   value: string | number;
   label: string;
   suffix?: string;
 }
 
-interface PageLayoutProps {
+export interface PageLayoutProps {
   title: string;
   children: React.ReactNode;
   actions?: React.ReactNode;
   stats?: StatItem[];
   statsLoading?: boolean;
-  pageKey?: string;
+  pageKey?: PageType;
   extraStatsContent?: React.ReactNode;
   statsContent?: React.ReactNode;
 }

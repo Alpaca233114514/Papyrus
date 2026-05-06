@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { aiConfig } from '../../ai/config-instance.js';
 import { isPrivateUrl } from '../../ai/config.js';
-import { getProviderApiKeyFromDB, getProviderConfigFromDB } from '../../ai/db-sync.js';
+import { getProviderApiKeyFromDB, getProviderConfigFromDB, syncDBToAIConfig } from '../../ai/db-sync.js';
 import { loadAllProviders } from '../../db/database.js';
 import { fetchWithProxy } from '../../utils/proxy.js';
 import { isKeylessProvider } from './ai-common.js';
@@ -78,6 +78,9 @@ export default async function aiConfigRoutes(fastify: FastifyInstance): Promise<
 
   fastify.post('/config/ai/test', async (_request, reply) => {
     try {
+      // 在处理请求前，同步最新的配置
+      syncDBToAIConfig(aiConfig);
+      
       const providerName = aiConfig.config.current_provider;
       const providerConfig = getProviderConfigFromDB(providerName);
       if (!providerConfig) {
@@ -90,17 +93,28 @@ export default async function aiConfigRoutes(fastify: FastifyInstance): Promise<
         if (dbKey) providerConfig.api_key = dbKey;
       }
 
-      if (providerName === 'ollama') {
-        const baseUrl = providerConfig.base_url || 'http://localhost:11434';
+      // 对于所有 keyless providers，执行类似 ollama 的简单连接测试
+      if (isKeylessProvider(providerName)) {
+        const baseUrl = providerConfig.base_url || (providerName === 'ollama' ? 'http://localhost:11434' : '');
+        if (!baseUrl) {
+          reply.send({ success: false, error: 'Base URL 未设置' });
+          return;
+        }
         try {
-          const resp = await fetch(`${baseUrl}/api/tags`, { signal: AbortSignal.timeout(5000) });
-          if (resp.ok) {
-            reply.send({ success: true, message: 'Ollama 连接成功' });
+          // 对于 liyuan-deepseek 和其他 keyless providers，尝试连接 base URL
+          // 不同的 provider 可能有不同的健康检查端点，这里我们做一个简单的 GET 请求
+          const resp = await fetch(baseUrl, { 
+            method: 'GET', 
+            signal: AbortSignal.timeout(5000) 
+          });
+          if (resp.ok || resp.status === 404 || resp.status === 401) {
+            // 即使返回 404 或 401，也说明服务器是可访问的
+            reply.send({ success: true, message: `${providerName} 连接成功` });
           } else {
-            reply.send({ success: false, error: `Ollama 返回错误: ${resp.status}` });
+            reply.send({ success: false, error: `${providerName} 返回错误: ${resp.status}` });
           }
         } catch (e) {
-          reply.send({ success: false, error: `Ollama 连接失败: ${e instanceof Error ? e.message : String(e)}` });
+          reply.send({ success: false, error: `${providerName} 连接失败: ${e instanceof Error ? e.message : String(e)}` });
         }
         return;
       }

@@ -28,4 +28,4 @@ export type { CommonCardStyles, CommonCardConfig } from './CommonCard';
 
 // 页面布局组件
 export { PageLayout } from './PageLayout';
-export type { StatItem } from './PageLayout';
+export type { StatItem, PageLayoutProps } from './PageLayout';

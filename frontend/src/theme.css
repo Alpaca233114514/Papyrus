@@ -121,29 +121,29 @@ input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
   outline: none !important;
-  box-shadow: 0 0 0 2px rgba(32, 108, 207, 0.25);
+  box-shadow: 0 0 0 0.5px rgba(32, 108, 207, 0.15);
   border-color: var(--color-primary) !important;
 }
 
 /* Arco Input组件焦点处理 - 外层wrapper不显示边框，只在内层显示 */
 .arco-input-wrapper:focus-within,
 .arco-input-password:focus-within,
-.arco-textarea-wrapper:focus-within,
-.arco-select-view:focus-within {
+.arco-textarea-wrapper:focus-within {
   box-shadow: none !important;
   border-color: transparent !important;
+}
+
+/* Arco Select组件焦点处理 - 外层div显示光晕和描边 */
+.arco-select-view:focus-within,
+.arco-select-view.arco-select-view-focus {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 0.5px rgba(32, 108, 207, 0.15) !important;
 }
 
 .arco-input-inner-wrapper:focus-within,
 .arco-textarea-inner-wrapper:focus-within {
   border-color: var(--color-primary) !important;
-  box-shadow: 0 0 0 2px rgba(32, 108, 207, 0.25) !important;
-}
-
-.arco-select-view:focus-within .arco-select-view-selector,
-.arco-select-view.arco-select-view-focus .arco-select-view-selector {
-  border-color: var(--color-primary) !important;
-  box-shadow: 0 0 0 2px rgba(32, 108, 207, 0.25) !important;
+  box-shadow: 0 0 0 0.5px rgba(32, 108, 207, 0.15) !important;
 }
 
 .arco-input-wrapper .arco-input:focus,
@@ -151,8 +151,69 @@ select:focus-visible {
 .arco-input-password .arco-input:focus,
 .arco-input-password .arco-input:focus-visible,
 .arco-textarea-wrapper .arco-textarea:focus,
-.arco-textarea-wrapper .arco-textarea:focus-visible {
+.arco-textarea-wrapper .arco-textarea:focus-visible,
+.arco-select-view .arco-input-tag-input:focus,
+.arco-select-view .arco-input-tag-input:focus-visible {
   outline: none !important;
+  box-shadow: none !important;
+}
+
+/* 无边框输入框和文本域 - 无聚焦光晕 */
+/* 处理直接在 input/textarea 元素上的 no-border-input/no-border-textarea 类 */
+input.no-border-input,
+textarea.no-border-textarea {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+input.no-border-input:focus,
+input.no-border-input:focus-visible,
+textarea.no-border-textarea:focus,
+textarea.no-border-textarea:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+/* 处理父容器上有 no-border-input/no-border-textarea 类的情况 */
+.no-border-input .arco-input-inner-wrapper:focus-within,
+.no-border-textarea .arco-textarea-inner-wrapper:focus-within,
+.no-border-input .arco-input-inner-wrapper.arco-input-inner-wrapper-focus,
+.no-border-textarea .arco-textarea-inner-wrapper.arco-textarea-inner-wrapper-focus {
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.no-border-input .arco-input-wrapper:focus-within,
+.no-border-textarea .arco-textarea-wrapper:focus-within,
+.no-border-input .arco-input-wrapper.arco-input-wrapper-focus,
+.no-border-textarea .arco-textarea-wrapper.arco-textarea-wrapper-focus {
+  box-shadow: none !important;
+  border-color: transparent !important;
+  outline: none !important;
+}
+
+.no-border-input .arco-input:focus,
+.no-border-input .arco-input:focus-visible,
+.no-border-textarea .arco-textarea:focus,
+.no-border-textarea .arco-textarea:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+/* a11y-focus-indicator 模式下也要禁用无框输入框的光晕 */
+html.a11y-focus-indicator input.no-border-input:focus-visible,
+html.a11y-focus-indicator textarea.no-border-textarea:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+html.a11y-focus-indicator .no-border-input .arco-input-inner-wrapper:focus-within,
+html.a11y-focus-indicator .no-border-textarea .arco-textarea-inner-wrapper:focus-within {
+  border-color: transparent !important;
   box-shadow: none !important;
 }
 
@@ -161,14 +222,13 @@ select:focus-visible {
 [class*="arco-modal"] textarea:focus-visible,
 [class*="arco-modal"] select:focus-visible {
   outline: none !important;
-  box-shadow: 0 0 0 2px rgba(32, 108, 207, 0.25) !important;
+  box-shadow: 0 0 0 0.5px rgba(32, 108, 207, 0.15) !important;
   border-color: var(--color-primary) !important;
 }
 
 [class*="arco-modal"] .arco-input-wrapper:focus-within,
 [class*="arco-modal"] .arco-input-password:focus-within,
-[class*="arco-modal"] .arco-textarea-wrapper:focus-within,
-[class*="arco-modal"] .arco-select-view:focus-within {
+[class*="arco-modal"] .arco-textarea-wrapper:focus-within {
   box-shadow: none !important;
   border-color: transparent !important;
 }
@@ -176,13 +236,52 @@ select:focus-visible {
 [class*="arco-modal"] .arco-input-inner-wrapper:focus-within,
 [class*="arco-modal"] .arco-textarea-inner-wrapper:focus-within {
   border-color: var(--color-primary) !important;
-  box-shadow: 0 0 0 2px rgba(32, 108, 207, 0.25) !important;
+  box-shadow: 0 0 0 0.5px rgba(32, 108, 207, 0.15) !important;
 }
 
-[class*="arco-modal"] .arco-select-view:focus-within .arco-select-view-selector,
-[class*="arco-modal"] .arco-select-view.arco-select-view-focus .arco-select-view-selector {
+[class*="arco-modal"] .arco-select-view:focus-within,
+[class*="arco-modal"] .arco-select-view.arco-select-view-focus {
   border-color: var(--color-primary) !important;
-  box-shadow: 0 0 0 2px rgba(32, 108, 207, 0.25) !important;
+  box-shadow: 0 0 0 0.5px rgba(32, 108, 207, 0.15) !important;
+}
+
+/* 笔记详情页元信息区输入框 - 与搜索框一致的光晕效果 */
+.notes-meta-input .arco-input-inner-wrapper:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px rgba(32, 108, 207, 0.25) !important;
+}
+
+.notes-meta-input .arco-input:focus,
+.notes-meta-input .arco-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+/* a11y-focus-indicator 模式下 notes-meta-input 输入框的光晕也要统一为 1px */
+html.a11y-focus-indicator .notes-meta-input input:focus-visible {
+  box-shadow: 0 0 0 1px rgba(32, 108, 207, 0.25) !important;
+}
+
+html.a11y-focus-indicator .notes-meta-input .arco-input-inner-wrapper:focus-within {
+  box-shadow: 0 0 0 1px rgba(32, 108, 207, 0.25) !important;
+}
+
+/* a11y-focus-indicator 模式下普通输入框的光晕覆盖（修复设置页等输入框光晕过粗问题） */
+html.a11y-focus-indicator input:focus-visible,
+html.a11y-focus-indicator textarea:focus-visible,
+html.a11y-focus-indicator select:focus-visible {
+  box-shadow: 0 0 0 0.5px rgba(32, 108, 207, 0.15) !important;
+  outline: none !important;
+}
+
+html.a11y-focus-indicator .arco-input-inner-wrapper:focus-within,
+html.a11y-focus-indicator .arco-textarea-inner-wrapper:focus-within {
+  box-shadow: 0 0 0 0.5px rgba(32, 108, 207, 0.15) !important;
+}
+
+html.a11y-focus-indicator .arco-select-view:focus-within,
+html.a11y-focus-indicator .arco-select-view.arco-select-view-focus {
+  box-shadow: 0 0 0 0.5px rgba(32, 108, 207, 0.15) !important;
 }
 
 /* 减少动画 - 无障碍支持 */

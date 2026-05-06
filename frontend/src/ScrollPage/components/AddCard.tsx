@@ -26,7 +26,7 @@ const AddCard = ({ label, onClick }: AddCardProps) => {
         width: '220px',
         height: '140px',
         borderRadius: '16px',
-        border: `2px dashed ${hovered ? SECONDARY_COLOR : 'var(--color-text-3)'}`,
+        border: `2px dashed ${hovered ? PRIMARY_COLOR : 'var(--color-text-3)'}`,
         background: 'transparent',
         display: 'flex',
         flexDirection: 'column',

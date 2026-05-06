@@ -4,6 +4,7 @@ import { IconFire, IconClockCircle, IconCheckCircle, IconCalendar } from '@arco-
 import { api, type Card as CardType } from '../api';
 import { useCommonCardStyle, CommonCard, PageLayout } from '../components';
 import { PRIMARY_COLOR, SUCCESS_COLOR } from '../theme-constants';
+import { getAdaptivePrimaryColor } from '../hooks/useSceneryColor';
 
 function useAnimatedNumber(targetValue: number, duration: number = 800, delay: number = 100, dataReady: boolean = false): number {
   const [displayValue, setDisplayValue] = useState(0);

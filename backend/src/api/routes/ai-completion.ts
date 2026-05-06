@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { aiConfig } from '../../ai/config-instance.js';
-import { getProviderConfigFromDB } from '../../ai/db-sync.js';
+import { getProviderConfigFromDB, syncDBToAIConfig } from '../../ai/db-sync.js';
 import { isPrivateUrl } from '../../ai/config.js';
 import { fetchWithProxy } from '../../utils/proxy.js';
 import { isKeylessProvider } from './ai-common.js';
@@ -43,6 +43,9 @@ export default async function aiCompletionRoutes(fastify: FastifyInstance): Prom
   });
 
   fastify.post('/completion', async (request, reply) => {
+    // 在处理请求前，同步最新的配置
+    syncDBToAIConfig(aiConfig);
+    
     const payload = request.body as CompletionPayload;
     const providerName = aiConfig.config.current_provider;
     const providerConfig = getProviderConfigFromDB(providerName);

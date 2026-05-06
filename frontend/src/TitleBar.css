@@ -115,7 +115,7 @@
 .titlebar-center .arco-input-wrapper .arco-input-inner-wrapper:focus-within,
 .titlebar-search-input .arco-input-inner-wrapper:focus-within {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(32, 108, 207, 0.25);
+  box-shadow: 0 0 0 1px rgba(32, 108, 207, 0.25);
 }
 
 .titlebar-search .arco-input:focus,
@@ -125,6 +125,7 @@
 .titlebar-search-input .arco-input:focus,
 .titlebar-search-input .arco-input:focus-visible {
   outline: none;
+  box-shadow: none;
 }
 
 /* avatar */

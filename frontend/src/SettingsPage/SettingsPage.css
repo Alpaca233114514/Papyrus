@@ -399,20 +399,16 @@
 .settings-page .arco-input-wrapper .arco-input:focus,
 .settings-page .arco-input-wrapper .arco-input:focus-visible,
 .settings-page .arco-input-password .arco-input:focus,
-.settings-page .arco-input-password .arco-input:focus-visible {
+.settings-page .arco-input-password .arco-input:focus-visible,
+.settings-page .arco-select-view .arco-input-tag-input:focus,
+.settings-page .arco-select-view .arco-input-tag-input:focus-visible {
   outline: none !important;
   box-shadow: none !important;
 }
 
-/* Select焦点样式 - 外层wrapper不显示边框，只在内层显示 */
+/* Select焦点样式 - 外层div显示光晕和描边 */
 .settings-page .arco-select-view:focus-within,
 .settings-page .arco-select-view.arco-select-view-focus {
-  box-shadow: none !important;
-  border-color: transparent !important;
-}
-
-.settings-page .arco-select-view:focus-within .arco-select-view-selector,
-.settings-page .arco-select-view.arco-select-view-focus .arco-select-view-selector {
   border-color: var(--color-primary) !important;
   box-shadow: 0 0 0 2px rgba(32, 108, 207, 0.25) !important;
 }
@@ -425,7 +421,7 @@
 
 .settings-page .arco-textarea-inner-wrapper:focus-within {
   border-color: var(--color-primary) !important;
-  box-shadow: 0 0 0 2px rgba(32, 108, 207, 0.25) !important;
+  box-shadow: 0 0 0 1px rgba(32, 108, 207, 0.25) !important;
 }
 
 .settings-page .arco-textarea-wrapper .arco-textarea:focus,
