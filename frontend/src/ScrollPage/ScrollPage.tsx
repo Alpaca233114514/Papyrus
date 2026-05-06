@@ -1,12 +1,14 @@
 import { Typography, Button, Empty, Spin, Modal, Input, Select, Message } from '@arco-design/web-react';
 import { IconPlus, IconClockCircle, IconBook, IconPlayCircle, IconEye, IconEdit } from '@arco-design/web-react/icon';
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import FlashcardStudy from './FlashcardStudy';
 
 import { api, type Card as CardType } from '../api';
 import { type SceneryContent } from '../StartPage/sceneryContent';
 import { usePageScenery } from '../hooks/useScenery';
 import { useSceneryColor, getAdaptivePrimaryColor } from '../hooks/useSceneryColor';
+import { useCommonCardStyle, CommonCard } from '../components';
 
 // 类型定义
 interface Collection {
@@ -64,6 +66,7 @@ const StatsCard = ({
   opacity?: number;
   loading: boolean;
 }) => {
+  const { t } = useTranslation();
   const { primaryTextColor, secondaryTextColor, averageBrightness } = useSceneryColor(
     scenery?.image,
     !!scenery
@@ -99,9 +102,9 @@ const StatsCard = ({
         background: 'var(--color-bg-1)',
       }}>
         <div style={{ display: 'flex', gap: '48px' }}>
-          <StatItem label='待复习' value={dueCount} color={dueCount > 0 ? PRIMARY_COLOR : undefined} />
-          <StatItem label='已掌握' value={`${totalCount && overallProgress ? Math.round(totalCount * overallProgress / 100) : 0}/${totalCount ?? 0}`} color={SUCCESS_COLOR} />
-          <StatItem label='总进度' value={`${overallProgress ?? 0}%`} />
+          <StatItem label={t('scrollPage.dueForReview')} value={dueCount} color={dueCount > 0 ? PRIMARY_COLOR : undefined} />
+          <StatItem label={t('scrollPage.mastered')} value={`${totalCount && overallProgress ? Math.round(totalCount * overallProgress / 100) : 0}/${totalCount ?? 0}`} color={SUCCESS_COLOR} />
+          <StatItem label={t('scrollPage.totalProgress')} value={`${overallProgress ?? 0}%`} />
         </div>
       </div>
     );
@@ -150,35 +153,29 @@ const StatsCard = ({
         display: 'flex', 
         gap: '48px',
       }}>
-        <StatItem label='待复习' value={dueCount} color={dueCount > 0 ? PRIMARY_COLOR : undefined} colorConfig={scenery ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
-        <StatItem label='已掌握' value={`${Math.round(totalCount * overallProgress / 100)}/${totalCount}`} color={SUCCESS_COLOR} colorConfig={scenery ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
-        <StatItem label='总进度' value={`${overallProgress}%`} colorConfig={scenery ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
+        <StatItem label={t('scrollPage.dueForReview')} value={dueCount} color={dueCount > 0 ? PRIMARY_COLOR : undefined} colorConfig={scenery ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
+        <StatItem label={t('scrollPage.mastered')} value={`${Math.round(totalCount * overallProgress / 100)}/${totalCount}`} color={SUCCESS_COLOR} colorConfig={scenery ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
+        <StatItem label={t('scrollPage.totalProgress')} value={`${overallProgress}%`} colorConfig={scenery ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
       </div>
     </div>
   );
 };
 
-// 通用卡片样式
-const useCardStyle = (hovered: boolean) => ({
-  borderRadius: '16px',
-  border: `2px solid ${hovered ? SECONDARY_COLOR : 'var(--color-text-3)'}`,
-  background: 'var(--color-bg-1)',
-  transition: 'border-color 0.2s, background 0.2s',
-  cursor: 'pointer',
-});
-
 // 卷帙卡片
 const CollectionCard = ({ collection, onClick, onManage }: { collection: Collection; onClick?: () => void; onManage?: (e: React.MouseEvent) => void }) => {
-  const [hovered, setHovered] = useState(false);
-  const cardStyle = useCardStyle(hovered);
+  const { t } = useTranslation();
+  const { hovered, setHovered, cardStyle } = useCommonCardStyle({
+    borderWidth: 2,
+  });
 
   return (
-    <div
+    <CommonCard
+      hovered={hovered}
+      setHovered={setHovered}
+      cardStyle={cardStyle}
       role="button"
       tabIndex={0}
       aria-label={`${collection.title}，包含 ${collection.scrollCount} 个卷轴，共 ${collection.totalCards} 张卡片`}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       onClick={onClick}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -187,7 +184,6 @@ const CollectionCard = ({ collection, onClick, onManage }: { collection: Collect
         }
       }}
       style={{
-        ...cardStyle,
         flex: '0 0 auto',
         width: '220px',
         height: '140px',
@@ -210,7 +206,7 @@ const CollectionCard = ({ collection, onClick, onManage }: { collection: Collect
           fontSize: '12px',
           fontWeight: 600,
         }}>
-          {collection.totalCards} 张卡片
+          {t('scrollPage.cards', { count: collection.totalCards })}
         </div>
         <Typography.Text bold style={{ fontSize: '16px', lineHeight: 1.3 }}>
           {collection.title}
@@ -220,7 +216,7 @@ const CollectionCard = ({ collection, onClick, onManage }: { collection: Collect
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <IconBook style={{ fontSize: '14px', color: 'var(--color-text-3)' }} />
         <Typography.Text type='secondary' style={{ fontSize: '13px' }}>
-          {collection.totalCards} 张卡片
+          {t('scrollPage.cards', { count: collection.totalCards })}
         </Typography.Text>
       </div>
 
@@ -247,7 +243,7 @@ const CollectionCard = ({ collection, onClick, onManage }: { collection: Collect
           <IconEdit style={{ fontSize: '12px', color: 'var(--color-text-2)' }} />
         </div>
       )}
-    </div>
+    </CommonCard>
   );
 };
 
@@ -272,17 +268,20 @@ function generateCollections(cards: CardType[]): Collection[] {
 
 // 卷轴卡片
 const ScrollCard = ({ scroll, onStudy }: { scroll: Scroll; onStudy?: () => void }) => {
-  const [hovered, setHovered] = useState(false);
-  const cardStyle = useCardStyle(hovered);
+  const { t } = useTranslation();
+  const { hovered, setHovered, cardStyle } = useCommonCardStyle({
+    borderWidth: 2,
+  });
 
   return (
-    <div
+    <CommonCard
+      hovered={hovered}
+      setHovered={setHovered}
+      cardStyle={cardStyle}
       role="button"
       tabIndex={onStudy ? 0 : -1}
-      aria-label={`${scroll.title}，${scroll.collection}，${scroll.dueCount > 0 ? `${scroll.dueCount} 张待复习` : '已完成'}，共 ${scroll.cardCount} 张卡片`}
+      aria-label={`${scroll.title}，${scroll.collection}，${scroll.dueCount > 0 ? t('scrollPage.dueCards', { count: scroll.dueCount }) : t('scrollPage.completedCards')}，共 ${scroll.cardCount} 张卡片`}
       aria-disabled={!onStudy ? 'true' : 'false'}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       onClick={onStudy}
       onKeyDown={(e) => {
         if ((e.key === 'Enter' || e.key === ' ') && onStudy) {
@@ -291,7 +290,6 @@ const ScrollCard = ({ scroll, onStudy }: { scroll: Scroll; onStudy?: () => void 
         }
       }}
       style={{
-        ...cardStyle,
         flex: '0 0 auto',
         width: '280px',
         height: '140px',
@@ -341,7 +339,7 @@ const ScrollCard = ({ scroll, onStudy }: { scroll: Scroll; onStudy?: () => void 
               fontSize: '12px',
               fontWeight: 600,
             }}>
-              {scroll.dueCount} 待复习
+              {t('scrollPage.dueCards', { count: scroll.dueCount })}
             </div>
           ) : (
             <div style={{
@@ -354,7 +352,7 @@ const ScrollCard = ({ scroll, onStudy }: { scroll: Scroll; onStudy?: () => void 
               fontSize: '12px',
               fontWeight: 600,
             }}>
-              已完成
+              {t('scrollPage.completedCards')}
             </div>
           )}
           <Typography.Text type='secondary' style={{ fontSize: '12px' }}>
@@ -377,7 +375,7 @@ const ScrollCard = ({ scroll, onStudy }: { scroll: Scroll; onStudy?: () => void 
           {scroll.masteredCount}/{scroll.cardCount}
         </Typography.Text>
       </div>
-    </div>
+    </CommonCard>
   );
 };
 
@@ -426,7 +424,7 @@ const AddCard = ({ label, onClick }: { label: string; onClick?: () => void }) =>
         justifyContent: 'center',
         transition: 'background 0.2s',
       }}>
-        <IconPlus style={{ fontSize: '20px', color: hovered ? '#fff' : 'var(--color-text-2)' }} />
+        <IconPlus style={{ fontSize: '20px', color: hovered ? '#fff' : 'var(--color-text-1)' }} />
       </div>
       <Typography.Text type={hovered ? 'primary' : 'secondary'} style={{ fontSize: '14px' }}>
         {label}
@@ -451,6 +449,7 @@ interface ScrollPageProps {
 }
 
 const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
+  const { t } = useTranslation();
   const [isStudying, setIsStudying] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [dueCount, setDueCount] = useState(0);
@@ -498,7 +497,7 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
         }
       } catch (err) {
         console.error('获取统计失败:', err);
-        Message.error('获取统计数据失败，请稍后重试');
+        Message.error(t('scrollPage.fetchStatsFailed'));
       } finally {
         setLoading(false);
       }
@@ -625,7 +624,7 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
           heading={1}
           style={{ fontWeight: 600, lineHeight: 1, margin: 0, fontSize: '40px' }}
         >
-          卷轴
+          {t('scrollPage.title')}
         </Typography.Title>
         <div style={{ display: 'flex', gap: '12px' }}>
           <Button
@@ -639,7 +638,7 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
               fontSize: '14px',
             }}
           >
-            添加卷轴
+            {t('scrollPage.addScroll')}
           </Button>
           <Button
             shape='round'
@@ -655,7 +654,7 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
               fontSize: '14px',
             }}
           >
-            管理卡片
+            {t('scrollPage.manageCards')}
           </Button>
           <Button
             shape='round'
@@ -668,7 +667,7 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
               fontSize: '14px',
             }}
           >
-            预览学习界面
+            {t('scrollPage.previewStudy')}
           </Button>
           <Button
             shape='round'
@@ -684,7 +683,7 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
               backgroundColor: dueCount > 0 ? PRIMARY_COLOR : 'var(--color-text-3)',
             }}
           >
-            {dueCount > 0 ? `开始复习 (${dueCount})` : '暂无待复习'}
+            {dueCount > 0 ? t('scrollPage.startReview', { count: dueCount }) : t('scrollPage.noDueCards')}
           </Button>
         </div>
       </div>
@@ -704,7 +703,7 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
       />
 
       <section style={{ marginBottom: '40px' }}>
-        <ShelfTitle>卷帙</ShelfTitle>
+        <ShelfTitle>{t('scrollPage.collections')}</ShelfTitle>
         <div style={shelfContainerStyle}>
           {collections.map(c => (
             <CollectionCard
@@ -719,13 +718,13 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
             />
           ))}
           <div onClick={() => setCreateModalVisible(true)}>
-            <AddCard label='新建卷帙' />
+            <AddCard label={t('scrollPage.newCollection')} />
           </div>
         </div>
       </section>
 
       <section>
-        <ShelfTitle>最近使用</ShelfTitle>
+        <ShelfTitle>{t('scrollPage.recentlyUsed')}</ShelfTitle>
         <div style={shelfContainerStyle}>
           {scrolls.map(s => (
             <ScrollCard
@@ -735,7 +734,7 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
             />
           ))}
           <div onClick={() => setCreateCardModalVisible(true)}>
-            <AddCard label='新建卷轴' />
+            <AddCard label={t('scrollPage.newScroll')} />
           </div>
         </div>
       </section>
@@ -744,16 +743,16 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
 
       {/* 新建卷帙模态框 */}
       <Modal
-        title="新建卷帙"
+        title={t('scrollPage.createCollection')}
         visible={createModalVisible}
         onOk={async () => {
           const name = newCollectionName.trim();
           if (!name) {
-            Message.error('请输入卷帙名称');
+            Message.error(t('scrollPage.pleaseEnterCollectionName'));
             return;
           }
           if (selectedCardIds.length === 0) {
-            Message.error('请至少选择一张卡片');
+            Message.error(t('scrollPage.pleaseSelectAtLeastOneCard'));
             return;
           }
           setIsSubmitting(true);
@@ -767,7 +766,7 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
                 if (res.success) successCount++;
               }
             }
-            Message.success(`成功创建卷帙，已分配 ${successCount} 张卡片`);
+            Message.success(t('scrollPage.collectionCreated', { count: successCount }));
             setCreateModalVisible(false);
             setNewCollectionName('');
             setSelectedCardIds([]);
@@ -775,7 +774,7 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
             const cardsRes = await api.listCards();
             if (cardsRes.success) setCards(cardsRes.cards);
           } catch (err) {
-            Message.error('创建卷帙失败');
+            Message.error(t('scrollPage.createCollectionFailed'));
           } finally {
             setIsSubmitting(false);
           }
@@ -789,23 +788,23 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
-            <Typography.Text style={{ display: 'block', marginBottom: 8 }}>卷帙名称</Typography.Text>
+            <Typography.Text style={{ display: 'block', marginBottom: 8 }}>{t('scrollPage.collectionName')}</Typography.Text>
             <Input 
               value={newCollectionName} 
               onChange={setNewCollectionName} 
-              placeholder="例如：英语单词"
+              placeholder={t('scrollPage.collectionPlaceholder')}
               maxLength={20}
             />
           </div>
           <div>
-            <Typography.Text style={{ display: 'block', marginBottom: 8 }}>选择卡片</Typography.Text>
+            <Typography.Text style={{ display: 'block', marginBottom: 8 }}>{t('scrollPage.selectCards')}</Typography.Text>
             <Select
               mode="multiple"
               value={selectedCardIds}
               onChange={setSelectedCardIds}
-              placeholder="请选择要加入卷帙的卡片"
+              placeholder={t('scrollPage.selectCardsPlaceholder')}
               style={{ width: '100%' }}
-              options={cards.map(c => ({ label: c.q.slice(0, 40) || '无标题', value: c.id }))}
+              options={cards.map(c => ({ label: c.q.slice(0, 40) || t('startPage.untitled'), value: c.id }))}
             />
           </div>
         </div>
@@ -813,7 +812,7 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
 
       {/* 管理卷帙模态框 */}
       <Modal
-        title={`管理卷帙：${manageCollectionId || ''}`}
+        title={t('scrollPage.manageCollection', { name: manageCollectionId || '' })}
         visible={manageModalVisible && !!manageCollectionId}
         onCancel={() => {
           setManageModalVisible(false);
@@ -821,7 +820,7 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
         }}
         footer={[
           <Button key="close" onClick={() => { setManageModalVisible(false); setManageCollectionId(null); }}>
-            关闭
+            {t('scrollPage.close')}
           </Button>,
           <Button 
             key="delete" 
@@ -830,8 +829,8 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
             onClick={async () => {
               if (!manageCollectionId) return;
               Modal.confirm({
-                title: '删除卷帙',
-                content: `确定要删除卷帙「${manageCollectionId}」吗？卡片不会被删除，只是移除此标签。`,
+                title: t('scrollPage.deleteCollection'),
+                content: t('scrollPage.confirmDeleteCollectionMessage', { name: manageCollectionId }),
                 onOk: async () => {
                   try {
                     const targetCards = cards.filter(c => (c.tags || []).includes(manageCollectionId));
@@ -839,19 +838,19 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
                       const newTags = (card.tags || []).filter(t => t !== manageCollectionId);
                       await api.updateCard(card.id, { tags: newTags });
                     }
-                    Message.success('卷帙已删除');
+                    Message.success(t('scrollPage.collectionDeleted'));
                     setManageModalVisible(false);
                     setManageCollectionId(null);
                     const cardsRes = await api.listCards();
                     if (cardsRes.success) setCards(cardsRes.cards);
                   } catch {
-                    Message.error('删除卷帙失败');
+                    Message.error(t('scrollPage.deleteCollectionFailed'));
                   }
                 }
               });
             }}
           >
-            删除卷帙
+            {t('scrollPage.deleteCollection')}
           </Button>
         ]}
       >
@@ -871,7 +870,7 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
                 }}
               >
                 <Typography.Text style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {card.q.slice(0, 60) || '无标题'}
+                  {card.q.slice(0, 60) || t('startPage.untitled')}
                 </Typography.Text>
                 <Button
                   type="text"
@@ -880,32 +879,32 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
                     try {
                       const newTags = (card.tags || []).filter(t => t !== manageCollectionId);
                       await api.updateCard(card.id, { tags: newTags });
-                      Message.success('已移出卷帙');
+                      Message.success(t('scrollPage.removedFromCollection'));
                       const cardsRes = await api.listCards();
                       if (cardsRes.success) setCards(cardsRes.cards);
                     } catch {
-                      Message.error('移除失败');
+                      Message.error(t('scrollPage.removeFailed'));
                     }
                   }}
                 >
-                  移除
+                  {t('scrollPage.remove')}
                 </Button>
               </div>
             ))}
           {cards.filter(c => manageCollectionId && (c.tags || []).includes(manageCollectionId)).length === 0 && (
-            <Empty description="该卷帙暂无卡片" />
+            <Empty description={t('scrollPage.noCardsInCollection')} />
           )}
         </div>
       </Modal>
 
       {/* 批量管理卡片模态框 */}
       <Modal
-        title={`管理卡片 (${cards.length} 张)`}
+        title={t('scrollPage.manageCardsTitle', { count: cards.length })}
         visible={batchCardModalVisible}
         onCancel={() => setBatchCardModalVisible(false)}
         footer={[
           <Button key="close" onClick={() => setBatchCardModalVisible(false)}>
-            关闭
+            {t('scrollPage.close')}
           </Button>,
           <Button
             key="delete"
@@ -914,24 +913,24 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
             disabled={batchSelectedIds.size === 0}
             onClick={() => {
               Modal.confirm({
-                title: '批量删除卡片',
-                content: `确定要删除选中的 ${batchSelectedIds.size} 张卡片吗？此操作不可撤销。`,
+                title: t('scrollPage.batchDeleteCards'),
+                content: t('scrollPage.confirmBatchDelete', { count: batchSelectedIds.size }),
                 onOk: async () => {
                   try {
                     const res = await api.batchDeleteCards([...batchSelectedIds]);
-                    Message.success(`已删除 ${res.deleted} 张卡片`);
+                    Message.success(t('scrollPage.batchDeleteSuccess', { count: res.deleted }));
                     setBatchCardModalVisible(false);
                     setBatchSelectedIds(new Set());
                     const cardsRes = await api.listCards();
                     if (cardsRes.success) setCards(cardsRes.cards);
                   } catch {
-                    Message.error('批量删除失败');
+                    Message.error(t('scrollPage.batchDeleteFailed'));
                   }
                 },
               });
             }}
           >
-            删除选中 ({batchSelectedIds.size})
+            {t('scrollPage.deleteSelected', { count: batchSelectedIds.size })}
           </Button>,
         ]}
       >
@@ -966,33 +965,33 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
                 checked={batchSelectedIds.has(card.id)}
                 onChange={() => {}}
                 style={{ cursor: 'pointer', accentColor: PRIMARY_COLOR }}
-                aria-label="选择此卡片"
+                aria-label={t('scrollPage.selectThisCard')}
               />
               <Typography.Text style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {card.q.slice(0, 60) || '无标题'}
+                {card.q.slice(0, 60) || t('startPage.untitled')}
               </Typography.Text>
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                {card.tags?.join(', ') || '未分类'}
+                {card.tags?.join(', ') || t('startPage.uncategorized')}
               </Typography.Text>
             </div>
           ))}
-          {cards.length === 0 && <Empty description="暂无卡片" />}
+          {cards.length === 0 && <Empty description={t('startPage.noCards')} />}
         </div>
       </Modal>
 
       {/* 新建卡片模态框 */}
       <Modal
-        title="新建卡片"
+        title={t('scrollPage.createCard')}
         visible={createCardModalVisible}
         onOk={async () => {
           const q = newCardQuestion.trim();
           const a = newCardAnswer.trim();
           if (!q) {
-            Message.error('请输入问题');
+            Message.error(t('scrollPage.pleaseEnterQuestion'));
             return;
           }
           if (!a) {
-            Message.error('请输入答案');
+            Message.error(t('scrollPage.pleaseEnterAnswer'));
             return;
           }
           setIsSubmittingCard(true);
@@ -1000,7 +999,7 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
             const tags = newCardTags.split(',').map(t => t.trim()).filter(Boolean);
             const res = await api.createCard(q, a, tags.length > 0 ? tags : undefined);
             if (res.success) {
-              Message.success('卡片创建成功');
+              Message.success(t('scrollPage.cardCreated'));
               setCreateCardModalVisible(false);
               setNewCardQuestion('');
               setNewCardAnswer('');
@@ -1018,7 +1017,7 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
               }
             }
           } catch (err) {
-            Message.error(err instanceof Error ? err.message : '创建卡片失败');
+            Message.error(err instanceof Error ? err.message : t('scrollPage.createCardFailed'));
           } finally {
             setIsSubmittingCard(false);
           }
@@ -1033,29 +1032,29 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
-            <Typography.Text style={{ display: 'block', marginBottom: 8 }}>问题（正面）</Typography.Text>
+            <Typography.Text style={{ display: 'block', marginBottom: 8 }}>{t('scrollPage.questionLabel')}</Typography.Text>
             <Input.TextArea
               value={newCardQuestion}
               onChange={setNewCardQuestion}
-              placeholder="输入卡片问题..."
+              placeholder={t('scrollPage.questionPlaceholder')}
               rows={3}
             />
           </div>
           <div>
-            <Typography.Text style={{ display: 'block', marginBottom: 8 }}>答案（背面）</Typography.Text>
+            <Typography.Text style={{ display: 'block', marginBottom: 8 }}>{t('scrollPage.answerLabel')}</Typography.Text>
             <Input.TextArea
               value={newCardAnswer}
               onChange={setNewCardAnswer}
-              placeholder="输入卡片答案..."
+              placeholder={t('scrollPage.answerPlaceholder')}
               rows={3}
             />
           </div>
           <div>
-            <Typography.Text style={{ display: 'block', marginBottom: 8 }}>标签（用逗号分隔）</Typography.Text>
+            <Typography.Text style={{ display: 'block', marginBottom: 8 }}>{t('scrollPage.tagsLabel')}</Typography.Text>
             <Input
               value={newCardTags}
               onChange={setNewCardTags}
-              placeholder="例如：英语, 单词"
+              placeholder={t('scrollPage.tagsPlaceholder')}
             />
           </div>
         </div>

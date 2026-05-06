@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Select,
   Switch,
@@ -39,25 +40,11 @@ import { useScrollNavigation } from '../../hooks/useScrollNavigation';
 import { ProviderLogo } from '../../icons/ProviderLogo';
 import { ModelLogo } from '../../icons/ModelLogo';
 import { api } from '../../api';
+import { PORT_OPTIONS } from '../../utils/modelSelector';
 
 const FormItem = Form.Item;
 const { Title, Text, Paragraph } = Typography;
 const Option = Select.Option;
-
-const PORT_OPTIONS = [
-  { label: 'OpenAI', value: 'openai' },
-  { label: 'OpenAI-Response', value: 'openai-response' },
-  { label: 'Anthropic', value: 'anthropic' },
-  { label: 'Gemini', value: 'gemini' },
-  { label: 'LiYuan For DeepSeek', value: 'liyuan-deepseek' },
-  { label: 'Ollama', value: 'ollama' },
-];
-
-const CAPABILITIES = [
-  { key: 'tools', label: '工具调用', icon: IconTool },
-  { key: 'vision', label: '视觉理解', icon: IconEye },
-  { key: 'reasoning', label: '推理能力', icon: IconBulb },
-];
 
 const PROVIDER_PRESETS: Record<string, { name: string; baseUrl: string }> = {
   openai: { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1' },
@@ -68,22 +55,13 @@ const PROVIDER_PRESETS: Record<string, { name: string; baseUrl: string }> = {
   ollama: { name: 'Ollama', baseUrl: 'http://localhost:11434' },
 };
 
-const PROVIDER_PORT_OPTIONS = [
-  { label: 'OpenAI', value: 'openai' },
-  { label: 'OpenAI-Response', value: 'openai-response' },
-  { label: 'Anthropic', value: 'anthropic' },
-  { label: 'Gemini', value: 'gemini' },
-  { label: 'LiYuan For DeepSeek', value: 'liyuan-deepseek' },
-  { label: 'Ollama', value: 'ollama' },
-];
-
-const NAV_ITEMS = [
-  { key: 'general-section', label: '通用设置', icon: IconMessage },
-  { key: 'user-section', label: '用户设置', icon: IconUser },
-  { key: 'providers-section', label: '供应商管理', icon: IconSafe },
-  { key: 'models-section', label: '模型管理', icon: IconRobot },
-  { key: 'completion-section', label: '自动补全', icon: IconBulb },
-  { key: 'parameters-section', label: '模型参数', icon: IconSettings },
+const NAV_ITEMS = (t: (key: string) => string) => [
+  { key: 'general-section', label: t('chatView.general'), icon: IconMessage },
+  { key: 'user-section', label: t('chatView.user'), icon: IconUser },
+  { key: 'providers-section', label: t('chatView.providers'), icon: IconSafe },
+  { key: 'models-section', label: t('chatView.models'), icon: IconRobot },
+  { key: 'completion-section', label: t('chatView.completion'), icon: IconBulb },
+  { key: 'parameters-section', label: t('chatView.parameters'), icon: IconSettings },
 ];
 
 interface ApiKeyItem {
@@ -117,24 +95,25 @@ interface ChatViewProps {
   onBack: () => void;
 }
 
-const renderCapabilityIcons = (capabilities: string[]) => {
+const CAPABILITIES_MAP = {
+  tools: { icon: IconTool, labelKey: 'chatView.tools' },
+  vision: { icon: IconEye, labelKey: 'chatView.vision' },
+  reasoning: { icon: IconBulb, labelKey: 'chatView.reasoning' },
+};
+
+const renderCapabilityIcons = (capabilities: string[], t: (key: string) => string) => {
   return (
     <Space size={8}>
-      {capabilities.includes('vision') && (
-        <Tooltip content="视觉理解">
-          <IconEye style={{ color: 'var(--color-primary)', fontSize: 16 }} />
-        </Tooltip>
-      )}
-      {capabilities.includes('tools') && (
-        <Tooltip content="工具调用">
-          <IconTool style={{ color: 'var(--color-primary)', fontSize: 16 }} />
-        </Tooltip>
-      )}
-      {capabilities.includes('reasoning') && (
-        <Tooltip content="推理能力">
-          <IconBulb style={{ color: 'var(--color-primary)', fontSize: 16 }} />
-        </Tooltip>
-      )}
+      {capabilities.map(cap => {
+        const capConfig = CAPABILITIES_MAP[cap as keyof typeof CAPABILITIES_MAP];
+        if (!capConfig) return null;
+        const IconComp = capConfig.icon;
+        return (
+          <Tooltip key={cap} content={t(capConfig.labelKey)}>
+            <IconComp style={{ color: 'var(--color-primary)', fontSize: 16 }} />
+          </Tooltip>
+        );
+      })}
     </Space>
   );
 };
@@ -191,7 +170,8 @@ const saveAgentSettings = (settings: AgentSettings) => {
 };
 
 const ChatView = ({ onBack }: ChatViewProps) => {
-  const { contentRef, activeSection, scrollToSection } = useScrollNavigation(NAV_ITEMS);
+  const { t } = useTranslation();
+  const { contentRef, activeSection, scrollToSection } = useScrollNavigation(NAV_ITEMS(t));
   const [agentModeEnabled, setAgentModeEnabledState] = useState(() => loadAgentSettings().agentModeEnabled);
   const [showTimestamp, setShowTimestamp] = useState(true);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -208,7 +188,6 @@ const ChatView = ({ onBack }: ChatViewProps) => {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [providersLoading, setProvidersLoading] = useState(false);
   const [currentModelId, setCurrentModelId] = useState<string>('');
-  const [aiCurrentModel, setAiCurrentModel] = useState<string>('');
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [addForm] = Form.useForm();
   const [newProviderType, setNewProviderType] = useState('openai');
@@ -250,21 +229,6 @@ const ChatView = ({ onBack }: ChatViewProps) => {
     api.getAIConfig()
       .then(data => {
         if (data.success && data.config) {
-          const backendCurrentModel = data.config.current_model;
-          if (backendCurrentModel) {
-            setAiCurrentModel(backendCurrentModel);
-            // 如果 providers 已加载，立即同步 currentModelId
-            setProviders(currentProviders => {
-              for (const p of currentProviders) {
-                const model = p.models.find(m => m.modelId === backendCurrentModel && m.enabled);
-                if (model) {
-                  setCurrentModelId(model.id);
-                  break;
-                }
-              }
-              return currentProviders;
-            });
-          }
           if (data.config.features) {
             const agentEnabled = data.config.features.agent_enabled ?? false;
             setAgentModeEnabledState(agentEnabled);
@@ -285,14 +249,11 @@ const ChatView = ({ onBack }: ChatViewProps) => {
       .then(data => {
         if (data.success && data.providers) {
           setProviders(data.providers);
-          // 根据后端 current_model (modelId) 查找对应的数据库 id
-          if (aiCurrentModel) {
-            for (const p of data.providers) {
-              const model = p.models.find(m => m.modelId === aiCurrentModel && m.enabled);
-              if (model) {
-                setCurrentModelId(model.id);
-                break;
-              }
+          const defaultProvider = data.providers.find(p => p.isDefault && p.enabled);
+          if (defaultProvider) {
+            const defaultModel = defaultProvider.models.find(m => m.enabled);
+            if (defaultModel && !currentModelId) {
+              setCurrentModelId(defaultModel.id);
             }
           }
         }
@@ -335,7 +296,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
       api.createProvider(newProvider)
         .then(data => {
           if (data.success) {
-            Message.success('供应商添加成功');
+            Message.success(t('chatView.supplierAdded'));
             setAddModalVisible(false);
             addForm.resetFields();
             setApiKeys([{ id: '1', key: '', name: '' }]);
@@ -346,16 +307,16 @@ const ChatView = ({ onBack }: ChatViewProps) => {
               syncKeyToAIConfig(newProviderType, firstKey.key);
             }
           } else {
-            Message.error(data.error || '添加失败');
+            Message.error(data.error || t('chatView.addFailed'));
           }
         })
         .catch(err => {
-          console.error('添加供应商失败:', err);
+          console.error('Failed to add provider:', err);
           const msg = err instanceof Error ? err.message : String(err);
           if (msg.includes('已存在')) {
-            Message.warning('该配置已存在，无需重复添加');
+            Message.warning(t('chatView.supplierAlreadyExists'));
           } else {
-            Message.error('添加供应商失败');
+            Message.error(t('chatView.addFailed'));
           }
         })
         .finally(() => {
@@ -369,16 +330,16 @@ const ChatView = ({ onBack }: ChatViewProps) => {
     api.deleteProvider(id)
       .then(data => {
         if (data.success) {
-          Message.success('供应商已删除');
+          Message.success(t('chatView.supplierDeleted'));
           loadProviders();
           notifyAIConfigChanged();
         } else {
-          Message.error(data.error || '删除失败');
+          Message.error(data.error || t('chatView.deleteFailed'));
         }
       })
       .catch(err => {
-        console.error('删除供应商失败:', err);
-        Message.error('删除供应商失败');
+        console.error('Failed to delete provider:', err);
+        Message.error(t('chatView.deleteFailed'));
       });
   };
 
@@ -386,15 +347,15 @@ const ChatView = ({ onBack }: ChatViewProps) => {
     api.setDefaultProvider(id)
       .then(data => {
         if (data.success) {
-          Message.success('默认供应商已设置');
+          Message.success(t('chatView.defaultProviderSet'));
           loadProviders();
         } else {
-          Message.error(data.error || '设置失败');
+          Message.error(data.error || t('chatView.updateFailed'));
         }
       })
       .catch(err => {
-        console.error('设置默认供应商失败:', err);
-        Message.error('设置默认供应商失败');
+        console.error('Failed to set default provider:', err);
+        Message.error(t('chatView.updateFailed'));
       });
   };
 
@@ -402,16 +363,16 @@ const ChatView = ({ onBack }: ChatViewProps) => {
     api.deleteModel(providerId, modelId)
       .then(data => {
         if (data.success) {
-          Message.success('模型已删除');
+          Message.success(t('chatView.modelDeleted'));
           loadProviders();
           notifyAIConfigChanged();
         } else {
-          Message.error(data.error || '删除失败');
+          Message.error(data.error || t('chatView.deleteFailed'));
         }
       })
       .catch(err => {
-        console.error('删除模型失败:', err);
-        Message.error('删除模型失败');
+        console.error('Failed to delete model:', err);
+        Message.error(t('chatView.deleteFailed'));
       });
   };
 
@@ -462,12 +423,12 @@ const ChatView = ({ onBack }: ChatViewProps) => {
 
       const targetProvider = providers.find(p => p.id === targetProviderId);
       if (!targetProvider) {
-        Message.error('所选供应商不存在，请刷新页面后重试');
+        Message.error(t('chatView.providerNotFound'));
         return;
       }
 
       if (!trimmedModelId) {
-        Message.error('模型 ID 不能为空');
+        Message.error(t('chatView.modelIdEmpty'));
         return;
       }
 
@@ -498,17 +459,17 @@ const ChatView = ({ onBack }: ChatViewProps) => {
         api.updateModel(targetProviderId, editingModel.id, modelData)
           .then(data => {
             if (data.success) {
-              Message.success('模型已更新');
+              Message.success(t('chatView.modelUpdated'));
               loadProviders();
               notifyAIConfigChanged();
               closeModal();
             } else {
-              Message.error(data.error || '更新失败');
+              Message.error(data.error || t('chatView.updateFailed'));
             }
           })
           .catch(err => {
-            console.error('更新模型失败:', err);
-            Message.error('更新模型失败');
+            console.error('Failed to update model:', err);
+            Message.error(t('chatView.updateFailed'));
           })
           .finally(() => {
             setSaveModelLoading(false);
@@ -517,21 +478,21 @@ const ChatView = ({ onBack }: ChatViewProps) => {
         api.addModel(targetProviderId, modelData)
           .then(data => {
             if (data.success) {
-              Message.success('模型已添加');
+              Message.success(t('chatView.modelAdded'));
               loadProviders();
               notifyAIConfigChanged();
               closeModal();
             } else {
-              Message.error(data.error || '添加失败');
+              Message.error(data.error || t('chatView.addFailed'));
             }
           })
           .catch(err => {
-            console.error('添加模型失败:', err);
+            console.error('Failed to add model:', err);
             const msg = err instanceof Error ? err.message : String(err);
             if (msg.includes('已存在')) {
-              Message.warning('该模型已存在于当前供应商');
+              Message.warning(t('chatView.modelAlreadyExists'));
             } else {
-              Message.error('添加模型失败');
+              Message.error(t('chatView.addFailed'));
             }
           })
           .finally(() => {
@@ -539,8 +500,8 @@ const ChatView = ({ onBack }: ChatViewProps) => {
           });
       }
     }).catch((err: unknown) => {
-      console.error('模型表单验证失败:', err);
-      Message.error('模型表单验证失败，请检查输入');
+      console.error('Model form validation failed:', err);
+      Message.error(t('chatView.formValidationFailed'));
     });
   };
 
@@ -549,12 +510,12 @@ const ChatView = ({ onBack }: ChatViewProps) => {
     if (!file) return;
     
     if (!file.type.startsWith('image/')) {
-      Message.error('请选择图片文件');
+      Message.error(t('chatView.selectImageFile'));
       return;
     }
     
     if (file.size > 2 * 1024 * 1024) {
-      Message.error('图片大小不能超过 2MB');
+      Message.error(t('chatView.imageSizeExceeded'));
       return;
     }
     
@@ -564,7 +525,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
       const newProfile = { ...userProfile, avatarUrl };
       setUserProfile(newProfile);
       saveUserProfile(newProfile);
-      Message.success('头像已更新');
+      Message.success(t('chatView.avatarUpdated'));
     };
     reader.readAsDataURL(file);
   };
@@ -580,14 +541,13 @@ const ChatView = ({ onBack }: ChatViewProps) => {
     const newProfile = { ...userProfile, avatarUrl: null };
     setUserProfile(newProfile);
     saveUserProfile(newProfile);
-    Message.success('已恢复默认头像');
+    Message.success(t('chatView.defaultAvatarRestored'));
   };
   
   const setAgentModeEnabled = async (enabled: boolean) => {
     setAgentModeEnabledState(enabled);
     saveAgentSettings({ agentModeEnabled: enabled });
     try {
-      // Provider 配置仅通过 /api/providers 管理，这里只同步 agent_enabled
       await api.saveAIConfig({
         features: {
           agent_enabled: enabled,
@@ -595,7 +555,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
       } as Partial<import('../../api').AIConfig>);
       notifyAIConfigChanged();
     } catch (err) {
-      console.error('保存 Agent 模式配置失败:', err);
+      console.error('Failed to save Agent mode config:', err);
     }
   };
 
@@ -608,7 +568,6 @@ const ChatView = ({ onBack }: ChatViewProps) => {
     try {
       const provider = providers.find(p => p.models.some(m => m.id === modelId));
       const model = provider?.models.find(m => m.id === modelId);
-      // Provider 配置仅通过 /api/providers 管理，这里只同步 current_provider / current_model
       const updated: Partial<import('../../api').AIConfig> = {
         current_model: model?.modelId || modelId,
       };
@@ -618,8 +577,8 @@ const ChatView = ({ onBack }: ChatViewProps) => {
       await api.saveAIConfig(updated);
       notifyAIConfigChanged();
     } catch (err) {
-      console.error('同步模型配置到后端失败:', err);
-      Message.error('同步模型配置到后端失败');
+      console.error('Failed to sync model config to backend:', err);
+      Message.error(t('chatView.syncFailed'));
     }
   };
 
@@ -634,15 +593,13 @@ const ChatView = ({ onBack }: ChatViewProps) => {
         max_tokens: updates.max_tokens ?? completionMaxTokens,
       });
     } catch (err) {
-      console.error('保存补全配置失败:', err);
+      console.error('Failed to save completion config:', err);
     } finally {
       setCompletionSaving(false);
     }
   };
 
   const syncKeyToAIConfig = async (_providerType: string, _apiKey: string) => {
-    // Phase 1: provider 配置由数据库独立维护，不再同步到 aiConfig
-    // api_key 已通过 saveProviderChanges() 中的 api.updateProvider() 保存到数据库
     notifyAIConfigChanged();
   };
 
@@ -677,11 +634,11 @@ const ChatView = ({ onBack }: ChatViewProps) => {
             onClick={onBack}
             style={{ padding: 0, fontSize: 14 }}
           />
-          <Text style={{ fontSize: '14px', fontWeight: 500 }}>聊天设置</Text>
+          <Text style={{ fontSize: '14px', fontWeight: 500 }}>{t('chatView.title')}</Text>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
-          {NAV_ITEMS.map(({ key, label, icon: Icon }) => {
+          {NAV_ITEMS(t).map(({ key, label, icon: Icon }) => {
             const isActive = activeSection === key;
             return (
               <button
@@ -729,17 +686,17 @@ const ChatView = ({ onBack }: ChatViewProps) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
             <IconMessage style={{ fontSize: 32, color: 'var(--color-primary)' }} />
             <Title heading={2} style={{ margin: 0, fontWeight: 400, fontSize: '28px' }}>
-              聊天设置
+              {t('chatView.title')}
             </Title>
           </div>
           <Paragraph type="secondary">
-            配置 AI 聊天、供应商和模型参数
+            {t('chatView.titleDesc')}
           </Paragraph>
         </div>
 
         <div id="general-section" style={{ marginBottom: 48, scrollMarginTop: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>通用设置</Title>
+            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>{t('chatView.general')}</Title>
           </div>
 
           <div className="settings-section" style={{ 
@@ -748,22 +705,22 @@ const ChatView = ({ onBack }: ChatViewProps) => {
             padding: '16px 20px',
             marginBottom: 24,
           }}>
-            <SettingItem title="Agent 模式" desc="启用工具调用功能，AI 可以操作卡片和笔记">
+            <SettingItem title={t('chatView.agentMode')} desc={t('chatView.agentModeDesc')}>
               <Switch
                 checked={agentModeEnabled}
                 onChange={setAgentModeEnabled}
               />
             </SettingItem>
 
-            <SettingItem title="显示时间戳" desc="在消息旁显示发送时间">
+            <SettingItem title={t('chatView.showTimestamp')} desc={t('chatView.showTimestampDesc')}>
               <Switch checked={showTimestamp} onChange={setShowTimestamp} />
             </SettingItem>
 
-            <SettingItem title="自动滚动" desc="新消息到来时自动滚动到底部">
+            <SettingItem title={t('chatView.autoScroll')} desc={t('chatView.autoScrollDesc')}>
               <Switch checked={autoScroll} onChange={setAutoScroll} />
             </SettingItem>
 
-            <SettingItem title="Enter 发送" desc="按 Enter 键发送消息，Shift+Enter 换行" divider={false}>
+            <SettingItem title={t('chatView.enterToSend')} desc={t('chatView.enterToSendDesc')} divider={false}>
               <Switch checked={sendOnEnter} onChange={setSendOnEnter} />
             </SettingItem>
           </div>
@@ -771,7 +728,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
 
         <div id="user-section" style={{ marginBottom: 48, scrollMarginTop: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>用户设置</Title>
+            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>{t('chatView.user')}</Title>
           </div>
 
           <div className="settings-section" style={{ 
@@ -780,7 +737,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
             padding: '16px 20px',
             marginBottom: 24,
           }}>
-            <SettingItem title="用户标识" desc="显示在聊天头像上的文字（最多10个字符）">
+            <SettingItem title={t('chatView.userId')} desc={t('chatView.userIdDesc')}>
               <Input
                 value={userProfile.userId}
                 onChange={handleUserIdChange}
@@ -790,7 +747,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
               />
             </SettingItem>
 
-            <SettingItem title="头像" desc="自定义聊天中的用户头像图片" divider={false}>
+            <SettingItem title={t('chatView.avatar')} desc={t('chatView.avatarDesc')} divider={false}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                   <div
@@ -828,7 +785,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
                       style={{ height: '32px', padding: '0 16px', fontSize: '13px' }}
                       onClick={() => document.getElementById('avatar-input')?.click()}
                     >
-                      选择图片
+                      {t('chatView.selectImage')}
                     </Button>
                     {userProfile.avatarUrl && (
                       <Button
@@ -838,7 +795,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
                         style={{ height: '32px', padding: '0 16px', fontSize: '13px' }}
                         onClick={clearAvatar}
                       >
-                        恢复默认
+                        {t('chatView.restoreDefault')}
                       </Button>
                     )}
                     <input
@@ -847,12 +804,12 @@ const ChatView = ({ onBack }: ChatViewProps) => {
                       accept="image/*"
                       style={{ display: 'none' }}
                       onChange={handleAvatarChange}
-                      aria-label="选择头像图片"
+                      aria-label={t('chatView.selectImage')}
                     />
                   </div>
                 </div>
                 <Paragraph type="secondary" style={{ fontSize: 12, margin: 0 }}>
-                  支持 JPG、PNG、GIF 格式，最大 2MB
+                  {t('chatView.avatarTip')}
                 </Paragraph>
               </div>
             </SettingItem>
@@ -861,9 +818,9 @@ const ChatView = ({ onBack }: ChatViewProps) => {
 
         <div id="providers-section" style={{ marginBottom: 48, scrollMarginTop: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>供应商管理</Title>
+            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>{t('chatView.providers')}</Title>
             <Button type="primary" icon={<IconPlus />} onClick={() => setAddModalVisible(true)} style={{ borderRadius: '999px', padding: '4px 16px', display: 'flex', alignItems: 'center' }}>
-              添加供应商
+              {t('chatView.addProvider')}
             </Button>
           </div>
 
@@ -873,27 +830,27 @@ const ChatView = ({ onBack }: ChatViewProps) => {
             padding: '16px 20px',
             marginBottom: 24,
           }}>
-            <ProvidersSection providers={providers} loadProviders={loadProviders} deleteProvider={deleteProvider} setDefault={setDefault} syncKeyToAIConfig={syncKeyToAIConfig} />
+            <ProvidersSection providers={providers} loadProviders={loadProviders} deleteProvider={deleteProvider} setDefault={setDefault} syncKeyToAIConfig={syncKeyToAIConfig} t={t} />
           </div>
         </div>
 
         <div id="models-section" style={{ marginBottom: 48, scrollMarginTop: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>模型管理</Title>
+            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>{t('chatView.models')}</Title>
             <Button 
               type="primary" 
               icon={<IconPlus />} 
               onClick={() => {
                 const enabledProvider = providers.find(p => p.enabled);
                 if (!enabledProvider) {
-                  Message.warning('请先启用至少一个供应商');
+                  Message.warning(t('chatView.noProviderSelected'));
                   return;
                 }
                 openModelModal(enabledProvider.id);
               }} 
               style={{ borderRadius: '999px', padding: '4px 16px', display: 'flex', alignItems: 'center' }}
             >
-              添加模型
+              {t('chatView.addModel')}
             </Button>
           </div>
 
@@ -910,13 +867,14 @@ const ChatView = ({ onBack }: ChatViewProps) => {
               deleteModel={deleteModel}
               openModelModal={openModelModal}
               renderCapabilityIcons={renderCapabilityIcons}
+              t={t}
             />
           </div>
         </div>
 
         <div id="completion-section" style={{ marginBottom: 48, scrollMarginTop: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>自动补全</Title>
+            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>{t('chatView.completion')}</Title>
           </div>
 
           <div className="settings-section" style={{ 
@@ -925,7 +883,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
             padding: '16px 20px',
             marginBottom: 24,
           }}>
-            <SettingItem title="笔记自动补全" desc="启用 AI 驱动的笔记内容自动补全功能">
+            <SettingItem title={t('chatView.completionEnabled')} desc={t('chatView.completionEnabledDesc')}>
               <Switch
                 checked={completionEnabled}
                 onChange={(checked) => {
@@ -937,7 +895,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
 
             {completionEnabled && (
               <>
-                <SettingItem title="二次确认模式" desc="开启后需按 Tab 触发补全，Enter 确认；关闭时输入自动显示补全，Tab 直接接受">
+                <SettingItem title={t('chatView.completionConfirm')} desc={t('chatView.completionConfirmDesc')}>
                   <Switch
                     checked={completionRequireConfirm}
                     onChange={(checked) => {
@@ -947,7 +905,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
                   />
                 </SettingItem>
 
-                <SettingItem title="触发延迟" desc="实时预览模式下的防抖延迟（毫秒）">
+                <SettingItem title={t('chatView.completionDelay')} desc={t('chatView.completionDelayDesc')}>
                   <Slider
                     min={200}
                     max={2000}
@@ -961,7 +919,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
                   />
                 </SettingItem>
 
-                <SettingItem title="最大补全长度" desc="每次补全的最大 token 数" divider={false}>
+                <SettingItem title={t('chatView.completionMaxTokens')} desc={t('chatView.completionMaxTokensDesc')} divider={false}>
                   <Slider
                     min={10}
                     max={200}
@@ -981,7 +939,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
 
         <div id="parameters-section" style={{ marginBottom: 48, scrollMarginTop: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>模型参数</Title>
+            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>{t('chatView.parameters')}</Title>
           </div>
 
           <div className="settings-section" style={{ 
@@ -991,9 +949,9 @@ const ChatView = ({ onBack }: ChatViewProps) => {
             marginBottom: 24,
           }}>
             {[
-              { label: 'Temperature', min: 0, max: 2, step: 0.1, default: 0.7 },
-              { label: 'Top P', min: 0, max: 1, step: 0.1, default: 0.9 },
-              { label: 'Max Tokens', min: 100, max: 8000, step: 100, default: 2000 },
+              { label: t('chatView.temperature'), min: 0, max: 2, step: 0.1, default: 0.7 },
+              { label: t('chatView.topP'), min: 0, max: 1, step: 0.1, default: 0.9 },
+              { label: t('chatView.maxTokens'), min: 100, max: 8000, step: 100, default: 2000 },
             ].map((item, index) => (
               <SettingItem 
                 key={item.label} 
@@ -1009,7 +967,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
             ))}
 
             <SettingItem title="" desc="" divider={false}>
-              <Button type="primary" shape="round">保存参数</Button>
+              <Button type="primary" shape="round">{t('chatView.saveParams')}</Button>
             </SettingItem>
           </div>
         </div>
@@ -1018,7 +976,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
       </div>
 
       <Modal
-        title="添加 Provider"
+        title={t('chatView.addProviderTitle')}
         visible={addModalVisible}
         onOk={addProvider}
         confirmLoading={addLoading}
@@ -1028,9 +986,9 @@ const ChatView = ({ onBack }: ChatViewProps) => {
       >
         <div style={{ background: 'var(--color-fill-2)', borderRadius: '16px', padding: '16px', border: '1px solid var(--color-border-2)' }}>
         <Form form={addForm} layout="vertical">
-          <FormItem label={<Title heading={6} style={{ margin: 0 }}>端口</Title>} field="port" initialValue="openai">
+          <FormItem label={<Title heading={6} style={{ margin: 0 }}>{t('chatView.port')}</Title>} field="port" initialValue="openai">
             <Select value={newProviderType} onChange={setNewProviderType} style={{ borderRadius: '8px' }}>
-              {PROVIDER_PORT_OPTIONS.map((opt) => (
+              {PORT_OPTIONS.map((opt) => (
                 <Option key={opt.value} value={opt.value}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <ProviderLogo type={opt.value} size={16} />
@@ -1040,15 +998,15 @@ const ChatView = ({ onBack }: ChatViewProps) => {
               ))}
             </Select>
           </FormItem>
-          <FormItem label={<Title heading={6} style={{ margin: 0 }}>名称</Title>} field="name">
+          <FormItem label={<Title heading={6} style={{ margin: 0 }}>{t('chatView.providerName')}</Title>} field="name">
             <Input placeholder={PROVIDER_PRESETS[newProviderType]?.name} style={{ borderRadius: '8px' }} />
           </FormItem>
-          <FormItem label={<Title heading={6} style={{ margin: 0 }}>API Key</Title>}>
+          <FormItem label={<Title heading={6} style={{ margin: 0 }}>{t('chatView.apiKey')}</Title>}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {apiKeys.map((item, index) => (
                 <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Input.Password 
-                    placeholder="输入 API Key" 
+                  <Input.Password
+                    placeholder={`Enter ${t('chatView.apiKey')}`}
                     style={{ borderRadius: '8px', flex: 1 }}
                     value={item.key}
                     onChange={(v) => {
@@ -1058,8 +1016,8 @@ const ChatView = ({ onBack }: ChatViewProps) => {
                     }}
                   />
                   <span style={{ color: 'var(--color-text-3)' }}>:</span>
-                  <Input 
-                    placeholder="自定义名称" 
+                  <Input
+                    placeholder={t('chatView.apiKeyName')}
                     style={{ borderRadius: '8px', width: 120 }}
                     value={item.name}
                     onChange={(v) => {
@@ -1069,17 +1027,17 @@ const ChatView = ({ onBack }: ChatViewProps) => {
                     }}
                   />
                   {index === 0 ? (
-                    <Button 
-                      type="primary" 
-                      icon={<IconPlus />} 
+                    <Button
+                      type="primary"
+                      icon={<IconPlus />}
                       size="small"
                       onClick={() => setApiKeys([...apiKeys, { id: crypto.randomUUID(), key: '', name: '' }])}
                       style={{ background: 'var(--color-primary)', borderRadius: '6px', padding: '0 8px' }}
                     />
                   ) : (
-                    <Button 
-                      type="text" 
-                      icon={<IconDelete />} 
+                    <Button
+                      type="text"
+                      icon={<IconDelete />}
                       size="small"
                       status="danger"
                       onClick={() => setApiKeys(apiKeys.filter((_, i) => i !== index))}
@@ -1089,7 +1047,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
               ))}
             </div>
           </FormItem>
-          <FormItem label={<Title heading={6} style={{ margin: 0 }}>Base URL</Title>} field="baseUrl">
+          <FormItem label={<Title heading={6} style={{ margin: 0 }}>{t('chatView.baseUrl')}</Title>} field="baseUrl">
             <Input placeholder={PROVIDER_PRESETS[newProviderType]?.baseUrl} style={{ borderRadius: '8px' }} />
           </FormItem>
         </Form>
@@ -1097,7 +1055,7 @@ const ChatView = ({ onBack }: ChatViewProps) => {
       </Modal>
 
       <Modal
-        title={editingModel ? '编辑模型' : '添加模型'}
+        title={editingModel ? t('chatView.editModel') : t('chatView.addModelTitle')}
         visible={modelModalVisible}
         onOk={saveModel}
         confirmLoading={saveModelLoading}
@@ -1107,8 +1065,8 @@ const ChatView = ({ onBack }: ChatViewProps) => {
       >
         <div style={{ background: 'var(--color-fill-2)', borderRadius: '16px', padding: '16px', border: '1px solid var(--color-border-2)' }}>
         <Form form={modelForm} layout="vertical">
-          <FormItem label={<Title heading={6} style={{ margin: 0 }}>供应商</Title>} field="providerId" initialValue="1">
-            <Select 
+          <FormItem label={<Title heading={6} style={{ margin: 0 }}>{t('chatView.provider')}</Title>} field="providerId" initialValue="1">
+            <Select
               style={{ borderRadius: '8px' }}
               onChange={(value) => {
                 setModelFormProviderId(value as string);
@@ -1128,20 +1086,20 @@ const ChatView = ({ onBack }: ChatViewProps) => {
               ))}
             </Select>
           </FormItem>
-          <FormItem label={<Title heading={6} style={{ margin: 0 }}>模型名称</Title>} field="name">
-            <Input placeholder="如：GPT-4o" style={{ borderRadius: '8px' }} />
+          <FormItem label={<Title heading={6} style={{ margin: 0 }}>{t('chatView.modelName')}</Title>} field="name">
+            <Input placeholder={t('chatView.modelNamePlaceholder')} style={{ borderRadius: '8px' }} />
           </FormItem>
-          <FormItem label={<Title heading={6} style={{ margin: 0 }}>模型 ID</Title>} field="modelId">
-            <Input placeholder="实际的 API ID，如：gpt-4o" style={{ borderRadius: '8px' }} />
+          <FormItem label={<Title heading={6} style={{ margin: 0 }}>{t('chatView.modelId')}</Title>} field="modelId">
+            <Input placeholder={t('chatView.modelIdPlaceholder')} style={{ borderRadius: '8px' }} />
           </FormItem>
-          <FormItem label={<Title heading={6} style={{ margin: 0 }}>端口</Title>} field="port" initialValue={selected?.type || 'openai'}>
+          <FormItem label={<Title heading={6} style={{ margin: 0 }}>{t('chatView.port')}</Title>} field="port" initialValue={selected?.type || 'openai'}>
             <Select style={{ borderRadius: '8px' }}>
               {PORT_OPTIONS.map(opt => (
                 <Option key={opt.value} value={opt.value}>{opt.label}</Option>
               ))}
             </Select>
           </FormItem>
-          <FormItem label={<Title heading={6} style={{ margin: 0 }}>API Key 方案</Title>} field="apiKeyId">
+          <FormItem label={<Title heading={6} style={{ margin: 0 }}>{t('chatView.apiKeyScheme')}</Title>} field="apiKeyId">
             <Select style={{ borderRadius: '8px' }}>
               {(() => {
                 const providerId = modelFormProviderId || modelForm.getFieldValue('providerId') || '1';
@@ -1152,22 +1110,25 @@ const ChatView = ({ onBack }: ChatViewProps) => {
               })()}
             </Select>
           </FormItem>
-          <FormItem label={<Title heading={6} style={{ margin: 0 }}>模型能力</Title>} style={{ marginBottom: 0 }}>
+          <FormItem label={<Title heading={6} style={{ margin: 0 }}>{t('chatView.modelCapabilities')}</Title>} style={{ marginBottom: 0 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {CAPABILITIES.map(cap => (
-                <FormItem 
-                  key={cap.key} 
-                  field={`cap_${cap.key}`} 
-                  style={{ marginBottom: 0 }}
-                  triggerPropName="checked"
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                    <Checkbox />
-                    <cap.icon style={{ color: 'var(--color-primary)', fontSize: 16 }} />
-                    <Text style={{ fontSize: 14 }}>{cap.label}</Text>
-                  </div>
-                </FormItem>
-              ))}
+              {Object.entries(CAPABILITIES_MAP).map(([key, cap]) => {
+                const IconComp = cap.icon;
+                return (
+                  <FormItem
+                    key={key}
+                    field={`cap_${key}`}
+                    style={{ marginBottom: 0 }}
+                    triggerPropName="checked"
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                      <Checkbox />
+                      <IconComp style={{ color: 'var(--color-primary)', fontSize: 16 }} />
+                      <Text style={{ fontSize: 14 }}>{t(cap.labelKey)}</Text>
+                    </div>
+                  </FormItem>
+                );
+              })}
             </div>
           </FormItem>
         </Form>
@@ -1177,12 +1138,13 @@ const ChatView = ({ onBack }: ChatViewProps) => {
   );
 };
 
-const ProvidersSection = ({ providers, loadProviders, deleteProvider, setDefault, syncKeyToAIConfig }: {
+const ProvidersSection = ({ providers, loadProviders, deleteProvider, setDefault, syncKeyToAIConfig, t }: {
   providers: Provider[];
   loadProviders: () => void;
   deleteProvider: (id: string) => void;
   setDefault: (id: string) => void;
   syncKeyToAIConfig: (providerType: string, apiKey: string) => void;
+  t: (key: string) => string;
 }) => {
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set());
   const [editingProviders, setEditingProviders] = useState<Provider[]>(providers);
@@ -1249,7 +1211,7 @@ const ProvidersSection = ({ providers, loadProviders, deleteProvider, setDefault
     })
       .then(data => {
         if (data.success) {
-          Message.success('供应商配置已保存');
+          Message.success(t('chatView.supplierConfigSaved'));
           loadProviders();
           window.dispatchEvent(new CustomEvent('papyrus_ai_config_changed'));
           const firstKey = provider.apiKeys.find(k => k.key.trim() !== '');
@@ -1257,12 +1219,12 @@ const ProvidersSection = ({ providers, loadProviders, deleteProvider, setDefault
             syncKeyToAIConfig(provider.type, firstKey.key);
           }
         } else {
-          Message.error(data.error || '保存失败');
+          Message.error(data.error || t('chatView.saveFailed'));
         }
       })
       .catch(err => {
-        console.error('保存供应商配置失败:', err);
-        Message.error('保存供应商配置失败');
+        console.error('Failed to save provider config:', err);
+        Message.error(t('chatView.saveFailed'));
       })
       .finally(() => {
         setSaveProviderLoading(prev => {
@@ -1287,11 +1249,11 @@ const ProvidersSection = ({ providers, loadProviders, deleteProvider, setDefault
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <ProviderLogo type={provider.type} name={provider.name} size={20} />
                   <Text bold>{provider.name}</Text>
-                  {provider.isDefault && <Tag color="arcoblue" size="small">默认</Tag>}
-                  {!provider.enabled && <Tag color="gray" size="small">禁用</Tag>}
+                  {provider.isDefault && <Tag color="arcoblue" size="small">{t('chatView.default')}</Tag>}
+                  {!provider.enabled && <Tag color="gray" size="small">{t('chatView.disabled')}</Tag>}
                 </div>
                 <Paragraph type="secondary" style={{ fontSize: 12, margin: 0 }}>
-                  {provider.baseUrl || '未设置 Base URL'}
+                  {provider.baseUrl || t('chatView.notConfigured')}
                 </Paragraph>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} onClick={(e: React.MouseEvent) => e.stopPropagation()}>
@@ -1309,18 +1271,18 @@ const ProvidersSection = ({ providers, loadProviders, deleteProvider, setDefault
                         loadProviders();
                         window.dispatchEvent(new CustomEvent('papyrus_ai_config_changed'));
                       } else {
-                        Message.error(data.error || '更新失败');
+                        Message.error(data.error || t('chatView.updateFailed'));
                         loadProviders();
                       }
                     })
                     .catch(err => {
-                      console.error('更新供应商状态失败:', err);
-                      Message.error('更新供应商状态失败');
+                      console.error('Failed to update provider status:', err);
+                      Message.error(t('chatView.updateFailed'));
                       loadProviders();
                     });
                 }} />
                 <Button type="text" size="mini" icon={<IconSafe />} onClick={() => setDefault(provider.id)} disabled={provider.isDefault} />
-                <Popconfirm title="删除供应商？" onOk={() => deleteProvider(provider.id)} disabled={provider.isDefault}>
+                <Popconfirm title={t('chatView.confirmDeleteProvider')} onOk={() => deleteProvider(provider.id)} disabled={provider.isDefault}>
                   <Button type="text" size="mini" icon={<IconDelete />} status="danger" disabled={provider.isDefault} />
                 </Popconfirm>
               </div>
@@ -1345,7 +1307,7 @@ const ProvidersSection = ({ providers, loadProviders, deleteProvider, setDefault
                           <Input.Password 
                             value={apiKey.key}
                             onChange={(v) => updateApiKey(provider.id, apiKey.id, { key: v })}
-                            placeholder="输入 API Key" 
+                            placeholder={`Enter ${t('chatView.apiKey')}`}
                             style={{ flex: 1, border: '1px solid var(--color-border-2)', borderRadius: '6px', background: 'var(--color-bg-2)' }}
                           />
                           {index === 0 ? (
@@ -1384,7 +1346,7 @@ const ProvidersSection = ({ providers, loadProviders, deleteProvider, setDefault
                       size="small"
                       onClick={() => saveProviderChanges(provider.id)}
                     >
-                      保存修改
+                      {t('chatView.save')}
                     </Button>
                   </div>
                 </div>
@@ -1397,13 +1359,14 @@ const ProvidersSection = ({ providers, loadProviders, deleteProvider, setDefault
   );
 };
 
-const ModelsSection = ({ providers, currentModelId, saveDefaultModel, deleteModel, openModelModal, renderCapabilityIcons }: {
+const ModelsSection = ({ providers, currentModelId, saveDefaultModel, deleteModel, openModelModal, renderCapabilityIcons, t }: {
   providers: Provider[];
   currentModelId: string;
   saveDefaultModel: (id: string) => void;
   deleteModel: (providerId: string, modelId: string) => void;
   openModelModal: (providerId?: string, model?: Model) => void;
-  renderCapabilityIcons: (capabilities: string[]) => React.ReactNode;
+  renderCapabilityIcons: (capabilities: string[], t: (key: string) => string) => React.ReactNode;
+  t: (key: string) => string;
 }) => {
   const enabledProviders = providers.filter(p => p.enabled && p.models.length > 0);
 
@@ -1414,8 +1377,8 @@ const ModelsSection = ({ providers, currentModelId, saveDefaultModel, deleteMode
         <IconSafe style={{ fontSize: 48, color: 'var(--color-text-4)', marginBottom: 16 }} />
         <Paragraph type="secondary" style={{ fontSize: 14 }}>
           {hasEnabledProviders
-            ? '暂无模型，请点击右上角"添加模型"按钮添加'
-            : '暂无启用的供应商，请先启用供应商后再添加模型'}
+            ? t('chatView.noModelsYet')
+            : t('chatView.noEnabledProviders')}
         </Paragraph>
       </div>
     );
@@ -1428,7 +1391,7 @@ const ModelsSection = ({ providers, currentModelId, saveDefaultModel, deleteMode
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <ProviderLogo type={provider.type} name={provider.name} size={20} />
             <Text bold style={{ fontSize: 16 }}>{provider.name}</Text>
-            {provider.isDefault && <Tag color="arcoblue" size="small">默认</Tag>}
+            {provider.isDefault && <Tag color="arcoblue" size="small">{t('chatView.default')}</Tag>}
           </div>
           {provider.models.map(model => {
             const apiKey = provider.apiKeys.find(k => k.id === model.apiKeyId);
@@ -1439,16 +1402,16 @@ const ModelsSection = ({ providers, currentModelId, saveDefaultModel, deleteMode
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <ModelLogo model={model.name} modelId={model.modelId || model.id} size={18} />
                       <Text bold style={{ fontSize: 14 }}>{model.name}</Text>
-                      {renderCapabilityIcons(model.capabilities)}
+                      {renderCapabilityIcons(model.capabilities, t)}
                     </div>
                     <Paragraph type="secondary" style={{ fontSize: 12, margin: '4px 0 0 0' }}>
-                      Key: {apiKey?.name || 'default'} {apiKey?.key ? `(已配置)` : '(未配置)'}
+                      Key: {apiKey?.name || 'default'} {apiKey?.key ? `(${t('chatView.configured')})` : `(${t('chatView.notConfigured')})`}
                     </Paragraph>
                   </div>
                   <Space size={4}>
-                    <Button type="text" size="mini" icon={<IconSafe />} onClick={() => saveDefaultModel(model.id)} disabled={currentModelId === model.id} title="设为默认" />
-                    <Button type="text" size="mini" icon={<IconEdit />} onClick={() => openModelModal(provider.id, model)} title="编辑" />
-                    <Popconfirm title="删除模型？" onOk={() => deleteModel(provider.id, model.id)}>
+                    <Button type="text" size="mini" icon={<IconSafe />} onClick={() => saveDefaultModel(model.id)} disabled={currentModelId === model.id} title={t('chatView.setAsDefault')} />
+                    <Button type="text" size="mini" icon={<IconEdit />} onClick={() => openModelModal(provider.id, model)} title={t('chatView.edit')} />
+                    <Popconfirm title={t('chatView.confirmDeleteModel')} onOk={() => deleteModel(provider.id, model.id)}>
                       <Button type="text" size="mini" icon={<IconDelete />} status="danger" />
                     </Popconfirm>
                   </Space>

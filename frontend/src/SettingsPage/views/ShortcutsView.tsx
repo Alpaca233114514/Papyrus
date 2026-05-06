@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Modal,
@@ -7,15 +8,13 @@ import {
   Typography,
 } from '@arco-design/web-react';
 import {
-  IconArrowLeft,
   IconEdit,
   IconBulb,
   IconCommand,
   IconRefresh,
 } from '@arco-design/web-react/icon';
 import { useShortcuts, type ShortcutConfig } from '../../hooks/useShortcuts';
-import { SettingItem } from '../components';
-import { useScrollNavigation } from '../../hooks/useScrollNavigation';
+import { SettingItem, SettingsViewLayout, type NavItem } from '../components';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -23,43 +22,43 @@ interface ShortcutsViewProps {
   onBack: () => void;
 }
 
-const NAV_ITEMS = [
-  { key: 'general-section', label: '通用快捷键', icon: IconEdit },
-  { key: 'editor-section', label: '编辑器快捷键', icon: IconCommand },
-  { key: 'study-section', label: '学习模式快捷键', icon: IconCommand },
+const NAV_ITEMS: NavItem[] = [
+  { key: 'general-section', label: 'shortcutsView.general', icon: IconEdit },
+  { key: 'editor-section', label: 'shortcutsView.editor', icon: IconCommand },
+  { key: 'study-section', label: 'shortcutsView.study', icon: IconCommand },
 ];
 
 const ShortcutsView = ({ onBack }: ShortcutsViewProps) => {
-  const { contentRef, activeSection, scrollToSection } = useScrollNavigation(NAV_ITEMS);
+  const { t } = useTranslation();
   const { shortcuts, setShortcut, resetToDefault } = useShortcuts();
   const [editingKey, setEditingKey] = useState<keyof ShortcutConfig | null>(null);
   const [editingValue, setEditingValue] = useState('');
   const [resetModalVisible, setResetModalVisible] = useState(false);
 
   const generalShortcutKeys = [
-    { key: 'newNote', label: '新建笔记' },
-    { key: 'newCard', label: '新建卡片' },
-    { key: 'newWindow', label: '新建窗口' },
-    { key: 'openNotes', label: '打开笔记页' },
-    { key: 'openFiles', label: '打开文件库' },
-    { key: 'openReview', label: '开始复习' },
-    { key: 'search', label: '搜索' },
-    { key: 'save', label: '保存' },
-    { key: 'saveAll', label: '全部保存' },
-    { key: 'preferences', label: '首选项' },
-    { key: 'closeEditor', label: '关闭编辑器' },
-    { key: 'exit', label: '退出' },
-    { key: 'importTxt', label: '从文本导入卡片' },
+    { key: 'newNote', label: t('shortcutsView.newNote') },
+    { key: 'newCard', label: t('shortcutsView.newCard') },
+    { key: 'newWindow', label: t('shortcutsView.newWindow') },
+    { key: 'openNotes', label: t('shortcutsView.openNotes') },
+    { key: 'openFiles', label: t('shortcutsView.openFiles') },
+    { key: 'openReview', label: t('shortcutsView.openReview') },
+    { key: 'search', label: t('shortcutsView.search') },
+    { key: 'save', label: t('shortcutsView.save') },
+    { key: 'saveAll', label: t('shortcutsView.saveAll') },
+    { key: 'preferences', label: t('shortcutsView.preferences') },
+    { key: 'closeEditor', label: t('shortcutsView.closeEditor') },
+    { key: 'exit', label: t('shortcutsView.exit') },
+    { key: 'importTxt', label: t('shortcutsView.importTxt') },
   ] as const;
 
   const editorShortcutKeys = [
-    { key: 'undo', label: '撤销' },
-    { key: 'redo', label: '重做' },
-    { key: 'cut', label: '剪切' },
-    { key: 'copy', label: '复制' },
-    { key: 'paste', label: '粘贴' },
-    { key: 'selectAll', label: '全选' },
-    { key: 'find', label: '查找' },
+    { key: 'undo', label: t('shortcutsView.undo') },
+    { key: 'redo', label: t('shortcutsView.redo') },
+    { key: 'cut', label: t('shortcutsView.cut') },
+    { key: 'copy', label: t('shortcutsView.copy') },
+    { key: 'paste', label: t('shortcutsView.paste') },
+    { key: 'selectAll', label: t('shortcutsView.selectAll') },
+    { key: 'find', label: t('shortcutsView.find') },
   ] as const;
 
   const [studyShortcuts, setStudyShortcuts] = useState({
@@ -72,12 +71,12 @@ const ShortcutsView = ({ onBack }: ShortcutsViewProps) => {
   });
 
   const studyShortcutKeys = [
-    { key: 'revealAnswer', label: '揭晓答案', desc: '在卡片问题界面' },
-    { key: 'rateForgot', label: '评分 - 忘记', desc: '在卡片答案界面' },
-    { key: 'rateHard', label: '评分 - 模糊', desc: '在卡片答案界面' },
-    { key: 'rateGood', label: '评分 - 掌握', desc: '在卡片答案界面' },
-    { key: 'undoRate', label: '撤销评分', desc: '' },
-    { key: 'exitStudy', label: '退出学习', desc: '' },
+    { key: 'revealAnswer', label: t('shortcutsView.revealAnswer'), desc: t('shortcutsView.revealAnswerDesc') },
+    { key: 'rateForgot', label: t('shortcutsView.rateForgot'), desc: t('shortcutsView.rateForgotDesc') },
+    { key: 'rateHard', label: t('shortcutsView.rateHard'), desc: t('shortcutsView.rateHardDesc') },
+    { key: 'rateGood', label: t('shortcutsView.rateGood'), desc: t('shortcutsView.rateGoodDesc') },
+    { key: 'undoRate', label: t('shortcutsView.undoRate'), desc: '' },
+    { key: 'exitStudy', label: t('shortcutsView.exitStudy'), desc: '' },
   ] as const;
 
   const startEditing = (key: keyof ShortcutConfig) => {
@@ -90,7 +89,7 @@ const ShortcutsView = ({ onBack }: ShortcutsViewProps) => {
       const trimmed = editingValue.trim();
       if (trimmed) {
         setShortcut(editingKey, trimmed);
-        Message.success(`已将快捷键设置为 ${trimmed}`);
+        Message.success(t('shortcutsView.shortcutSet', { shortcut: trimmed }));
       }
       setEditingKey(null);
       setEditingValue('');
@@ -105,273 +104,156 @@ const ShortcutsView = ({ onBack }: ShortcutsViewProps) => {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     e.preventDefault();
     const keys: string[] = [];
-    
+
     if (e.ctrlKey || e.metaKey) keys.push('Ctrl');
     if (e.altKey) keys.push('Alt');
     if (e.shiftKey) keys.push('Shift');
-    
+
     const key = e.key;
     if (key && !['Control', 'Alt', 'Shift', 'Meta'].includes(key)) {
       const formattedKey = key.length === 1 ? key.toUpperCase() : key;
       keys.push(formattedKey);
     }
-    
+
     setEditingValue(keys.join('+'));
   };
 
   const handleReset = () => {
     resetToDefault();
     setResetModalVisible(false);
-    Message.success('已重置为默认快捷键');
+    Message.success(t('shortcutsView.shortcutsReset'));
   };
 
   const ShortcutInput = ({ value, onEdit }: { value: string; onEdit: () => void }) => (
     <div className="settings-shortcut-input">
       <span className="settings-shortcut-value">{value}</span>
-      <Button 
-        type="text" 
-        size="mini" 
-        icon={<IconEdit />} 
+      <Button
+        type="text"
+        size="mini"
+        icon={<IconEdit />}
         onClick={onEdit}
       />
     </div>
   );
 
-  return (
-    <div style={{
-      flex: 1,
-      display: 'flex',
-      overflow: 'hidden',
-      position: 'relative',
-      background: 'var(--color-bg-1)',
-      height: '100%',
-    }}>
-      <div style={{
-        width: 200,
-        height: '100%',
-        borderRight: '1px solid var(--color-border-2)',
-        background: 'var(--color-bg-1)',
-        display: 'flex',
-        flexDirection: 'column',
-        flexShrink: 0,
-      }}>
-        <div style={{
-          padding: 16,
-          borderBottom: '1px solid var(--color-border-2)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-        }}>
-          <Button
-            type="text"
-            icon={<IconArrowLeft />}
-            onClick={onBack}
-            style={{ padding: 0, fontSize: 14 }}
-          />
-          <Text style={{ fontSize: '14px', fontWeight: 500 }}>快捷键</Text>
-        </div>
+  const renderSection = (sectionId: string) => {
+    switch (sectionId) {
+      case 'general-section':
+        return generalShortcutKeys.map(({ key, label }, index) => (
+          <SettingItem
+            key={key}
+            title={label}
+            divider={index !== generalShortcutKeys.length - 1}
+          >
+            <ShortcutInput
+              value={shortcuts[key as keyof ShortcutConfig]}
+              onEdit={() => startEditing(key as keyof ShortcutConfig)}
+            />
+          </SettingItem>
+        ));
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
-          {NAV_ITEMS.map(({ key, label, icon: Icon }) => {
-            const isActive = activeSection === key;
-            return (
-              <button
-                key={key}
-                onClick={() => scrollToSection(key)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '10px 12px',
-                  cursor: 'pointer',
-                  borderRadius: 8,
-                  marginBottom: 4,
-                  background: isActive ? 'var(--color-primary-light)' : 'transparent',
-                  color: isActive ? 'var(--color-primary)' : 'var(--color-text-1)',
-                  border: 'none',
-                  width: '100%',
-                  textAlign: 'left',
-                  transition: 'all 0.2s',
-                  userSelect: 'none',
-                }}
-              >
-                <Icon style={{ fontSize: 16 }} />
-                <Text style={{ 
-                  fontSize: 13, 
-                  color: isActive ? 'var(--color-primary)' : 'inherit',
-                  fontWeight: isActive ? 500 : 400,
-                }}>{label}</Text>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div 
-        ref={contentRef}
-        onWheel={(e) => e.stopPropagation()}
-        style={{ 
-          flex: 1, 
-          overflowY: 'auto', 
-          padding: '32px 48px',
-        }}
-      >
-        <div style={{ marginBottom: 32 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-            <IconCommand style={{ fontSize: 32, color: 'var(--color-primary)' }} />
-            <Title heading={2} style={{ margin: 0, fontWeight: 400, fontSize: '28px' }}>
-              快捷键
-            </Title>
-          </div>
-          <Paragraph type="secondary">
-            自定义键盘快捷键，提高操作效率
-          </Paragraph>
-        </div>
-
-        <div id="general-section" style={{ marginBottom: 48, scrollMarginTop: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>通用快捷键</Title>
-          </div>
-
-          <div className="settings-section" style={{ 
-            background: 'var(--color-bg-2)', 
-            borderRadius: 8, 
-            padding: '16px 20px',
-            marginBottom: 24,
-          }}>
-            {generalShortcutKeys.map(({ key, label }, index) => (
-              <SettingItem 
-                key={key}
-                title={label}
-                divider={index !== generalShortcutKeys.length - 1}
-              >
-                <ShortcutInput 
-                  value={shortcuts[key as keyof ShortcutConfig]}
-                  onEdit={() => startEditing(key as keyof ShortcutConfig)}
-                />
-              </SettingItem>
-            ))}
-          </div>
-        </div>
-
-        <div id="editor-section" style={{ marginBottom: 48, scrollMarginTop: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>编辑器快捷键</Title>
-          </div>
-
-          <div className="settings-section" style={{ 
-            background: 'var(--color-bg-2)', 
-            borderRadius: 8, 
-            padding: '16px 20px',
-            marginBottom: 24,
-          }}>
+      case 'editor-section':
+        return (
+          <>
             {editorShortcutKeys.map(({ key, label }, index) => (
-              <SettingItem 
+              <SettingItem
                 key={key}
                 title={label}
                 divider={index !== editorShortcutKeys.length - 1}
               >
-                <ShortcutInput 
+                <ShortcutInput
                   value={shortcuts[key as keyof ShortcutConfig]}
                   onEdit={() => startEditing(key as keyof ShortcutConfig)}
                 />
               </SettingItem>
             ))}
-          </div>
+            <div className="settings-tip">
+              <IconBulb style={{ color: 'var(--color-primary)' }} />
+              {t('shortcutsView.editorTip')}
+            </div>
+          </>
+        );
 
-          <div className="settings-tip">
-            <IconBulb style={{ color: 'var(--color-primary)' }} />
-            编辑器快捷键在文本编辑区域生效
-          </div>
-        </div>
-
-        <div id="study-section" style={{ marginBottom: 48, scrollMarginTop: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>学习模式快捷键</Title>
-          </div>
-
-          <div className="settings-section" style={{ 
-            background: 'var(--color-bg-2)', 
-            borderRadius: 8, 
-            padding: '16px 20px',
-            marginBottom: 24,
-          }}>
+      case 'study-section':
+        return (
+          <>
             {studyShortcutKeys.map(({ key, label, desc }, index) => (
-              <SettingItem 
+              <SettingItem
                 key={key}
                 title={label}
                 desc={desc || undefined}
                 divider={index !== studyShortcutKeys.length - 1}
               >
-                <ShortcutInput 
+                <ShortcutInput
                   value={studyShortcuts[key as keyof typeof studyShortcuts]}
-                  onEdit={() => Message.info('学习模式快捷键编辑功能开发中')}
+                  onEdit={() => Message.info(t('shortcutsView.studyModeEditing'))}
                 />
               </SettingItem>
             ))}
-          </div>
+            <div className="settings-tip">
+              <IconBulb style={{ color: 'var(--color-primary)' }} />
+              {t('shortcutsView.studyTip')}
+            </div>
+          </>
+        );
 
-          <div className="settings-tip">
-            <IconBulb style={{ color: 'var(--color-primary)' }} />
-            学习模式快捷键仅在闪卡学习界面生效
-          </div>
-        </div>
+      default:
+        return null;
+    }
+  };
 
-        <div style={{ marginBottom: 48 }}>
-          <div className="settings-section" style={{ 
-            background: 'var(--color-bg-2)', 
-            borderRadius: 8, 
-            padding: '16px 20px',
-          }}>
-            <SettingItem title="重置快捷键" desc="将所有快捷键恢复为默认设置" divider={false}>
-              <Button 
-                type="secondary" 
-                icon={<IconRefresh />}
-                onClick={() => setResetModalVisible(true)}
-              >
-                重置为默认快捷键
-              </Button>
-            </SettingItem>
-          </div>
-        </div>
-
-        <div style={{ height: 'calc(100vh - 200px)', flexShrink: 0 }} />
-      </div>
+  return (
+    <>
+      <SettingsViewLayout
+        title={t('shortcutsView.title')}
+        description={t('shortcutsView.titleDesc')}
+        icon={IconCommand}
+        iconColor="var(--color-warning)"
+        navItems={NAV_ITEMS.map(item => ({ ...item, label: t(item.label) }))}
+        sections={[
+          { id: 'general-section', title: t('shortcutsView.general') },
+          { id: 'editor-section', title: t('shortcutsView.editor') },
+          { id: 'study-section', title: t('shortcutsView.study') },
+        ]}
+        onBack={onBack}
+      >
+        {renderSection}
+      </SettingsViewLayout>
 
       <Modal
-        title="编辑快捷键"
+        title={t('shortcutsView.editShortcut')}
         visible={editingKey !== null}
         onOk={saveEditing}
         onCancel={cancelEditing}
-        okText="保存"
-        cancelText="取消"
+        okText={t('shortcutsView.save')}
+        cancelText={t('shortcutsView.cancel')}
       >
         <div style={{ padding: '16px 0' }}>
-          按下想要的快捷键组合，或手动输入
+          {t('shortcutsView.pressShortcut')}
           <Input
             value={editingValue}
             onChange={setEditingValue}
             onKeyDown={handleKeyDown}
-            placeholder="按下快捷键..."
+            placeholder={t('shortcutsView.pressPlaceholder')}
             style={{ fontFamily: 'monospace', fontSize: 16, marginTop: 16 }}
           />
           <div style={{ fontSize: 12, marginTop: 8, color: 'var(--color-text-3)' }}>
-            提示：在输入框中按下快捷键组合即可自动识别
+            {t('shortcutsView.shortcutHint')}
           </div>
         </div>
       </Modal>
 
       <Modal
-        title="重置快捷键"
+        title={t('shortcutsView.confirmReset')}
         visible={resetModalVisible}
         onOk={handleReset}
         onCancel={() => setResetModalVisible(false)}
-        okText="重置"
-        cancelText="取消"
+        okText={t('shortcutsView.reset')}
+        cancelText={t('shortcutsView.cancel')}
       >
-        确定要将所有快捷键重置为默认值吗？
+        {t('shortcutsView.confirmResetMessage')}
       </Modal>
-    </div>
+    </>
   );
 };
 

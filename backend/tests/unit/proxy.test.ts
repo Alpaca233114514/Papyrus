@@ -110,7 +110,7 @@ describe('proxy utilities', () => {
       const mockResponse = { ok: true, status: 200 } as Response;
       global.fetch = () => Promise.resolve(mockResponse);
 
-      const result = await fetchWithProxy('https://example.com/test');
+      const result = await fetchWithProxy('https://api.github.com/test');
       expect(result).toBe(mockResponse);
     });
 
@@ -118,7 +118,7 @@ describe('proxy utilities', () => {
       process.env.HTTPS_PROXY = 'http://127.0.0.1:1';
       global.fetch = () => Promise.reject(new Error('Direct fetch failed'));
 
-      await expect(fetchWithProxy('https://example.com/test')).rejects.toThrow(
+      await expect(fetchWithProxy('https://api.github.com/test')).rejects.toThrow(
         /通过代理 .* 连接失败，已尝试直连仍失败/
       );
     });
@@ -131,6 +131,66 @@ describe('proxy utilities', () => {
       // @ts-expect-error — 构造与 undici 运行时一致的 mock error shape
       connError.cause = { code: 'ECONNREFUSED' };
       expect(isProxyConnectionError(connError)).toBe(true);
+    });
+
+    it('should bypass proxy for AI API URLs (not GitHub)', async () => {
+      process.env.HTTPS_PROXY = 'http://127.0.0.1:7890';
+      const mockResponse = { ok: true, status: 200 } as Response;
+      let calledWithGlobalFetch = false;
+      global.fetch = () => {
+        calledWithGlobalFetch = true;
+        return Promise.resolve(mockResponse);
+      };
+
+      const result = await fetchWithProxy('https://api.openai.com/v1/chat/completions');
+      expect(calledWithGlobalFetch).toBe(true);
+      expect(result).toBe(mockResponse);
+    });
+
+    it('should bypass proxy for local AI services (Ollama, etc.)', async () => {
+      process.env.HTTPS_PROXY = 'http://127.0.0.1:7890';
+      const mockResponse = { ok: true, status: 200 } as Response;
+      let calledWithGlobalFetch = false;
+      global.fetch = () => {
+        calledWithGlobalFetch = true;
+        return Promise.resolve(mockResponse);
+      };
+
+      const result = await fetchWithProxy('http://localhost:11434/api/tags');
+      expect(calledWithGlobalFetch).toBe(true);
+      expect(result).toBe(mockResponse);
+    });
+
+    it('should bypass proxy for other external APIs (not GitHub)', async () => {
+      process.env.HTTPS_PROXY = 'http://127.0.0.1:7890';
+      const mockResponse = { ok: true, status: 200 } as Response;
+      let calledWithGlobalFetch = false;
+      global.fetch = () => {
+        calledWithGlobalFetch = true;
+        return Promise.resolve(mockResponse);
+      };
+
+      const result = await fetchWithProxy('https://api.deepseek.com/v1/chat/completions');
+      expect(calledWithGlobalFetch).toBe(true);
+      expect(result).toBe(mockResponse);
+    });
+
+    it('should attempt to use proxy for GitHub API (update check)', async () => {
+      process.env.HTTPS_PROXY = 'http://127.0.0.1:1';
+      const mockResponse = { ok: true, status: 200 } as Response;
+      global.fetch = () => Promise.resolve(mockResponse);
+
+      const result = await fetchWithProxy('https://api.github.com/repos/PapyrusOR/Papyrus_Desktop/releases/latest');
+      expect(result).toBe(mockResponse);
+    });
+
+    it('should attempt to use proxy for raw.githubusercontent.com', async () => {
+      process.env.HTTPS_PROXY = 'http://127.0.0.1:1';
+      const mockResponse = { ok: true, status: 200 } as Response;
+      global.fetch = () => Promise.resolve(mockResponse);
+
+      const result = await fetchWithProxy('https://raw.githubusercontent.com/PapyrusOR/Papyrus_Desktop/main/README.md');
+      expect(result).toBe(mockResponse);
     });
   });
 });

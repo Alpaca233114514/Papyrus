@@ -80,7 +80,7 @@ interface ProviderLogoProps {
   style?: React.CSSProperties;
 }
 
-export const ProviderLogo = ({ type, name, size = 20, className, style }: ProviderLogoProps) => {
+export const ProviderLogo = ({ type, name, size = 28, className, style }: ProviderLogoProps) => {
   let iconName: keyof typeof ProviderIcons | undefined;
 
   // 优先按名称匹配用户自定义的提供商
@@ -94,10 +94,44 @@ export const ProviderLogo = ({ type, name, size = 20, className, style }: Provid
   const IconComponent = iconName ? (ProviderIcons as Record<string, SvgIconComponent>)[iconName] : null;
 
   if (IconComponent) {
-    return <IconComponent size={size} className={className} style={{ flex: 'none', lineHeight: 1, ...style }} />;
+    return (
+      <div
+        className={className}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: size,
+          height: size,
+          borderRadius: 6,
+          backgroundColor: 'var(--color-fill-2)',
+          flex: 'none',
+          ...style,
+        }}
+      >
+        <IconComponent size={size * 0.65} style={{ flex: 'none', lineHeight: 1 }} />
+      </div>
+    );
   }
 
-  return <IconRobot style={{ fontSize: size, flex: 'none', lineHeight: 1, ...style }} className={className} />;
+  return (
+    <div
+      className={className}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: size,
+        height: size,
+        borderRadius: 6,
+        backgroundColor: 'var(--color-fill-2)',
+        flex: 'none',
+        ...style,
+      }}
+    >
+      <IconRobot style={{ fontSize: size * 0.65, flex: 'none', lineHeight: 1 }} />
+    </div>
+  );
 };
 
 export default ProviderLogo;

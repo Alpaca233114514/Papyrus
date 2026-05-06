@@ -56,9 +56,11 @@ export const useNotes = (): UseNotesReturn => {
   // 从 API 加载笔记
   const refreshNotes = useCallback(async () => {
     try {
+      console.log('[useNotes] Starting refreshNotes, setting isLoading to true');
       setIsLoading(true);
       setError(null);
       const response = await api.listNotes();
+      console.log('[useNotes] Received response, success:', response.success, 'notes count:', response.notes?.length);
       if (response.success) {
         // 转换后端数据格式到前端格式
         const formattedNotes: Note[] = response.notes.map(n => ({
@@ -74,8 +76,10 @@ export const useNotes = (): UseNotesReturn => {
         setNotes(formattedNotes);
       }
     } catch (err) {
+      console.error('[useNotes] Error loading notes:', err);
       setError(err instanceof Error ? err.message : '加载失败');
     } finally {
+      console.log('[useNotes] Finished refreshNotes, setting isLoading to false');
       setIsLoading(false);
     }
   }, []);
@@ -93,6 +97,7 @@ export const useNotes = (): UseNotesReturn => {
 
   // 初始加载
   useEffect(() => {
+    console.log('[useNotes] Mounted, calling refreshNotes');
     refreshNotes();
   }, [refreshNotes]);
 

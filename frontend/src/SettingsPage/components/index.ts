@@ -8,3 +8,9 @@ export {
 
 export { default as SettingItem } from './SettingItem';
 export type { SettingItemProps } from './SettingItem';
+
+export {
+  SettingsViewLayout,
+  type NavItem,
+  type Section,
+} from './SettingsViewLayout';

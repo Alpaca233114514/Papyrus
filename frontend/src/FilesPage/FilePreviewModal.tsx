@@ -50,6 +50,10 @@ export default function FilePreviewModal({ file, onClose }: FilePreviewModalProp
     return getFileUrl(file.id, 'download');
   }, [file]);
 
+  const handleClose = () => {
+    onClose();
+  };
+
   useEffect(() => {
     if (!file) {
       setTextContent('');
@@ -111,11 +115,10 @@ export default function FilePreviewModal({ file, onClose }: FilePreviewModalProp
     };
   }, [file, previewUrl]);
 
-  if (!file) return null;
-
-  const ext = getFileExtension(file.name);
-
   const renderPreview = () => {
+    if (!file) return null;
+    const ext = getFileExtension(file.name);
+
     if (!isPreviewable(file)) {
       return (
         <div style={{ textAlign: 'center', padding: '48px 0' }}>
@@ -227,18 +230,15 @@ export default function FilePreviewModal({ file, onClose }: FilePreviewModalProp
                 style={{ width: '100%', height: '100%', border: 'none' }}
                 sandbox="allow-scripts allow-same-origin"
                 onLoad={() => {
-                  // 延迟检查 iframe 是否正常加载
                   setTimeout(() => {
                     const iframe = document.querySelector(`iframe[src="${previewUrl}"]`);
                     if (iframe) {
                       try {
-                        // 尝试访问 contentWindow，如果跨域会抛异常，但加载成功时通常可访问
                         const cw = (iframe as HTMLIFrameElement).contentWindow;
                         if (!cw && !pdfError) {
                           setPdfError(true);
                         }
                       } catch {
-                        // 跨域限制，视为正常加载
                       }
                     }
                   }, 3000);
@@ -333,19 +333,19 @@ export default function FilePreviewModal({ file, onClose }: FilePreviewModalProp
             whiteSpace: 'nowrap',
             verticalAlign: 'bottom',
           }}
-          title={file.name}
+          title={file?.name}
         >
-          {file.name}
+          {file?.name}
         </span>
       }
       visible={!!file}
-      onCancel={onClose}
+      onCancel={handleClose}
       footer={null}
       autoFocus={false}
       focusLock
       style={{ width: 'auto', maxWidth: '90vw' }}
     >
-      {renderPreview()}
+      {file && renderPreview()}
     </Modal>
   );
 }

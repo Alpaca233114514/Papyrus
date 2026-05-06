@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Typography,
@@ -9,17 +10,11 @@ import {
   Popconfirm,
 } from '@arco-design/web-react';
 import {
-  IconArrowLeft,
   IconSafe,
   IconStorage,
-  IconDelete,
-  IconCloud,
-  IconFolder,
-  IconDownload,
 } from '@arco-design/web-react/icon';
 import { api } from '../../api';
-import { SettingItem } from '../components';
-import { useScrollNavigation } from '../../hooks/useScrollNavigation';
+import { SettingItem, SettingsViewLayout, type NavItem } from '../components';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -27,13 +22,13 @@ interface DataViewProps {
   onBack: () => void;
 }
 
-const NAV_ITEMS = [
-  { key: 'backup-section', label: '备份与恢复', icon: IconSafe },
-  { key: 'storage-section', label: '存储管理', icon: IconStorage },
+const NAV_ITEMS: NavItem[] = [
+  { key: 'backup-section', label: 'dataView.backup', icon: IconSafe },
+  { key: 'storage-section', label: 'dataView.storage', icon: IconStorage },
 ];
 
 const DataView = ({ onBack }: DataViewProps) => {
-  const { contentRef, activeSection, scrollToSection } = useScrollNavigation(NAV_ITEMS);
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [vaultPath, setVaultPath] = useState('');
@@ -44,12 +39,12 @@ const DataView = ({ onBack }: DataViewProps) => {
     try {
       const result = await api.createBackup();
       if (result.success) {
-        Message.success(`备份成功: ${result.path}`);
+        Message.success(t('dataView.backupSuccess', { path: result.path }));
       } else {
-        Message.error('备份失败');
+        Message.error(t('dataView.backupFailed'));
       }
     } catch (err) {
-      Message.error(`备份失败: ${err instanceof Error ? err.message : '未知错误'}`);
+      Message.error(t('dataView.backupFailed'));
     } finally {
       setLoading(false);
     }
@@ -69,9 +64,9 @@ const DataView = ({ onBack }: DataViewProps) => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      Message.success('导出成功');
+      Message.success(t('dataView.exportSuccess'));
     } catch (err) {
-      Message.error(`导出失败: ${err instanceof Error ? err.message : '未知错误'}`);
+      Message.error(t('dataView.exportFailed', { error: err instanceof Error ? err.message : 'Unknown error' }));
     } finally {
       setLoading(false);
     }
@@ -79,17 +74,17 @@ const DataView = ({ onBack }: DataViewProps) => {
 
   const handleImportObsidian = async () => {
     if (!vaultPath.trim()) {
-      Message.error('请输入 Vault 路径');
+      Message.error(t('dataView.vaultPathRequired'));
       return;
     }
     setLoading(true);
     try {
       const result = await api.importObsidian(vaultPath.trim());
-      Message.success(`导入完成: ${result.imported} 条已导入, ${result.skipped} 条已跳过`);
+      Message.success(t('dataView.importSuccess', { imported: result.imported, skipped: result.skipped }));
       setImportModalVisible(false);
       setVaultPath('');
     } catch (err) {
-      Message.error(`导入失败: ${err instanceof Error ? err.message : '未知错误'}`);
+      Message.error(t('dataView.importFailed', { error: err instanceof Error ? err.message : 'Unknown error' }));
     } finally {
       setLoading(false);
     }
@@ -98,229 +93,142 @@ const DataView = ({ onBack }: DataViewProps) => {
   const handleReset = async () => {
     setResetLoading(true);
     try {
-      const res = await fetch('/api/data/reset', { method: 'POST' });
-      const data = await res.json();
+      const data = await api.resetData();
       if (data.success) {
-        Message.success('所有数据已重置');
+        Message.success(t('dataView.resetSuccess'));
         window.dispatchEvent(new CustomEvent('papyrus_cards_changed'));
         window.dispatchEvent(new CustomEvent('papyrus_notes_changed'));
       } else {
-        Message.error(data.error || '重置失败');
+        Message.error(t('dataView.resetFailed', { error: '' }));
       }
     } catch (err) {
-      Message.error(`重置失败: ${err instanceof Error ? err.message : '未知错误'}`);
+      Message.error(t('dataView.resetFailed', { error: err instanceof Error ? err.message : 'Unknown error' }));
     } finally {
       setResetLoading(false);
     }
   };
 
-  return (
-    <div style={{
-      flex: 1,
-      display: 'flex',
-      overflow: 'hidden',
-      position: 'relative',
-      background: 'var(--color-bg-1)',
-      height: '100%',
-    }}>
-      <div style={{
-        width: 200,
-        height: '100%',
-        borderRight: '1px solid var(--color-border-2)',
-        background: 'var(--color-bg-1)',
-        display: 'flex',
-        flexDirection: 'column',
-        flexShrink: 0,
-      }}>
-        <div style={{
-          padding: 16,
-          borderBottom: '1px solid var(--color-border-2)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-        }}>
-          <Button
-            type="text"
-            icon={<IconArrowLeft />}
-            onClick={onBack}
-            style={{ padding: 0, fontSize: 14 }}
-          />
-          <Text style={{ fontSize: '14px', fontWeight: 500 }}>数据设置</Text>
-        </div>
-
-        <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
-          {NAV_ITEMS.map(({ key, label, icon: Icon }) => {
-            const isActive = activeSection === key;
-            return (
-              <button
-                key={key}
-                onClick={() => scrollToSection(key)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '10px 12px',
-                  cursor: 'pointer',
-                  borderRadius: 8,
-                  marginBottom: 4,
-                  background: isActive ? 'var(--color-primary-light)' : 'transparent',
-                  color: isActive ? 'var(--color-primary)' : 'var(--color-text-1)',
-                  border: 'none',
-                  width: '100%',
-                  textAlign: 'left',
-                  transition: 'all 0.2s',
-                  userSelect: 'none',
-                }}
-              >
-                <Icon style={{ fontSize: 16 }} />
-                <Text style={{ 
-                  fontSize: 13, 
-                  color: isActive ? 'var(--color-primary)' : 'inherit',
-                  fontWeight: isActive ? 500 : 400,
-                }}>{label}</Text>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div 
-        ref={contentRef}
-        onWheel={(e) => e.stopPropagation()}
-        style={{ 
-          flex: 1, 
-          overflowY: 'auto', 
-          padding: '32px 48px',
-        }}
-      >
-        <div style={{ marginBottom: 32 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-            <IconSafe style={{ fontSize: 32, color: 'var(--color-primary)' }} />
-            <Title heading={2} style={{ margin: 0, fontWeight: 400, fontSize: '28px' }}>
-              数据设置
-            </Title>
-          </div>
-          <Paragraph type="secondary">
-            管理数据备份、恢复和存储
-          </Paragraph>
-        </div>
-
-        <div id="backup-section" style={{ marginBottom: 48, scrollMarginTop: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>备份与恢复</Title>
-          </div>
-
-          <div className="settings-section" style={{ 
-            background: 'var(--color-bg-2)', 
-            borderRadius: 8, 
-            padding: '16px 20px',
-            marginBottom: 24,
-          }}>
-            <SettingItem title="创建备份" desc="立即备份所有数据到本地文件">
-              <Button 
-                type="primary" 
+  const renderSection = (sectionId: string) => {
+    switch (sectionId) {
+      case 'backup-section':
+        return (
+          <>
+            <SettingItem title={t('dataView.createBackup')} desc={t('dataView.createBackupDesc')}>
+              <Button
+                type="primary"
                 shape="round"
                 onClick={handleBackup}
                 disabled={loading}
               >
-                {loading ? <Spin size={14} /> : '立即备份'}
+                {loading ? <Spin size={14} /> : t('dataView.backupNow')}
               </Button>
             </SettingItem>
 
-            <SettingItem title="导出数据" desc="导出为 JSON 或 Markdown 文件">
-              <Button 
+            <SettingItem title={t('dataView.exportData')} desc={t('dataView.exportDataDesc')}>
+              <Button
                 shape="round"
                 onClick={handleExport}
                 disabled={loading}
               >
-                {loading ? <Spin size={14} /> : '导出数据'}
+                {loading ? <Spin size={14} /> : t('dataView.exportNow')}
               </Button>
             </SettingItem>
 
-            <SettingItem title="从 Obsidian 导入" desc="导入 Obsidian Vault 中的 Markdown 文件">
-              <Button 
+            <SettingItem title={t('dataView.importObsidian')} desc={t('dataView.importObsidianDesc')}>
+              <Button
                 shape="round"
                 onClick={() => setImportModalVisible(true)}
                 disabled={loading}
               >
-                导入
+                {t('dataView.import')}
               </Button>
             </SettingItem>
 
-            <SettingItem title="重置所有数据" desc="永久删除所有数据，不可恢复" divider={false}>
+            <SettingItem title={t('dataView.resetAll')} desc={t('dataView.resetAllDesc')} divider={false}>
               <Popconfirm
-                title="确认重置"
-                content="确定要重置所有数据吗？此操作不可恢复！"
+                title={t('dataView.confirmReset')}
+                content={t('dataView.confirmResetMessage')}
                 onOk={handleReset}
               >
                 <Button status="danger" shape="round" loading={resetLoading}>
-                  重置
+                  {t('dataView.reset')}
                 </Button>
               </Popconfirm>
             </SettingItem>
-          </div>
 
-          <div className="settings-tip">
-            <IconSafe style={{ color: 'var(--color-success)' }} />
-            <Text type="secondary" style={{ fontSize: 13 }}>
-              建议定期备份数据，以防止意外丢失
-            </Text>
-          </div>
-        </div>
+            <div className="settings-tip">
+              <IconSafe style={{ color: 'var(--color-success)' }} />
+              <Text type="secondary" style={{ fontSize: 13 }}>
+                {t('dataView.backupTip')}
+              </Text>
+            </div>
+          </>
+        );
 
-        <div id="storage-section" style={{ marginBottom: 48, scrollMarginTop: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>存储管理</Title>
-          </div>
-
-          <div className="settings-section" style={{ 
-            background: 'var(--color-bg-2)', 
-            borderRadius: 8, 
-            padding: '16px 20px',
-            marginBottom: 24,
-          }}>
-            <SettingItem title="本地存储" desc="使用本地文件系统存储数据">
+      case 'storage-section':
+        return (
+          <>
+            <SettingItem title={t('dataView.localStorage')} desc={t('dataView.localStorageDesc')}>
               <Button shape="round" onClick={() => window.electronAPI?.openDataFolder?.()}>
-                查看位置
+                {t('dataView.viewLocation')}
               </Button>
             </SettingItem>
 
-            <SettingItem title="云同步" desc="同步数据到云端（即将推出）" divider={false}>
+            <SettingItem title={t('dataView.cloudSync')} desc={t('dataView.cloudSyncDesc')} divider={false}>
               <Button shape="round" disabled>
-                即将推出
+                {t('dataView.comingSoon')}
               </Button>
             </SettingItem>
-          </div>
-        </div>
+          </>
+        );
 
-        <div style={{ height: 'calc(100vh - 200px)', flexShrink: 0 }} />
-      </div>
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <>
+      <SettingsViewLayout
+        title={t('dataView.title')}
+        description={t('dataView.titleDesc')}
+        icon={IconSafe}
+        iconColor="var(--color-cyan-6, #14C9C9)"
+        navItems={NAV_ITEMS.map(item => ({ ...item, label: t(item.label) }))}
+        sections={[
+          { id: 'backup-section', title: t('dataView.backup'), icon: IconSafe },
+          { id: 'storage-section', title: t('dataView.storage'), icon: IconStorage },
+        ]}
+        onBack={onBack}
+      >
+        {renderSection}
+      </SettingsViewLayout>
 
       <Modal
-        title="从 Obsidian 导入"
+        title={t('dataView.importTitle')}
         visible={importModalVisible}
         onOk={handleImportObsidian}
         onCancel={() => {
           setImportModalVisible(false);
           setVaultPath('');
         }}
-        okText="导入"
-        cancelText="取消"
+        okText={t('dataView.import')}
+        cancelText={t('shortcutsView.cancel')}
         confirmLoading={loading}
       >
         <div style={{ marginTop: 16 }}>
           <Paragraph type="secondary" style={{ marginBottom: 16 }}>
-            请输入 Obsidian Vault 的完整路径，系统将导入其中的 Markdown 文件。
+            {t('dataView.importDesc')}
           </Paragraph>
           <Input
             value={vaultPath}
             onChange={setVaultPath}
-            placeholder="例如: C:\Users\用户名\Documents\Obsidian Vault"
+            placeholder={t('dataView.importPlaceholder')}
             disabled={loading}
           />
         </div>
       </Modal>
-    </div>
+    </>
   );
 };
 

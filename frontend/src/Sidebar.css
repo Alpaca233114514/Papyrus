@@ -10,9 +10,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 8px 0 48px 0;  /* 增加底部间距 */
+  padding: 8px 0 48px 0;
   flex-shrink: 0;
-  transition: width 0.15s ease;
+  transition: width 0.3s cubic-bezier(0.4,0,0.2,1);
   overflow: hidden;
 }
 
@@ -30,40 +30,36 @@
   margin-bottom: 8px;
   position: relative;
   flex-shrink: 0;
-  transition: all 0.15s ease;
+  transition: width 0.3s cubic-bezier(0.4,0,0.2,1), padding 0.3s cubic-bezier(0.4,0,0.2,1);
   box-sizing: border-box;
-  /* Reset button styles */
   background: none;
   border: 2px solid transparent;
   font-family: inherit;
   padding: 0;
-  /* 图标居中 - 使用 flex */
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 /* 展开状态下的按钮 */
 .sidebar-expanded .sidebar-item {
   width: 144px;
-  padding: 0 6px;
+  padding: 0 6px 0 30px;
   justify-content: flex-start;
-  gap: 8px;
 }
 
-/* 图标容器 */
+/* 图标容器 - 始终固定距离按钮左侧7px */
 .sidebar-icon {
   display: inline-flex;
-  vertical-align: middle;
   align-items: center;
   justify-content: center;
   width: 18px;
   height: 18px;
-}
-
-/* 展开状态下的图标 */
-.sidebar-expanded .sidebar-icon {
   flex-shrink: 0;
+  transition: none;
+  position: absolute;
+  left: 7px;
 }
 
 /* 标签文字 - 收起时隐藏 */
@@ -71,16 +67,16 @@
   font-size: 13px;
   white-space: nowrap;
   opacity: 0;
-  width: 0;
-  overflow: hidden;
-  transition: opacity 0.1s ease;
+  transition: opacity 0.3s cubic-bezier(0.4,0,0.2,1);
   pointer-events: none;
-  vertical-align: middle;
+  position: absolute;
+  left: 30px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .sidebar-expanded .sidebar-label {
   opacity: 1;
-  width: auto;
   pointer-events: auto;
 }
 

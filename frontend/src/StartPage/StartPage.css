@@ -326,3 +326,18 @@
     transition: none;
   }
 }
+
+/* ---- 窗景深色模式适配 ---- */
+body[arco-theme="dark"] .start-card-frame--scenery {
+  background: var(--color-bg-2);
+}
+
+body[arco-theme="dark"] .start-scenery-image {
+  filter: brightness(0.85) contrast(1.1);
+}
+
+body[arco-theme="dark"] .start-card-frame--pending,
+body[arco-theme="dark"] .start-card-frame--done {
+  background: var(--color-bg-2);
+  border-color: var(--color-border-2);
+}

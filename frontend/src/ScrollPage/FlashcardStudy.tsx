@@ -679,11 +679,12 @@ export default function FlashcardStudy({ onExit, demo = false, filterTag }: Flas
             >
               卷首 · 问题
             </Typography.Text>
-            <Typography.Paragraph style={{ 
-              fontSize: '22px', 
+            <Typography.Paragraph style={{
+              fontSize: '22px',
               lineHeight: 1.6,
               margin: 0,
               whiteSpace: 'pre-wrap',
+              color: 'var(--color-text-1)',
             }}>
               {currentCard?.q}
             </Typography.Paragraph>
@@ -692,7 +693,7 @@ export default function FlashcardStudy({ onExit, demo = false, filterTag }: Flas
           {/* 分隔线 */}
           <div style={{
             height: '1px',
-            background: 'var(--color-border-2)',
+            background: 'var(--color-border-3)',
             margin: '32px 0',
             transition: 'opacity 0.3s',
             opacity: studyState === 'answer' ? 1 : 0.3,
@@ -742,7 +743,7 @@ export default function FlashcardStudy({ onExit, demo = false, filterTag }: Flas
               background: 'var(--color-fill-2)',
               borderRadius: '20px',
             }}>
-              <Typography.Text style={{ fontSize: '16px' }}>␣</Typography.Text>
+              <Typography.Text style={{ fontSize: '16px', color: 'var(--color-text-1)' }}>␣</Typography.Text>
               <Typography.Text type="secondary" style={{ fontSize: '14px' }}>
                 按空格或回车揭晓答案
               </Typography.Text>

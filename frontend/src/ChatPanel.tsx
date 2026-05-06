@@ -5,11 +5,12 @@ import IconAgentMode from './icons/IconAgentMode';
 import { ReasoningChain } from './components/ReasoningChain';
 import { ToolCallCard } from './components/ToolCallCard';
 import { ChatHistory } from './components/ChatHistory';
-import type { AIConfig, ProviderModel } from './types/ai';
+import type { AIConfig } from './types/ai';
 import { getAuthToken, BASE, api } from './api';
 import type { ChatSession, ChatBlock as ApiChatBlock } from './api';
 import { MarkdownView } from './components/MarkdownView';
 import { ToolsCatalogPopover } from './components/ToolsCatalogPopover';
+import { useModelSelector } from './hooks/useModelSelector';
 import './ChatPanel.css';
 
 const SESSION_ID_STORAGE_KEY = 'papyrus_chat_session_id';
@@ -234,16 +235,12 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   const [text, setText] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [mode, setMode] = useState('agent');
-  const [model, setModel] = useState('');
   const [reasoning, setReasoning] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [inputHeight, setInputHeight] = useState(118);
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile>(loadUserProfile());
-  const [aiConfig, setAiConfig] = useState<AIConfig | null>(null);
-  const [configChecked, setConfigChecked] = useState(false);
   const [agentModeEnabled, setAgentModeEnabled] = useState<boolean>(loadAgentModeEnabled());
-  const [availableModels, setAvailableModels] = useState<ProviderModel[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string>(loadStoredSessionId());
@@ -257,17 +254,22 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textOverrideRef = useRef<string | null>(null);
-  const availableModelsRef = useRef<ProviderModel[]>([]);
-  const modelRef = useRef<string>('');
 
-  // 保持 ref 与 state 同步，避免 useCallback 依赖循环
-  useEffect(() => {
-    availableModelsRef.current = availableModels;
-  }, [availableModels]);
+  const {
+    models,
+    selectedModelId: model,
+    selectedModel,
+    loading: modelLoading,
+    configChecked,
+    selectModel,
+    refreshModels,
+  } = useModelSelector();
 
-  useEffect(() => {
-    modelRef.current = model;
-  }, [model]);
+  // 转换为下拉菜单使用的格式
+  const availableModels = models.map((m) => ({
+    key: m.id,
+    label: m.name,
+  }));
 
   useEffect(() => {
     persistSessionId(currentSessionId);
@@ -299,7 +301,6 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   // 监听 Agent 模式设置变化
   useEffect(() => {
     const handleAgentModeChange = (e?: CustomEvent) => {
-      // 如果事件中有详细数据，直接使用；否则从 localStorage 重新加载
       let enabled: boolean;
       if (e?.detail && typeof e.detail.agentModeEnabled === 'boolean') {
         enabled = e.detail.agentModeEnabled;
@@ -307,15 +308,12 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
         enabled = loadAgentModeEnabled();
       }
       setAgentModeEnabled(enabled);
-      // 如果 Agent 模式被禁用，且当前在 Agent 模式，则切换到 Chat 模式
       if (!enabled && mode === 'agent') {
         setMode('chat');
       }
     };
 
-    // 监听自定义事件（同页面内更新）
     window.addEventListener('papyrus_agent_settings_changed', handleAgentModeChange as EventListener);
-    // 同时监听 storage 事件（跨标签页）
     const storageHandler = () => handleAgentModeChange();
     window.addEventListener('storage', storageHandler);
 
@@ -324,87 +322,6 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
       window.removeEventListener('storage', storageHandler);
     };
   }, [mode]);
-
-  // 串行初始化 AI 配置和模型列表，消除竞态和循环
-  const initializeChatConfig = useCallback(async () => {
-    // 先加载 providers，确保 availableModels 就绪
-    let models: ProviderModel[] = [];
-    try {
-      const response = await authFetch('/providers');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.providers) {
-          for (const provider of data.providers) {
-            if (!provider.enabled) continue;
-            for (const m of provider.models) {
-              if (!m.enabled) continue;
-              models.push({
-                key: `${provider.type}:${m.modelId}`,
-                label: m.name,
-                providerId: provider.id,
-                providerType: provider.type,
-              });
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load providers:', error);
-      ArcoMessage.warning('无法加载模型列表，请检查后端连接');
-    }
-
-    // 使用 ref 获取最新值，避免 stale closure
-    const prevModels = availableModelsRef.current;
-
-    // 如果新加载的 models 为空但旧值非空，保留旧值（防止选择框"消失"）
-    if (models.length === 0 && prevModels.length > 0) {
-      console.warn('Provider 列表返回为空，保留之前的模型列表');
-    } else if (models.length > 0) {
-      setAvailableModels(models);
-    } else if (prevModels.length === 0) {
-      setAvailableModels([]);
-    }
-
-    // 再加载 AI config，此时可用 models 已就绪
-    try {
-      const response = await authFetch('/config/ai');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.config) {
-          setAiConfig(data.config);
-          const configuredModel = data.config.current_model;
-          // 只在配置的 model 存在于可用列表中时才更新，避免覆盖当前选择
-          const currentModels = models.length > 0 ? models : prevModels;
-          const currentModelRef = modelRef.current;
-          const configuredCompositeKey = configuredModel
-            ? currentModels.find((m) => {
-                const idx = m.key.indexOf(':');
-                return idx > 0 && m.key.slice(idx + 1) === configuredModel;
-              })?.key
-            : undefined;
-          if (configuredCompositeKey && currentModels.some((m) => m.key === configuredCompositeKey)) {
-            // 只有当用户没有已选模型，或已选模型不在可用列表中时，才使用后端配置
-            if (!currentModelRef || !currentModels.some((m) => m.key === currentModelRef)) {
-              setModel(configuredCompositeKey);
-            }
-          } else if (currentModels.length > 0 && !currentModelRef) {
-            setModel(currentModels[0].key);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load AI config:', error);
-    } finally {
-      setConfigChecked(true);
-    }
-  }, []);
-
-  // 组件挂载时加载配置和模型列表
-  useEffect(() => {
-    if (open) {
-      initializeChatConfig();
-    }
-  }, [open, initializeChatConfig]);
 
   // 初始化会话：优先用 localStorage 的会话；其次后端 active 会话；都不行才创建新会话
   // 沿用旧会话时必须把历史消息也加载回 messages，否则 UI 显示空白但底层带着旧上下文
@@ -449,11 +366,11 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   // 监听设置页 AI 配置变化，实时刷新
   useEffect(() => {
     const handleConfigChange = () => {
-      initializeChatConfig();
+      refreshModels();
     };
     window.addEventListener('papyrus_ai_config_changed', handleConfigChange);
     return () => window.removeEventListener('papyrus_ai_config_changed', handleConfigChange);
-  }, [initializeChatConfig]);
+  }, [refreshModels]);
 
   // 滚动到底部（仅当用户在底部附近时自动滚动，避免打断阅读）
   const scrollToBottom = useCallback(() => {
@@ -816,7 +733,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
     if ((!trimmedText && selectedFiles.length === 0) || isGenerating) return;
 
     // 检查 model 是否已选择
-    if (!modelRef.current) {
+    if (!selectedModel) {
       ArcoMessage.error('请先选择 AI 模型');
       return;
     }
@@ -881,7 +798,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
       role: 'assistant',
       content: '',
       blocks: [],
-      model: modelRef.current,
+      model: selectedModel.modelId,
     };
 
     setMessages((prev) => [...prev, userMessage, assistantMessage]);
@@ -892,11 +809,9 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
     abortControllerRef.current = new AbortController();
 
     try {
-      // 从 composite key 中提取真实的 modelId
-      const actualModelId = modelRef.current.includes(':') ? modelRef.current.split(':').slice(1).join(':') : modelRef.current;
       const chatBody: Record<string, unknown> = {
         message: messageText,
-        model: actualModelId,
+        model: selectedModel.modelId,
         mode,
         reasoning,
       };
@@ -956,7 +871,6 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
         console.log('Request aborted');
       } else {
         console.error('Failed to send message:', error);
-        // 根据错误类型显示不同的错误信息
         let errorMessage = '发送消息失败，请重试';
         if (error instanceof Error) {
           if (error.message.includes('Failed to fetch')) {
@@ -973,15 +887,35 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
         }
         ArcoMessage.error(errorMessage);
         
+        const errorContent = '❌ ' + errorMessage;
+        
         // 更新最后一条助手消息显示错误
         setMessages((prev) => {
           const lastIndex = prev.length - 1;
           const lastMsg = prev[lastIndex];
           if (lastMsg && lastMsg.role === 'assistant') {
+            const updatedMsg = { ...lastMsg, content: errorContent };
+            
+            // 保存失败消息到后端，防止关闭后丢失
+            if (currentSessionId) {
+              const userMsgIndex = prev.length - 2;
+              const userMsgId = userMsgIndex >= 0 ? prev[userMsgIndex]?.id : null;
+              authFetch('/messages', {
+                method: 'POST',
+                body: JSON.stringify({
+                  sessionId: currentSessionId,
+                  role: 'assistant' as const,
+                  content: errorContent,
+                  model: selectedModel.modelId,
+                  parentMessageId: userMsgId ?? null,
+                }),
+              }).catch((e) => {
+                console.error('Failed to save error message:', e);
+              });
+            }
+            
             return prev.map((msg, idx) =>
-              idx === lastIndex
-                ? { ...msg, content: '❌ ' + errorMessage }
-                : msg
+              idx === lastIndex ? updatedMsg : msg
             );
           }
           return prev;
@@ -991,7 +925,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
       setIsGenerating(false);
       abortControllerRef.current = null;
     }
-  }, [text, isGenerating, mode, reasoning, selectedFiles, handleSSEStream]);
+  }, [text, isGenerating, mode, reasoning, selectedFiles, handleSSEStream, currentSessionId]);
 
   // 停止生成
   const stopGeneration = useCallback(() => {
@@ -1218,10 +1152,6 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
     };
   }, []);
 
-  if (!open) return null;
-
-  const currentMode = modes.find((m) => m.key === mode) ?? modes[0]!;
-  
   // 加载会话列表
   const loadSessions = useCallback(async () => {
     setSessionsLoading(true);
@@ -1295,54 +1225,15 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
     setMode(newMode);
   };
 
-  const handleModelSelect = async (key: string) => {
-    const prevModel = modelRef.current;
-    setModel(key);
+  const handleModelSelect = async (modelId: string) => {
     if (isGenerating) {
       abortControllerRef.current?.abort();
       setIsGenerating(false);
     }
-    const selected = availableModels.find((m) => m.key === key);
-    if (!selected) return;
-
-    // 如果 aiConfig 尚未加载，只更新本地状态，跳过保存
-    if (!aiConfig) {
-      console.warn('AI 配置尚未加载，模型选择仅在本地生效');
-      return;
-    }
-
-    // 从 composite key 中提取真实 modelId
-    const actualModelId = key.includes(':') ? key.split(':').slice(1).join(':') : key;
-
-    // Provider 配置仅通过 /api/providers 管理，此处只同步 current_provider / current_model
-    const updatedConfig = {
-      current_provider: selected.providerType,
-      current_model: actualModelId,
-    };
-
-    try {
-      const resp = await authFetch('/config/ai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedConfig),
-      });
-      if (!resp.ok) {
-        let errMsg = `HTTP ${resp.status}`;
-        try {
-          const data = await resp.json();
-          if (data?.error) errMsg = String(data.error);
-        } catch {
-          // ignore JSON parse failure
-        }
-        throw new Error(errMsg);
-      }
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Failed to update AI config:', error);
-      setModel(prevModel);
-      ArcoMessage.error('模型切换失败：' + msg);
-    }
+    await selectModel(modelId);
   };
+
+  const currentMode = modes.find((m) => m.key === mode) ?? modes[0]!;
 
   return (
     <div className="chat-panel" style={{ width }}>
@@ -1350,6 +1241,9 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
         <Dropdown
           trigger="click"
           disabled={availableModels.length === 0}
+          popoverProps={{
+            style: { minWidth: '320px' }
+          }}
           droplist={
             <Menu className="chat-model-menu" onClickMenuItem={(key) => handleModelSelect(key)}>
               {availableModels.length === 0 ? (
@@ -1365,7 +1259,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
           }
         >
           <button className="chat-model-btn" disabled={availableModels.length === 0}>
-            <span>{(availableModels.find((m) => m.key === model)?.label ?? (model?.includes(':') ? model.split(':').slice(1).join(':') : model)) || '选择模型'}</span>
+            <span>{selectedModel?.name || '选择模型'}</span>
             <IconDown className="tw-text-xs" />
           </button>
         </Dropdown>
@@ -1479,7 +1373,7 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
                 )}
                 {msg.role === 'assistant' && (
                   <div className="chat-message-with-avatar tw-items-start">
-                    <span className="chat-message-model-label">{availableModels.find((m) => m.key === msg.model)?.label ?? (msg.model?.includes(':') ? msg.model.split(':').slice(1).join(':') : msg.model) ?? (model?.includes(':') ? model.split(':').slice(1).join(':') : model)}</span>
+                    <span className="chat-message-model-label">{selectedModel?.name ?? (msg.model?.includes(':') ? msg.model.split(':').slice(1).join(':') : msg.model) ?? (model?.includes(':') ? model.split(':').slice(1).join(':') : model)}</span>
                     <div className="chat-message-blocks">
                       {msg.blocks?.map((block) => renderMessageBlock(block, msg.id))}
                     </div>

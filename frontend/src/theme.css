@@ -116,12 +116,73 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
-/* 输入框焦点 */
+/* 输入框焦点 - 使用box-shadow替代outline，避免与组件自身border形成双线 */
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(32, 108, 207, 0.25);
+  border-color: var(--color-primary) !important;
+}
+
+/* Arco Input组件焦点处理 - 外层wrapper不显示边框，只在内层显示 */
+.arco-input-wrapper:focus-within,
+.arco-input-password:focus-within,
+.arco-textarea-wrapper:focus-within,
+.arco-select-view:focus-within {
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+.arco-input-inner-wrapper:focus-within,
+.arco-textarea-inner-wrapper:focus-within {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 2px rgba(32, 108, 207, 0.25) !important;
+}
+
+.arco-select-view:focus-within .arco-select-view-selector,
+.arco-select-view.arco-select-view-focus .arco-select-view-selector {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 2px rgba(32, 108, 207, 0.25) !important;
+}
+
+.arco-input-wrapper .arco-input:focus,
+.arco-input-wrapper .arco-input:focus-visible,
+.arco-input-password .arco-input:focus,
+.arco-input-password .arco-input:focus-visible,
+.arco-textarea-wrapper .arco-textarea:focus,
+.arco-textarea-wrapper .arco-textarea:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Modal内部输入框样式 */
+[class*="arco-modal"] input:focus-visible,
+[class*="arco-modal"] textarea:focus-visible,
+[class*="arco-modal"] select:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(32, 108, 207, 0.25) !important;
+  border-color: var(--color-primary) !important;
+}
+
+[class*="arco-modal"] .arco-input-wrapper:focus-within,
+[class*="arco-modal"] .arco-input-password:focus-within,
+[class*="arco-modal"] .arco-textarea-wrapper:focus-within,
+[class*="arco-modal"] .arco-select-view:focus-within {
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+[class*="arco-modal"] .arco-input-inner-wrapper:focus-within,
+[class*="arco-modal"] .arco-textarea-inner-wrapper:focus-within {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 2px rgba(32, 108, 207, 0.25) !important;
+}
+
+[class*="arco-modal"] .arco-select-view:focus-within .arco-select-view-selector,
+[class*="arco-modal"] .arco-select-view.arco-select-view-focus .arco-select-view-selector {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 2px rgba(32, 108, 207, 0.25) !important;
 }
 
 /* 减少动画 - 无障碍支持 */
@@ -192,3 +253,20 @@ select:focus-visible {
 }
 
 /* 页面切换动画已迁移至 tailwind.config.js — 通过 motion-safe:tw-animate-page-up/down 使用 */
+
+/* 骨架屏加载动画 */
+@keyframes skeleton-loading {
+  0% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0.4;
+  }
+}
+
+.skeleton-pulse {
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+}

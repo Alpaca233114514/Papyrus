@@ -380,6 +380,13 @@ body[arco-theme="dark"] .chat-message-user .chat-message-bubble {
   font-size: 14px;
   white-space: nowrap;
   transition: background 0.2s, color 0.2s;
+  min-width: 200px;
+  max-width: 280px;
+}
+
+.chat-model-btn span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chat-model-btn:hover {
@@ -610,6 +617,7 @@ body[arco-theme="dark"] .chat-file-tag .arco-tag-icon {
 .chat-session-menu {
   max-height: 320px;
   overflow: auto;
+  min-width: 280px;
 }
 
 .chat-session-item {

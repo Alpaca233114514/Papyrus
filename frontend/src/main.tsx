@@ -74,6 +74,20 @@ const LOCALE_MAP: Record<string, typeof zhCN> = {
   'en-US': enUS,
 };
 
+// 动态更新启动屏幕文本
+const updateSplashScreenText = async () => {
+  try {
+    const { default: i18n } = await import('./i18n');
+    await i18n.init;
+    const hintEl = document.querySelector('.splash-screen .hint');
+    if (hintEl) {
+      hintEl.textContent = i18n.t('settings.splashScreen');
+    }
+  } catch (e) {
+    console.warn('Failed to update splash screen text:', e);
+  }
+};
+
 const Root = () => {
   const [localeKey, setLocaleKey] = useState(() => {
     try { return localStorage.getItem('papyrus_language') ?? 'zh-CN'; }
@@ -89,6 +103,8 @@ const Root = () => {
       }
     };
     window.addEventListener('storage', handler);
+    // 更新启动屏幕文本
+    updateSplashScreenText();
     return () => window.removeEventListener('storage', handler);
   }, []);
 

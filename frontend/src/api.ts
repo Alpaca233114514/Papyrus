@@ -440,6 +440,8 @@ export const api = {
       method: 'POST', 
       body: JSON.stringify(data) 
     }),
+  resetData: () => 
+    request<{ success: boolean }>('/data/reset', { method: 'POST' }),
 
   // Completion
   getCompletionConfig: () =>

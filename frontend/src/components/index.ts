@@ -21,3 +21,7 @@ export { default as SceneryBackground } from './SceneryBackground';
 export { default as SmartTextArea } from './SmartTextArea';
 export { default as TailwindExample } from './TailwindExample';
 export { default as ToolCallCard } from './ToolCallCard';
+
+// 公共卡片组件
+export { CommonCard, useCommonCardStyle, SECONDARY_COLOR, PRIMARY_COLOR } from './CommonCard';
+export type { CommonCardStyles, CommonCardConfig } from './CommonCard';

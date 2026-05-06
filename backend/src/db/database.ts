@@ -909,18 +909,21 @@ export function deleteApiKey(keyId: string, logger?: PapyrusLogger): boolean {
 export function saveModel(providerId: string, model: { id?: string; name?: string; modelId?: string; port?: string; capabilities?: string[]; apiKeyId?: string | null; enabled?: boolean }, logger?: PapyrusLogger): string {
   const database = getDb();
 
+  const existingByProviderModel = database.prepare(
+    'SELECT id FROM provider_models WHERE provider_id = ? AND model_id = ?'
+  ).get(providerId, model.modelId ?? '') as { id: string } | undefined;
+
   let modelId: string;
-  if (model.id) {
+  if (existingByProviderModel) {
+    modelId = existingByProviderModel.id;
+  } else if (model.id) {
     modelId = model.id;
   } else {
-    const existing = database.prepare(
-      'SELECT id FROM provider_models WHERE provider_id = ? AND model_id = ?'
-    ).get(providerId, model.modelId ?? '') as { id: string } | undefined;
-    modelId = existing?.id ?? randomUUID();
+    modelId = randomUUID();
   }
 
-  const existing = database.prepare('SELECT id FROM provider_models WHERE id = ?').get(modelId) as { id: string } | undefined;
-  if (existing) {
+  const existingById = database.prepare('SELECT id FROM provider_models WHERE id = ?').get(modelId) as { id: string } | undefined;
+  if (existingById) {
     database.prepare(
       'UPDATE provider_models SET provider_id = ?, name = ?, model_id = ?, port = ?, capabilities = ?, api_key_id = ?, enabled = ? WHERE id = ?'
     ).run(
@@ -1510,9 +1513,19 @@ export function runInTransaction<T>(fn: () => T): T {
 export function clearAllData(): void {
   const database = getDb();
   database.exec('DELETE FROM cards;');
+  database.exec('DELETE FROM card_versions;');
   database.exec('DELETE FROM notes;');
+  database.exec('DELETE FROM note_versions;');
+  database.exec('DELETE FROM relations;');
+  database.exec('DELETE FROM files;');
   database.exec('DELETE FROM chat_messages;');
   database.exec('DELETE FROM chat_sessions;');
+  database.exec('DELETE FROM provider_models;');
+  database.exec('DELETE FROM api_keys;');
+  database.exec('DELETE FROM providers;');
+  
+  // 重新初始化默认的供应商和模型配置
+  seedDefaults(database);
 }
 
 // ==================== Chat Sessions ====================

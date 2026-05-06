@@ -9,6 +9,7 @@
  */
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { BackTop, Message } from '@arco-design/web-react';
+import { useTranslation } from 'react-i18next';
 import TitleBar from './TitleBar';
 import Sidebar from './Sidebar';
 import ChatPanel from './ChatPanel';
@@ -26,12 +27,14 @@ import type { SearchResult } from './api';
 const PAGE_ORDER = ['start', 'scroll', 'notes', 'charts', 'files', 'extensions', 'settings'];
 
 const App = () => {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const { t } = useTranslation();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [todayDone, setTodayDone] = useState(false);
   const [activePage, setActivePage] = useState('start');
-  const [chatOpen, setChatOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(true);
   const CHAT_DEFAULT_WIDTH = 320;
   const [chatWidth, setChatWidth] = useState(CHAT_DEFAULT_WIDTH);
+  const [isDragging, setIsDragging] = useState(false);
   const dragStartX = useRef<number>(0);
   const dragStartWidth = useRef<number>(0);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
@@ -44,7 +47,7 @@ const App = () => {
   const handlePageChange = useCallback((newPage: string) => {
     const newIndex = PAGE_ORDER.indexOf(newPage);
     if (newIndex === -1) {
-      console.warn(`页面 '${newPage}' 不存在于页面顺序列表中`);
+      console.warn(t('app.pageNotFound', { page: newPage }));
       setActivePage(newPage);
       return;
     }
@@ -67,13 +70,13 @@ const App = () => {
     if (result.type === 'note') {
       handlePageChange('notes');
       setSelectedNoteId(result.id);
-      Message.success(`打开笔记: ${result.title}`);
+      Message.success(t('app.openNote', { title: result.title }));
     } else if (result.type === 'card') {
       handlePageChange('scroll');
       setInitialScrollTag(result.tags?.[0]);
-      Message.success('跳转到复习页面');
+      Message.success(t('app.navigateToReview'));
     }
-  }, [handlePageChange]);
+  }, [handlePageChange, t]);
 
   // 监听来自 ChatPanel 的设置页面跳转事件
   useEffect(() => {
@@ -91,8 +94,10 @@ const App = () => {
     dragStartX.current = e.clientX;
     dragStartWidth.current = chatWidth;
     chatDragActiveRef.current = true;
+    setIsDragging(true);
     const cleanup = () => {
       chatDragActiveRef.current = false;
+      setIsDragging(false);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
       document.documentElement.removeEventListener('mouseleave', onLeave);
@@ -110,13 +115,13 @@ const App = () => {
 
   // 页面标题映射
   const pageTitles: Record<string, string> = {
-    start: '开始',
-    scroll: '复习',
-    notes: '笔记',
-    charts: '统计',
-    files: '文件',
-    extensions: '扩展',
-    settings: '设置',
+    start: t('app.pageTitles.start'),
+    scroll: t('app.pageTitles.scroll'),
+    notes: t('app.pageTitles.notes'),
+    charts: t('app.pageTitles.charts'),
+    files: t('app.pageTitles.files'),
+    extensions: t('app.pageTitles.extensions'),
+    settings: t('app.pageTitles.settings'),
   };
 
   // 更新文档标题
@@ -156,9 +161,9 @@ const App = () => {
       <a 
         href="#main-content" 
         className="skip-link"
-        aria-label="跳转到主内容区域"
+        aria-label={t('app.skipToMainContent')}
       >
-        跳转到主内容
+        {t('app.skipToMainContent')}
       </a>
       
       {/* 返回顶部按钮 */}
@@ -168,7 +173,7 @@ const App = () => {
           visibleHeight={200}
           style={{ right: chatOpen ? chatWidth + 48 : 48 }}
           target={() => document.getElementById('start-page-scroll') ?? window as unknown as HTMLElement}
-          aria-label="返回顶部"
+          aria-label={t('app.backToTop')}
         />
       )}
 
@@ -197,7 +202,7 @@ const App = () => {
           tabIndex={-1}
           className="tw-relative tw-flex-1 tw-flex tw-overflow-hidden tw-outline-none"
           role="main"
-          aria-label={`${pageTitles[activePage] || '主内容'}页面`}
+          aria-label={`${pageTitles[activePage] || t('app.mainContent')}页面`}
         >
           {/* 完成状态光晕 */}
           {activePage === 'start' && todayDone && (
@@ -219,30 +224,29 @@ const App = () => {
         />
         
         {/* 聊天面板 */}
-        {chatOpen && (
-          <div 
-            className="tw-flex tw-flex-shrink-0"
-            role="complementary"
-            aria-label="AI 助手聊天面板"
-          >
-            <div
-              className={[
-                "tw-flex-shrink-0 tw-w-1 tw-transition-colors tw-duration-200",
-                activePage === 'start' ? "tw-cursor-default" : "tw-cursor-ew-resize hover:tw-bg-arco-border-2"
-              ].join(" ")}
-              onMouseDown={activePage !== 'start' ? onChatDragStart : undefined}
-              role="separator"
-              aria-orientation="vertical"
-              aria-label="调整聊天面板宽度"
-              tabIndex={0}
-            />
-            <ChatPanel 
-              open={chatOpen} 
-              width={activePage === 'start' ? CHAT_DEFAULT_WIDTH : chatWidth} 
-              onClose={() => setChatOpen(false)} 
-            />
-          </div>
-        )}
+        <div 
+          className="tw-flex tw-flex-shrink-0 tw-overflow-hidden"
+          style={{ width: chatOpen ? (activePage === 'start' ? CHAT_DEFAULT_WIDTH + 4 : chatWidth + 4) : 0, opacity: chatOpen ? 1 : 0.01, transition: isDragging ? 'none' : 'width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease' }}
+          role="complementary"
+          aria-label="AI 助手聊天面板"
+        >
+          <div
+            className={[
+              "tw-flex-shrink-0 tw-w-1 tw-transition-colors tw-duration-200",
+              activePage === 'start' ? "tw-cursor-default" : "tw-cursor-ew-resize hover:tw-bg-arco-border-2"
+            ].join(" ")}
+            onMouseDown={activePage !== 'start' ? onChatDragStart : undefined}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="调整聊天面板宽度"
+            tabIndex={0}
+          />
+          <ChatPanel 
+            open={chatOpen} 
+            width={activePage === 'start' ? CHAT_DEFAULT_WIDTH : chatWidth} 
+            onClose={() => setChatOpen(false)} 
+          />
+        </div>
       </div>
       
       {/* 状态栏 */}

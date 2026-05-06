@@ -20,6 +20,7 @@ import {
   IconArrowLeft,
 } from '@arco-design/web-react/icon';
 import type { RelatedNote, SearchableNote, RelationType } from './types';
+import { BASE } from '../../../api';
 
 const TabPane = Tabs.TabPane;
 const Option = Select.Option;
@@ -72,7 +73,7 @@ export const RelationsPanel: React.FC<RelationsPanelProps> = ({
   const loadRelations = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/notes/${noteId}/relations`);
+      const response = await fetch(`${BASE}/notes/${noteId}/relations`);
       const data = await response.json();
       if (data.success) {
         setRelations({
@@ -102,7 +103,7 @@ export const RelationsPanel: React.FC<RelationsPanelProps> = ({
     setSearchError(false);
     try {
       const response = await fetch(
-        `/api/notes/search-for-relation?query=${encodeURIComponent(searchQuery)}&exclude_note_id=${noteId}&limit=10`
+        `${BASE}/notes/search-for-relation?query=${encodeURIComponent(searchQuery)}&exclude_note_id=${noteId}&limit=10`
       );
       const data = await response.json();
       if (data.success) {
@@ -140,7 +141,7 @@ export const RelationsPanel: React.FC<RelationsPanelProps> = ({
     }
 
     try {
-      const response = await fetch(`/api/notes/${noteId}/relations`, {
+      const response = await fetch(`${BASE}/notes/${noteId}/relations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -172,7 +173,7 @@ export const RelationsPanel: React.FC<RelationsPanelProps> = ({
     if (!editingRelation) return;
 
     try {
-      const response = await fetch(`/api/relations/${editingRelation.relation_id}`, {
+      const response = await fetch(`${BASE}/relations/${editingRelation.relation_id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -202,7 +203,7 @@ export const RelationsPanel: React.FC<RelationsPanelProps> = ({
       content: '确定要删除这个关联吗？',
       onOk: async () => {
         try {
-          const response = await fetch(`/api/relations/${relationId}`, {
+          const response = await fetch(`${BASE}/relations/${relationId}`, {
             method: 'DELETE',
           });
           

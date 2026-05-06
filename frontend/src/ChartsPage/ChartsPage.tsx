@@ -4,6 +4,8 @@ import { IconFire, IconClockCircle, IconCheckCircle, IconCalendar } from '@arco-
 import { usePageScenery } from '../hooks/useScenery';
 import { useSceneryColor, getAdaptivePrimaryColor } from '../hooks/useSceneryColor';
 import { api, type Card as CardType } from '../api';
+import { useCommonCardStyle, CommonCard } from '../components';
+import { ChartsSkeletonLoader } from './ChartsSkeletonLoader';
 
 // 进度数据类型
 interface StreakData {
@@ -59,26 +61,18 @@ const StatItem = ({ label, value, suffix, colorConfig }: { label: string; value:
   );
 };
 
-// 通用卡片样式
-const useCardStyle = (hovered: boolean) => ({
-  borderRadius: '16px',
-  border: `1px solid ${hovered ? PRIMARY_COLOR : 'var(--color-text-3)'}`,
-  background: hovered ? `${PRIMARY_COLOR}08` : 'var(--color-bg-1)',
-  transition: 'border-color 0.2s, background 0.2s',
-  cursor: 'pointer',
-});
-
 // 统计卡片
 const StatCard = ({ title, value, suffix, icon }: { title: string; value: string | number; suffix?: string; icon: React.ReactNode }) => {
-  const [hovered, setHovered] = useState(false);
-  const cardStyle = useCardStyle(hovered);
+  const { hovered, setHovered, cardStyle } = useCommonCardStyle({
+    borderWidth: 1,
+  });
 
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+    <CommonCard
+      hovered={hovered}
+      setHovered={setHovered}
+      cardStyle={cardStyle}
       style={{
-        ...cardStyle,
         padding: '20px',
         display: 'flex',
         alignItems: 'center',
@@ -106,7 +100,7 @@ const StatCard = ({ title, value, suffix, icon }: { title: string; value: string
           {value}{suffix && <span style={{ fontSize: '14px', fontWeight: 400, marginLeft: '4px' }}>{suffix}</span>}
         </Typography.Text>
       </div>
-    </div>
+    </CommonCard>
   );
 };
 
@@ -130,15 +124,16 @@ function calculateStats(cards: CardType[], streakData: StreakData | null): Stats
 
 // 简单的进度卡片
 const SimpleProgressCard = ({ title, progress, count }: { title: string; progress: number; count: number }) => {
-  const [hovered, setHovered] = useState(false);
-  const cardStyle = useCardStyle(hovered);
+  const { hovered, setHovered, cardStyle } = useCommonCardStyle({
+    borderWidth: 1,
+  });
 
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+    <CommonCard
+      hovered={hovered}
+      setHovered={setHovered}
+      cardStyle={cardStyle}
       style={{
-        ...cardStyle,
         padding: '20px',
       }}
     >
@@ -169,7 +164,7 @@ const SimpleProgressCard = ({ title, progress, count }: { title: string; progres
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--color-text-3)' }}>
         <span>进度 {progress}%</span>
       </div>
-    </div>
+    </CommonCard>
   );
 };
 
@@ -490,11 +485,7 @@ const ChartsPage = () => {
   }, [cards]);
 
   if (loading) {
-    return (
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Spin size={40} />
-      </div>
-    );
+    return <ChartsSkeletonLoader />;
   }
 
   if (cards.length === 0) {

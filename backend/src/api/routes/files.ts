@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import fs from 'node:fs';
 import { listFiles, createFolder, saveFile, deleteFileItem, getFileStream, getFileById } from '../../core/files.js';
 
 export default async function filesRoutes(fastify: FastifyInstance): Promise<void> {
@@ -86,35 +87,35 @@ export default async function filesRoutes(fastify: FastifyInstance): Promise<voi
   // Preview file (inline, not attachment)
   fastify.get('/:id/preview', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const result = getFileStream(id);
+    const file = getFileById(id);
 
-    if (!result) {
+    if (!file || !file.file_storage_path || !fs.existsSync(file.file_storage_path)) {
       reply.status(404).send({ success: false, error: '文件不存在或已被删除' });
       return;
     }
 
-    const { stream, file } = result;
+    const content = fs.readFileSync(file.file_storage_path);
     reply.type(file.mime_type || 'application/octet-stream');
     reply.header('Content-Disposition', 'inline');
     reply.header('Content-Length', file.size);
-    reply.send(stream);
+    reply.send(content);
   });
 
   // Download file
   fastify.get('/:id/download', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const result = getFileStream(id);
+    const file = getFileById(id);
 
-    if (!result) {
+    if (!file || !file.file_storage_path || !fs.existsSync(file.file_storage_path)) {
       reply.status(404).send({ success: false, error: '文件不存在或已被删除' });
       return;
     }
 
-    const { stream, file } = result;
+    const content = fs.readFileSync(file.file_storage_path);
     reply.type(file.mime_type || 'application/octet-stream');
     reply.header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`);
     reply.header('Content-Length', file.size);
-    reply.send(stream);
+    reply.send(content);
   });
 
   // Delete file/folder

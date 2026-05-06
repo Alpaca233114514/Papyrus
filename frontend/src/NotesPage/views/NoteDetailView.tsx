@@ -84,20 +84,24 @@ export const NoteDetailView = ({
     return () => window.removeEventListener('papyrus_edit_lock_changed', handleLockChange as EventListener);
   }, [isGloballyLocked, isCreateMode]);
 
-  // 初始化表单
+  // 初始化表单 - 编辑模式
   useEffect(() => {
     if (note) {
       setTitle(note.title);
       setContent(note.content || note.preview);
       setFolder(note.folder);
       setTags(note.tags);
-    } else if (isCreateMode) {
-      setTitle('');
+    }
+  }, [note]);
+
+  // 创建模式初始化 - 只在进入创建模式时执行
+  useEffect(() => {
+    if (isCreateMode && !note) {
       setContent('');
       setFolder(allFolders[0] || '默认文件夹');
       setTags([]);
     }
-  }, [note, isCreateMode, allFolders]);
+  }, [isCreateMode, allFolders, note]);
 
   // 输入变化时标记脏状态
   useEffect(() => {

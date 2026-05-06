@@ -11,7 +11,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@arco-design/web-react": "2.66.11",
+    "@arco-design/web-react": "^2.66.14",
     "dompurify": "^3.4.2",
     "i18next": "^26.0.8",
     "mammoth": "^1.12.0",

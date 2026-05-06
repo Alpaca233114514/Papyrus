@@ -45,9 +45,7 @@ export const StatsBar = ({ noteCount, totalWords, todayNotes, tagCount }: StatsB
   const poem = sceneryConfig.poem || '且将新火试新茶，诗酒趁年华。';
   const source = sceneryConfig.source || '[宋] 苏轼《望江南·超然台作》';
   const overlayOpacity = Math.max(0.25, Math.min(0.75, sceneryConfig.opacity));
-  const overlayColor = averageBrightness > 128
-    ? `rgba(255, 255, 255, ${overlayOpacity})`
-    : `rgba(0, 0, 0, ${overlayOpacity})`;
+  const overlayColor = `rgba(255, 255, 255, ${overlayOpacity})`;
 
   return (
     <div style={{

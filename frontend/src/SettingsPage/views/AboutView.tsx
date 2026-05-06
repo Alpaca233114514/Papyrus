@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Typography,
@@ -29,12 +30,12 @@ declare const __APP_VERSION__: string;
 const APP_VERSION = __APP_VERSION__;
 
 const AboutView = ({ onBack }: AboutViewProps) => {
+  const { t } = useTranslation();
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [checkResult, setCheckResult] = useState<'idle' | 'update' | 'latest' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
-  // 组件挂载时获取当前版本
   useEffect(() => {
     fetchCurrentVersion();
   }, []);
@@ -52,7 +53,7 @@ const AboutView = ({ onBack }: AboutViewProps) => {
         published_at: null,
       });
     } catch (error) {
-      console.error('获取版本信息失败:', error);
+      console.error(t('aboutView.fetchVersionFailed'), error);
     }
   };
 
@@ -68,19 +69,20 @@ const AboutView = ({ onBack }: AboutViewProps) => {
         setVersionInfo(result.data);
         if (result.data.has_update) {
           setCheckResult('update');
-          Message.info(`发现新版本: ${result.data.latest_version}`);
+          Message.info(t('aboutView.updateAvailable', { version: result.data.latest_version }));
         } else {
           setCheckResult('latest');
-          Message.success('当前已是最新版本');
+          Message.success(t('aboutView.latestVersion'));
         }
       } else {
         setCheckResult('error');
-        setErrorMessage(result.message || '检查更新失败');
-        Message.error(result.message || '检查更新失败');
+        const errMsg = result.message || t('aboutView.updateCheckFailed');
+        setErrorMessage(errMsg);
+        Message.error(errMsg);
       }
     } catch (error) {
       setCheckResult('error');
-      const msg = error instanceof Error ? error.message : '网络错误，请稍后重试';
+      const msg = error instanceof Error ? error.message : t('aboutView.updateCheckFailed');
       setErrorMessage(msg);
       Message.error(msg);
     } finally {
@@ -104,11 +106,10 @@ const AboutView = ({ onBack }: AboutViewProps) => {
     if (url && isAllowedExternalUrl(url)) {
       window.open(url, '_blank');
     } else if (url) {
-      Message.warning('未知的下载来源，已阻止打开');
+      Message.warning(t('aboutView.downloadBlocked'));
     }
   };
 
-  // 格式化发布日期
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '';
     try {
@@ -123,7 +124,6 @@ const AboutView = ({ onBack }: AboutViewProps) => {
     }
   };
 
-  // 截断发布说明（只显示前200字符）
   const truncateReleaseNotes = (notes: string | null) => {
     if (!notes) return '';
     if (notes.length <= 200) return notes;
@@ -139,10 +139,10 @@ const AboutView = ({ onBack }: AboutViewProps) => {
           onClick={onBack}
           className="settings-back-btn"
         >
-          返回
+          {t('aboutView.back')}
         </Button>
       </div>
-      <Title heading={2} className="settings-detail-title">关于</Title>
+      <Title heading={2} className="settings-detail-title">{t('aboutView.title')}</Title>
 
       <div className="settings-section about-hero">
         <img
@@ -150,12 +150,12 @@ const AboutView = ({ onBack }: AboutViewProps) => {
           alt="Papyrus Desktop"
           className="about-logo"
         />
-        <Title heading={3} className="about-app-name">Papyrus Desktop</Title>
+        <Title heading={3} className="about-app-name">{t('aboutView.appName')}</Title>
         <Text type="secondary" className="about-version">
-          版本 {versionInfo?.current_version || APP_VERSION}
+          {t('aboutView.version', { version: versionInfo?.current_version || APP_VERSION })}
         </Text>
         <Paragraph type="secondary" className="about-description">
-          SRS 复习引擎 - 基于间隔重复算法的智能记忆卡片应用
+          {t('aboutView.description')}
         </Paragraph>
 
         <div className="about-actions">
@@ -167,7 +167,7 @@ const AboutView = ({ onBack }: AboutViewProps) => {
               icon={<IconExclamationCircle />}
               onClick={handleDownload}
             >
-              下载更新
+              {t('aboutView.downloadUpdate')}
             </Button>
           ) : (
             <Button
@@ -177,7 +177,7 @@ const AboutView = ({ onBack }: AboutViewProps) => {
               disabled={isChecking}
               icon={isChecking ? <Spin size={14} /> : <IconCheckCircle />}
             >
-              {isChecking ? '检查中...' : '检查更新'}
+              {isChecking ? t('aboutView.checking') : t('aboutView.checkUpdate')}
             </Button>
           )}
           <Button
@@ -189,16 +189,15 @@ const AboutView = ({ onBack }: AboutViewProps) => {
             }}
           >
             <IconGithub className="about-github-icon" />
-            GitHub
+            {t('aboutView.github')}
           </Button>
         </div>
 
-        {/* 更新状态提示 */}
         {checkResult === 'latest' && (
           <div className="about-status-badge success">
             <IconCheckCircle className="about-status-icon success" />
             <Text className="about-status-text success">
-              当前已是最新版本
+              {t('aboutView.latestVersion')}
             </Text>
           </div>
         )}
@@ -207,26 +206,25 @@ const AboutView = ({ onBack }: AboutViewProps) => {
           <div className="about-status-badge error">
             <IconExclamationCircle className="about-status-icon error" />
             <Text className="about-status-text error">
-              {errorMessage || '检查更新失败'}
+              {errorMessage || t('aboutView.updateCheckFailed')}
             </Text>
           </div>
         )}
       </div>
 
-      {/* 更新详情 */}
       {checkResult === 'update' && versionInfo?.has_update && (
         <div
           className="settings-section about-update-card"
         >
           <Title heading={4} className="settings-section-title about-update-title">
             <IconInfoCircle className="about-update-title-icon" />
-            发现新版本
+            {t('aboutView.newVersionTitle')}
           </Title>
           <div className="about-update-version-row">
             <Text bold className="about-update-version">{versionInfo.latest_version}</Text>
             {versionInfo.published_at && (
               <Text type="secondary" className="about-update-date">
-                发布于 {formatDate(versionInfo.published_at)}
+                {t('aboutView.publishedAt', { date: formatDate(versionInfo.published_at) })}
               </Text>
             )}
           </div>
@@ -238,15 +236,15 @@ const AboutView = ({ onBack }: AboutViewProps) => {
             </div>
           )}
           <Button type="primary" onClick={handleDownload}>
-            前往下载页面
+            {t('aboutView.goToDownload')}
           </Button>
         </div>
       )}
 
       <div className="settings-section">
-        <Title heading={4} className="settings-section-title">致谢</Title>
+        <Title heading={4} className="settings-section-title">{t('aboutView.acknowledgements')}</Title>
         <Paragraph type="secondary" className="about-paragraph">
-          感谢使用 Papyrus Desktop！本应用使用了以下开源项目：
+          {t('aboutView.acknowledgementsDesc')}
         </Paragraph>
         <div className="about-tech-tags">
           {['React', 'Arco Design', 'Electron', 'Node.js'].map(tech => (
@@ -256,16 +254,16 @@ const AboutView = ({ onBack }: AboutViewProps) => {
       </div>
 
       <div className="settings-section">
-        <Title heading={4} className="settings-section-title">许可证</Title>
+        <Title heading={4} className="settings-section-title">{t('aboutView.license')}</Title>
         <Paragraph type="secondary" className="about-paragraph">
-          Papyrus Desktop 采用 MIT 许可证开源。您可以自由使用、修改和分发本软件。
+          {t('aboutView.licenseDesc')}
         </Paragraph>
       </div>
 
       <div className="settings-tip about-tip">
         <IconHeart className="about-tip-icon" />
         <Text type="secondary" className="about-tip-text">
-          如果喜欢这个项目，请在 GitHub 上给我们一个 Star ⭐
+          {t('aboutView.starTip')}
         </Text>
       </div>
     </div>

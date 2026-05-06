@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Message } from '@arco-design/web-react';
+import { useTranslation } from 'react-i18next';
 import { NoteListView } from './views/NoteListView';
 import { NoteDetailView } from './views/NoteDetailView';
 import { FileTree } from './components/FileTree';
@@ -11,6 +12,7 @@ import type { Note } from './types';
 type ViewMode = 'list' | 'detail';
 
 const NotesPage = () => {
+  const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [isCreateMode, setIsCreateMode] = useState(false);
@@ -25,16 +27,19 @@ const NotesPage = () => {
     activeFolder,
     totalWords,
     todayNotes,
+    isLoading,
     setActiveFolder,
     saveNote,
     deleteNote,
     refreshNotes,
   } = useNotes();
 
+  console.log('[NotesPage] isLoading:', isLoading, 'notes count:', notes.length);
+
   // 获取所有文件夹名称
   const allFolders = useMemo(() => 
-    folders.filter(f => f.name !== '全部笔记').map(f => f.name),
-    [folders]
+    folders.filter(f => f.name !== t('notesPage.allNotes')).map(f => f.name),
+    [folders, t]
   );
 
   // 打开笔记详情
@@ -79,11 +84,11 @@ const NotesPage = () => {
     try {
       await deleteNote(id);
       setViewMode('list');
-      Message.success('删除成功');
+      Message.success(t('notesPage.deleteSuccess'));
     } catch (err) {
-      Message.error(err instanceof Error ? err.message : '删除失败');
+      Message.error(err instanceof Error ? err.message : t('notesPage.deleteFailed'));
     }
-  }, [deleteNote]);
+  }, [deleteNote, t]);
 
   // 监听全局新建笔记事件（来自 TitleBar）
   useEffect(() => {
@@ -175,6 +180,7 @@ const NotesPage = () => {
             activeFolder={activeFolder}
             totalWords={totalWords}
             todayNotes={todayNotes}
+            isLoading={isLoading}
             onFolderChange={setActiveFolder}
             onNoteClick={handleNoteClick}
             onCreateClick={handleCreateClick}

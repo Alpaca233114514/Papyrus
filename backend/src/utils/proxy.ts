@@ -110,6 +110,16 @@ export async function fetchWithProxy(url: string, init?: RequestInit): Promise<R
     return global.fetch(url, init);
   }
 
+  try {
+    const parsedUrl = new URL(url);
+    const hostname = parsedUrl.hostname.toLowerCase();
+    if (!hostname.endsWith('github.com') && !hostname.endsWith('githubusercontent.com')) {
+      return global.fetch(url, init);
+    }
+  } catch {
+    return global.fetch(url, init);
+  }
+
   const proxyAgent = createProxyAgent();
   if (!proxyAgent) {
     return global.fetch(url, init);

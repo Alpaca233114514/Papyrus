@@ -73,7 +73,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
       window.dispatchEvent(new CustomEvent('papyrus_user_profile_changed'));
     } catch (error) {
       console.error('Failed to save user profile:', error);
-      Message.error('保存用户设置失败');
+      Message.error(t('titleBar.saveProfileFailed'));
     }
   };
 
@@ -92,7 +92,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
     };
     saveUserProfile(newProfile);
     setProfileModalVisible(false);
-    Message.success('用户设置已保存');
+    Message.success(t('titleBar.profileSaved'));
   };
 
   // 处理头像上传
@@ -107,13 +107,13 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
 
     // 验证文件类型
     if (!file.type.startsWith('image/')) {
-      Message.error('请选择图片文件');
+      Message.error(t('titleBar.pleaseSelectImage'));
       return;
     }
 
     // 验证文件大小（最大 2MB）
     if (file.size > 2 * 1024 * 1024) {
-      Message.error('图片大小不能超过 2MB');
+      Message.error(t('titleBar.imageSizeExceeds'));
       return;
     }
 
@@ -161,22 +161,26 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
     if (onPageChange) {
       onPageChange('notes');
     }
-    // 分派全局事件，让 NotesPage 进入创建模式
-    window.dispatchEvent(new CustomEvent('papyrus_new_note'));
-    Message.success('创建新笔记');
+    // 延迟派发事件，确保 NotesPage 组件已挂载并注册监听器
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('papyrus_new_note'));
+    }, 100);
+    Message.success(t('titleBar.createNewNote'));
   };
 
   const handleNewCard = () => {
     if (onPageChange) {
       onPageChange('scroll');
     }
-    // 分派全局事件，让 ScrollPage 进入创建模式
-    window.dispatchEvent(new CustomEvent('papyrus_new_card'));
-    Message.success('创建新卡片');
+    // 延迟派发事件，确保 ScrollPage 组件已挂载并注册监听器
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('papyrus_new_card'));
+    }, 100);
+    Message.success(t('titleBar.createNewCard'));
   };
 
   const handleNewWindow = () => {
-    Message.info('新窗口功能开发中');
+    Message.info(t('titleBar.newWindowComingSoon'));
   };
 
   // 打开菜单项
@@ -205,7 +209,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
 
   const handleConfirmImport = async () => {
     if (!importContent.trim()) {
-      Message.error('请输入要导入的内容');
+      Message.error(t('titleBar.pleaseEnterImportContent'));
       return;
     }
     try {
@@ -232,7 +236,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
 
   // 关闭功能
   const handleCloseEditor = () => {
-    Message.info('关闭当前编辑器');
+    Message.info(t('titleBar.closeCurrentEditor'));
   };
 
   const handleExit = () => {
@@ -247,7 +251,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
 
   // 首选项
   const handlePreferences = () => {
-    Message.info('首选项功能开发中');
+    Message.info(t('titleBar.preferencesComingSoon'));
   };
 
   // 文件菜单下拉内容
@@ -307,7 +311,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
       {/* 导入/导出组 */}
       <Menu.Item key="import" onClick={handleImportTxt}>
         <span className="tw-flex tw-items-center tw-w-full">
-          从文本导入卡片...
+          {t('titleBar.importFromText')}
           <Shortcut keys={getShortcutDisplay('importTxt')} />
         </span>
       </Menu.Item>
@@ -317,13 +321,13 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
       {/* 保存组 */}
       <Menu.Item key="save" onClick={handleSave}>
         <span className="tw-flex tw-items-center tw-w-full">
-          保存
+          {t('titleBar.save')}
           <Shortcut keys={getShortcutDisplay('save')} />
         </span>
       </Menu.Item>
       <Menu.Item key="save-all" onClick={handleSaveAll}>
         <span className="tw-flex tw-items-center tw-w-full">
-          全部保存
+          {t('titleBar.saveAll')}
           <Shortcut keys={getShortcutDisplay('saveAll')} />
         </span>
       </Menu.Item>
@@ -333,7 +337,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
       {/* 首选项 */}
       <Menu.Item key="preferences" onClick={handlePreferences}>
         <span className="tw-flex tw-items-center tw-w-full">
-          首选项
+          {t('titleBar.preferences')}
           <Shortcut keys={getShortcutDisplay('preferences')} />
         </span>
       </Menu.Item>
@@ -343,13 +347,13 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
       {/* 关闭组 */}
       <Menu.Item key="close-editor" onClick={handleCloseEditor}>
         <span className="tw-flex tw-items-center tw-w-full">
-          关闭编辑器
+          {t('titleBar.closeEditor')}
           <Shortcut keys={getShortcutDisplay('closeEditor')} />
         </span>
       </Menu.Item>
       <Menu.Item key="exit" onClick={handleExit}>
         <span className="tw-flex tw-items-center tw-w-full">
-          退出
+          {t('titleBar.exit')}
           <Shortcut keys={getShortcutDisplay('exit')} />
         </span>
       </Menu.Item>
@@ -361,45 +365,45 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
     <Menu style={{ width: 240, maxHeight: 'none', overflow: 'visible' }}>
       <Menu.Item key="undo" onClick={() => { try { document.execCommand('undo'); } catch { /* ignore */ } }}>
         <span className="tw-flex tw-items-center tw-w-full">
-          撤销
+          {t('titleBar.undo')}
           <Shortcut keys={getShortcutDisplay('undo')} />
         </span>
       </Menu.Item>
       <Menu.Item key="redo" onClick={() => { try { document.execCommand('redo'); } catch { /* ignore */ } }}>
         <span className="tw-flex tw-items-center tw-w-full">
-          重做
+          {t('titleBar.redo')}
           <Shortcut keys={getShortcutDisplay('redo')} />
         </span>
       </Menu.Item>
       <Divider style={{ margin: '4px 0' }} />
       <Menu.Item key="cut">
         <span className="tw-flex tw-items-center tw-w-full">
-          剪切
+          {t('titleBar.cut')}
           <Shortcut keys={getShortcutDisplay('cut')} />
         </span>
       </Menu.Item>
       <Menu.Item key="copy">
         <span className="tw-flex tw-items-center tw-w-full">
-          复制
+          {t('titleBar.copy')}
           <Shortcut keys={getShortcutDisplay('copy')} />
         </span>
       </Menu.Item>
       <Menu.Item key="paste">
         <span className="tw-flex tw-items-center tw-w-full">
-          粘贴
+          {t('titleBar.paste')}
           <Shortcut keys={getShortcutDisplay('paste')} />
         </span>
       </Menu.Item>
       <Divider style={{ margin: '4px 0' }} />
       <Menu.Item key="select-all">
         <span className="tw-flex tw-items-center tw-w-full">
-          全选
+          {t('titleBar.selectAll')}
           <Shortcut keys={getShortcutDisplay('selectAll')} />
         </span>
       </Menu.Item>
       <Menu.Item key="find">
         <span className="tw-flex tw-items-center tw-w-full">
-          查找
+          {t('titleBar.find')}
           <Shortcut keys={getShortcutDisplay('find')} />
         </span>
       </Menu.Item>
@@ -484,20 +488,20 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
 
       {/* 导入对话框 */}
       <Modal
-        title="从文本导入卡片"
+        title={t('titleBar.importFromText')}
         visible={importModalVisible}
         onOk={handleConfirmImport}
         onCancel={() => setImportModalVisible(false)}
-        okText="导入"
-        cancelText="取消"
+        okText={t('titleBar.import')}
+        cancelText={t('titleBar.cancel')}
       >
         <div className="tw-mb-4">
           <p className="tw-mb-2 tw-text-arco-text-2">
-            输入格式：<code>问题 === 答案</code>，每组一行
+            {t('titleBar.importFormat')}: <code>问题 === 答案</code>，{t('titleBar.onePerLine')}
           </p>
           <Input.TextArea
-            placeholder="例如：\n环境问题 A === 答案 A\n环境问题 B === 答案 B"
-            aria-label="导入内容，格式：问题 === 答案"
+            placeholder={t('titleBar.importPlaceholder')}
+            aria-label={t('titleBar.importContentAria')}
             value={importContent}
             onChange={(value: string) => setImportContent(value)}
             rows={8}
@@ -507,12 +511,12 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
 
       {/* 用户设置对话框 */}
       <Modal
-        title="用户设置"
+        title={t('titleBar.userSettings')}
         visible={profileModalVisible}
         onOk={handleCloseProfileModal}
         onCancel={() => setProfileModalVisible(false)}
-        okText="保存"
-        cancelText="取消"
+        okText={t('titleBar.save')}
+        cancelText={t('titleBar.cancel')}
       >
         <div className="tw-flex tw-flex-col tw-gap-6">
           {/* 头像上传区域 */}
@@ -532,10 +536,10 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
               accept="image/*"
               className="tw-hidden"
               onChange={handleFileChange}
-              aria-label="选择头像图片"
+              aria-label={t('titleBar.selectAvatarImage')}
             />
             <span className="tw-text-sm tw-text-arco-text-3">
-              点击上传头像（最大 2MB）
+              {t('titleBar.clickToUploadAvatar')}
             </span>
           </div>
 
@@ -544,17 +548,17 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
           {/* 用户名称输入 */}
           <div className="tw-flex tw-flex-col tw-gap-2">
             <label className="tw-text-sm tw-font-medium tw-text-arco-text-1">
-              用户标识
+              {t('titleBar.userId')}
             </label>
             <Input
               value={tempUserId}
               onChange={handleUserIdChange}
-              placeholder="请输入用户标识"
+              placeholder={t('titleBar.enterUserId')}
               maxLength={10}
               showWordLimit
             />
             <span className="tw-text-xs tw-text-arco-text-3">
-              将显示为头像文字（最多10个字符）
+              {t('titleBar.userIdHint')}
             </span>
           </div>
 
@@ -565,7 +569,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
             onClick={handleResetDefault}
             long
           >
-            恢复默认设置
+            {t('titleBar.restoreDefault')}
           </Button>
         </div>
       </Modal>

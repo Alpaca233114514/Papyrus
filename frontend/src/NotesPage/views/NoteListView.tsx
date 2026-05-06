@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { Typography, Button, Tag, Message, Modal } from '@arco-design/web-react';
 import { IconPlus, IconDelete, IconClose } from '@arco-design/web-react/icon';
 import type { Note, Folder } from '../types';
-import { NoteCard, FolderTab, AddCard, StatsBar } from '../components';
+import { NoteCard, FolderTab, AddCard, StatsBar, SkeletonLoader } from '../components';
 import { PRIMARY_COLOR, UNIFIED_BTN_STYLE } from '../constants';
 import { api } from '../../api';
 
@@ -13,6 +13,7 @@ interface NoteListViewProps {
   activeFolder: string;
   totalWords: number;
   todayNotes: number;
+  isLoading: boolean;
   onFolderChange: (folder: string) => void;
   onNoteClick: (note: Note) => void;
   onCreateClick: () => void;
@@ -26,11 +27,14 @@ export const NoteListView = ({
   activeFolder,
   totalWords,
   todayNotes,
+  isLoading,
   onFolderChange,
   onNoteClick,
   onCreateClick,
   onNotesDeleted,
 }: NoteListViewProps) => {
+  console.log('[NoteListView] isLoading:', isLoading);
+
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -69,6 +73,11 @@ export const NoteListView = ({
       },
     });
   }, [selectedIds, onNotesDeleted]);
+
+  if (isLoading) {
+    console.log('[NoteListView] Rendering SkeletonLoader because isLoading is true');
+    return <SkeletonLoader />;
+  }
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '48px 64px 64px' }}>

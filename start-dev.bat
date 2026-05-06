@@ -44,6 +44,11 @@ echo.
 echo 检查依赖...
 
 :: 检查 Node 依赖
+if not exist "node_modules" (
+    echo   正在安装根目录依赖...
+    call npm install
+)
+
 if not exist "frontend\node_modules" (
     echo   正在安装前端依赖...
     cd frontend

@@ -3,6 +3,7 @@ import path from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
 import { Mutex } from 'async-mutex';
 import OpenAI from 'openai';
+import type { Fetch } from 'openai/core';
 import type { AIConfig } from './config.js';
 import { isPrivateUrl } from './config.js';
 import { LLMCache } from './llm-cache.js';
@@ -942,19 +943,25 @@ export class AIManager {
     const client = new OpenAI({
       apiKey: apiKey || 'dummy',
       baseURL: baseUrl,
-      fetch: ((url: string, init?: RequestInit) => {
-        const reqUrl = url as string;
-        const reqInit = init as RequestInit | undefined;
-        const headers = new Headers(reqInit?.headers);
-        if (!apiKey) {
-          headers.delete('Authorization');
+      fetch: ((url: Parameters<Fetch>[0], init?: Parameters<Fetch>[1]) => {
+        const reqUrl = typeof url === 'string' ? url : url instanceof URL ? url.toString() : new URL((url as { url: string }).url).toString();
+        const reqInit = init || {};
+        let headers: Record<string, string> = {};
+        if (reqInit.headers instanceof Headers) {
+          headers = Object.fromEntries(reqInit.headers.entries());
+        } else if (typeof reqInit.headers === 'object') {
+          headers = { ...(reqInit.headers as Record<string, string>) };
+        }
+        if (!apiKey && headers['authorization']) {
+          delete headers['authorization'];
         }
         if (providerName === 'liyuan-deepseek') {
-          headers.set('X-Papyrus-Client-Id', getClientId());
-          headers.set('User-Agent', 'PapyrusDesktop/2.0');
+          headers['X-Papyrus-Client-Id'] = getClientId();
+          headers['User-Agent'] = 'PapyrusDesktop/2.0';
         }
-        return fetchWithProxy(reqUrl, { ...reqInit, headers });
-      }) as unknown as OpenAIFetchParam,
+        delete headers['content-length'];
+        return fetchWithProxy(reqUrl, { ...reqInit, headers } as unknown as RequestInit) as unknown as ReturnType<Fetch>;
+      }) as Fetch,
     });
 
     const baseParams: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {

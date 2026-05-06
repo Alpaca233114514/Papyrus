@@ -59,6 +59,13 @@
   outline-offset: var(--a11y-focus-offset);
 }
 
+/* 输入框除外 - 使用box-shadow替代outline */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+}
+
 /* 鼠标点击时不显示焦点 */
 :focus:not(:focus-visible) {
   outline: none;

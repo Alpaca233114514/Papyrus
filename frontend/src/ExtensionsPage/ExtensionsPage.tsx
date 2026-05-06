@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { IconPlus, IconSettings, IconDelete, IconCheckCircleFill, IconDownload, IconStarFill, IconRefresh } from '@arco-design/web-react/icon';
 import { usePageScenery } from '../hooks/useScenery';
 import { useSceneryColor, getAdaptivePrimaryColor } from '../hooks/useSceneryColor';
+import { useCommonCardStyle, CommonCard } from '../components';
 
 const PRIMARY_COLOR = '#206CCF';
 const SUCCESS_COLOR = '#00B42A';
@@ -21,26 +22,18 @@ interface Extension {
   tags: string[];
 }
 
-// 通用卡片样式
-const useCardStyle = (hovered: boolean) => ({
-  borderRadius: '16px',
-  border: `1px solid ${hovered ? PRIMARY_COLOR : 'var(--color-text-3)'}`,
-  background: hovered ? `${PRIMARY_COLOR}08` : 'var(--color-bg-1)',
-  transition: 'border-color 0.2s, background 0.2s',
-  cursor: 'pointer',
-});
-
 // 扩展卡片
 const ExtensionCard = ({ ext, isInstalled, onToggle }: { ext: Extension; isInstalled?: boolean; onToggle?: (enabled: boolean) => void }) => {
-  const [hovered, setHovered] = useState(false);
-  const cardStyle = useCardStyle(hovered);
+  const { hovered, setHovered, cardStyle } = useCommonCardStyle({
+    borderWidth: 1,
+  });
 
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+    <CommonCard
+      hovered={hovered}
+      setHovered={setHovered}
+      cardStyle={cardStyle}
       style={{
-        ...cardStyle,
         padding: '20px',
         display: 'flex',
         flexDirection: 'column',
@@ -104,7 +97,7 @@ const ExtensionCard = ({ ext, isInstalled, onToggle }: { ext: Extension; isInsta
           安装
         </Button>
       )}
-    </div>
+    </CommonCard>
   );
 };
 

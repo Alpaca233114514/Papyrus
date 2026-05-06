@@ -41,18 +41,18 @@ type PendingCardProps = {
   onStartStudy?: () => void;
 };
 
-function getGreeting(hour: number): string {
-  if (hour < 6) return '夜深了';
-  if (hour < 12) return '早安';
-  if (hour < 18) return '下午好';
-  return '晚上好';
+function getGreeting(hour: number, t: (key: string) => string): string {
+  if (hour < 6) return t('startPage.lateNight');
+  if (hour < 12) return t('startPage.goodMorning');
+  if (hour < 18) return t('startPage.goodAfternoon');
+  return t('startPage.goodEvening');
 }
 
 function formatDateLabel(date: Date): string {
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
 }
 
-function useStartPageData(): StartPageData & { refresh: () => void } {
+function useStartPageData(t: (key: string) => string): StartPageData & { refresh: () => void } {
   const [today] = useState(() => new Date());
   const [solarTerm, setSolarTerm] = useState<string | null>(() => getSolarTerm(today));
   const [scenery, setScenery] = useState<SceneryContent | null>(null);
@@ -99,14 +99,14 @@ function useStartPageData(): StartPageData & { refresh: () => void } {
   }, [refresh]);
 
   return useMemo(() => ({
-    greeting: getGreeting(today.getHours()),
+    greeting: getGreeting(today.getHours(), t),
     dateLabel: formatDateLabel(today),
     solarTerm,
     scenery,
     stats,
     loading,
     refresh,
-  }), [today, solarTerm, scenery, stats, loading, refresh]);
+  }), [today, solarTerm, scenery, stats, loading, refresh, t]);
 }
 
 function useCardHeight() {
@@ -283,7 +283,7 @@ const PendingCard = ({ stats, greeting, dateLabel, solarTerm, loading, onStartSt
           )}
         </Typography.Paragraph>
         <Typography.Text className="scenery-sub-text start-card-subline">
-          {loading ? '' : `已连续精进 ${stats.streakDays} 天 | 今日目标已完成 ${stats.todayProgress}%`}
+          {loading ? '' : t('startPage.streakProgress', { streakDays: stats.streakDays, todayProgress: stats.todayProgress })}
         </Typography.Text>
       </div>
 
@@ -321,8 +321,12 @@ const PendingCard = ({ stats, greeting, dateLabel, solarTerm, loading, onStartSt
 };
 
 const DoneCard = ({ scenery }: { scenery: SceneryContent | null }) => {
+  const { t } = useTranslation();
   const [hovered, setHovered] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const hoverState = hovered ? 'true' : 'false';
+
+  const defaultImage = './scenery/image.png';
 
   // 窗景关闭时（scenery 为 null），显示纯背景卡片样式
   if (!scenery) {
@@ -334,13 +338,13 @@ const DoneCard = ({ scenery }: { scenery: SceneryContent | null }) => {
             spacing='close'
             className="start-card-headline"
           >
-            恭喜你，今日任务已完成！
+            {t('startPage.congratulations')}
           </Typography.Paragraph>
         </div>
 
         <div className="start-card-bottom">
           <Typography.Text className="scenery-sub-text start-card-greeting">
-            继续保持，明天见。
+            {t('startPage.keepGoing')}
           </Typography.Text>
         </div>
       </div>
@@ -348,7 +352,7 @@ const DoneCard = ({ scenery }: { scenery: SceneryContent | null }) => {
   }
 
   // 窗景开启时，显示图片 + 诗句 + 渐变遮罩
-  const image = scenery.image;
+  const image = imageError ? defaultImage : scenery.image;
   const poem = scenery.poem ?? '且将新火试新茶，诗酒趁年华。';
   const source = scenery.source ?? '[宋] 苏轼《望江南·超然台作》';
 
@@ -363,6 +367,7 @@ const DoneCard = ({ scenery }: { scenery: SceneryContent | null }) => {
         alt={`窗景图片：${poem} —— ${source}`}
         className="start-scenery-image"
         data-hovered={hoverState}
+        onError={() => setImageError(true)}
       />
 
       <div className="start-done-greeting" data-hovered={hoverState}>
@@ -371,7 +376,7 @@ const DoneCard = ({ scenery }: { scenery: SceneryContent | null }) => {
           spacing='close'
           className="start-card-headline"
         >
-          恭喜你，今日任务已完成！
+          {t('startPage.congratulations')}
         </Typography.Paragraph>
       </div>
 
@@ -392,7 +397,8 @@ const DoneCard = ({ scenery }: { scenery: SceneryContent | null }) => {
 };
 
 const StartPage = ({ onDoneChange, onNavigate }: StartPageProps) => {
-  const data = useStartPageData();
+  const { t } = useTranslation();
+  const data = useStartPageData(t);
   const done = !data.loading && data.stats.cardsDue === 0;
   const [isStudying, setIsStudying] = useState(false);
   const [studyTag, setStudyTag] = useState<string | undefined>(undefined);
@@ -432,7 +438,7 @@ const StartPage = ({ onDoneChange, onNavigate }: StartPageProps) => {
     <div id="start-page-scroll" className="start-page-root">
       <div className="start-hero">
         <Typography.Title heading={1} className="start-hero-title">
-          开始
+          {t('startPage.title')}
         </Typography.Title>
 
         {done ? (
@@ -454,7 +460,7 @@ const StartPage = ({ onDoneChange, onNavigate }: StartPageProps) => {
 
       <div className="start-shelves">
         <Typography.Title heading={2} className="start-shelves-title">
-          书架
+          {t('startPage.bookshelf')}
         </Typography.Title>
 
         <ShelfSections
