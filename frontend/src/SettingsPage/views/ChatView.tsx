@@ -7,15 +7,7 @@ import {
   Slider,
   InputNumber,
   Typography,
-  Tag,
-  Card,
-  Popconfirm,
   Form,
-  Modal,
-  Divider,
-  Space,
-  Tooltip,
-  Checkbox,
   Input,
   Message,
 } from '@arco-design/web-react';
@@ -27,151 +19,26 @@ import {
   IconBulb,
   IconSettings,
   IconPlus,
-  IconDelete,
-  IconEdit,
-  IconTool,
-  IconEye,
-  IconDown,
-  IconLeft,
-  IconUser,
 } from '@arco-design/web-react/icon';
-import { SettingItem } from '../components';
-import { useScrollNavigation } from '../../hooks/useScrollNavigation';
-import { ProviderLogo } from '../../icons/ProviderLogo';
-import { ModelLogo } from '../../icons/ModelLogo';
+import { SettingItem, SettingsViewLayout } from '../components';
 import { api } from '../../api';
-import { PORT_OPTIONS } from '../../utils/modelSelector';
+import { NAV_ITEMS } from './ChatView/constants';
+import { loadUserProfile, saveUserProfile, loadAgentSettings, saveAgentSettings, notifyAIConfigChanged, renderCapabilityIcons } from './ChatView/utils';
+import { ProvidersSection } from './ChatView/components';
+import { ModelsSection } from './ChatView/components';
+import { AddProviderModal } from './ChatView/components';
+import { ModelModal } from './ChatView/components';
+import type { Provider, Model, UserProfile } from './ChatView/types';
 
 const FormItem = Form.Item;
 const { Title, Text, Paragraph } = Typography;
-const Option = Select.Option;
-
-const PROVIDER_PRESETS: Record<string, { name: string; baseUrl: string }> = {
-  openai: { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1' },
-  'openai-response': { name: 'OpenAI-Response', baseUrl: 'https://api.openai.com/v1' },
-  anthropic: { name: 'Anthropic', baseUrl: 'https://api.anthropic.com/v1' },
-  gemini: { name: 'Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta' },
-  'liyuan-deepseek': { name: 'LiYuan For DeepSeek', baseUrl: 'https://papyrus.liyuanstudio.com/v1' },
-  ollama: { name: 'Ollama', baseUrl: 'http://localhost:11434' },
-};
-
-const NAV_ITEMS = (t: (key: string) => string) => [
-  { key: 'general-section', label: t('chatView.general'), icon: IconMessage },
-  { key: 'user-section', label: t('chatView.user'), icon: IconUser },
-  { key: 'providers-section', label: t('chatView.providers'), icon: IconSafe },
-  { key: 'models-section', label: t('chatView.models'), icon: IconRobot },
-  { key: 'completion-section', label: t('chatView.completion'), icon: IconBulb },
-  { key: 'parameters-section', label: t('chatView.parameters'), icon: IconSettings },
-];
-
-interface ApiKeyItem {
-  id: string;
-  name: string;
-  key: string;
-}
-
-interface Model {
-  id: string;
-  name: string;
-  modelId: string;
-  enabled: boolean;
-  port: string;
-  capabilities: string[];
-  apiKeyId?: string;
-}
-
-interface Provider {
-  id: string;
-  type: string;
-  name: string;
-  apiKeys: ApiKeyItem[];
-  baseUrl: string;
-  models: Model[];
-  enabled: boolean;
-  isDefault: boolean;
-}
 
 interface ChatViewProps {
   onBack: () => void;
 }
 
-const CAPABILITIES_MAP = {
-  tools: { icon: IconTool, labelKey: 'chatView.tools' },
-  vision: { icon: IconEye, labelKey: 'chatView.vision' },
-  reasoning: { icon: IconBulb, labelKey: 'chatView.reasoning' },
-};
-
-const renderCapabilityIcons = (capabilities: string[], t: (key: string) => string) => {
-  return (
-    <Space size={8}>
-      {capabilities.map(cap => {
-        const capConfig = CAPABILITIES_MAP[cap as keyof typeof CAPABILITIES_MAP];
-        if (!capConfig) return null;
-        const IconComp = capConfig.icon;
-        return (
-          <Tooltip key={cap} content={t(capConfig.labelKey)}>
-            <IconComp style={{ color: 'var(--color-primary)', fontSize: 16 }} />
-          </Tooltip>
-        );
-      })}
-    </Space>
-  );
-};
-
-interface UserProfile {
-  userId: string;
-  avatarUrl: string | null;
-}
-
-const loadUserProfile = (): UserProfile => {
-  try {
-    const saved = localStorage.getItem('papyrus_user_profile');
-    if (saved) {
-      return JSON.parse(saved);
-    }
-  } catch {
-    // ignore
-  }
-  return { userId: '', avatarUrl: null };
-};
-
-const saveUserProfile = (profile: UserProfile) => {
-  try {
-    localStorage.setItem('papyrus_user_profile', JSON.stringify(profile));
-    window.dispatchEvent(new CustomEvent('papyrus_user_profile_changed'));
-  } catch {
-    // ignore
-  }
-};
-
-interface AgentSettings {
-  agentModeEnabled: boolean;
-}
-
-const loadAgentSettings = (): AgentSettings => {
-  try {
-    const saved = localStorage.getItem('papyrus_agent_settings');
-    if (saved) {
-      return JSON.parse(saved);
-    }
-  } catch {
-    // ignore
-  }
-  return { agentModeEnabled: false };
-};
-
-const saveAgentSettings = (settings: AgentSettings) => {
-  try {
-    localStorage.setItem('papyrus_agent_settings', JSON.stringify(settings));
-    window.dispatchEvent(new CustomEvent('papyrus_agent_settings_changed', { detail: settings }));
-  } catch {
-    // ignore
-  }
-};
-
 const ChatView = ({ onBack }: ChatViewProps) => {
   const { t } = useTranslation();
-  const { contentRef, activeSection, scrollToSection } = useScrollNavigation(NAV_ITEMS(t));
   const [agentModeEnabled, setAgentModeEnabledState] = useState(() => loadAgentSettings().agentModeEnabled);
   const [showTimestamp, setShowTimestamp] = useState(true);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -189,15 +56,9 @@ const ChatView = ({ onBack }: ChatViewProps) => {
   const [providersLoading, setProvidersLoading] = useState(false);
   const [currentModelId, setCurrentModelId] = useState<string>('');
   const [addModalVisible, setAddModalVisible] = useState(false);
-  const [addForm] = Form.useForm();
-  const [newProviderType, setNewProviderType] = useState('openai');
-  const [apiKeys, setApiKeys] = useState([{ id: '1', key: '', name: '' }]);
-  const [editingModel, setEditingModel] = useState<Model | null>(null);
   const [modelModalVisible, setModelModalVisible] = useState(false);
-  const [modelForm] = Form.useForm();
-  const [modelFormProviderId, setModelFormProviderId] = useState<string>('');
-  const [addLoading, setAddLoading] = useState(false);
-  const [saveModelLoading, setSaveModelLoading] = useState(false);
+  const [editingModel, setEditingModel] = useState<Model | null>(null);
+  const [modelModalProviderId, setModelModalProviderId] = useState<string>('');
 
   const selected = providers.find(p => p.enabled);
   
@@ -266,66 +127,6 @@ const ChatView = ({ onBack }: ChatViewProps) => {
     setProviders(providers.map(p => p.id === id ? { ...p, ...updates } : p));
   };
 
-  const addProvider = () => {
-    if (addLoading) return;
-    addForm.validate().then((values: { name?: string; baseUrl?: string }) => {
-      const preset = PROVIDER_PRESETS[newProviderType];
-
-      const validApiKeys = apiKeys
-        .filter(k => k.key.trim() !== '')
-        .map((k, index) => ({
-          id: k.id || crypto.randomUUID(),
-          name: k.name.trim() || `key-${index + 1}`,
-          key: k.key.trim()
-        }));
-
-      const finalApiKeys = validApiKeys.length > 0 ? validApiKeys : [{id: crypto.randomUUID(), name: 'default', key: ''}];
-
-      const newProvider: Provider = {
-        id: crypto.randomUUID(),
-        type: newProviderType,
-        name: values.name || preset.name,
-        apiKeys: finalApiKeys,
-        baseUrl: values.baseUrl || preset.baseUrl,
-        models: [],
-        enabled: false,
-        isDefault: false,
-      };
-
-      setAddLoading(true);
-      api.createProvider(newProvider)
-        .then(data => {
-          if (data.success) {
-            Message.success(t('chatView.supplierAdded'));
-            setAddModalVisible(false);
-            addForm.resetFields();
-            setApiKeys([{ id: '1', key: '', name: '' }]);
-            loadProviders();
-            notifyAIConfigChanged();
-            const firstKey = validApiKeys.find(k => k.key.trim() !== '');
-            if (firstKey) {
-              syncKeyToAIConfig(newProviderType, firstKey.key);
-            }
-          } else {
-            Message.error(data.error || t('chatView.addFailed'));
-          }
-        })
-        .catch(err => {
-          console.error('Failed to add provider:', err);
-          const msg = err instanceof Error ? err.message : String(err);
-          if (msg.includes('已存在')) {
-            Message.warning(t('chatView.supplierAlreadyExists'));
-          } else {
-            Message.error(t('chatView.addFailed'));
-          }
-        })
-        .finally(() => {
-          setAddLoading(false);
-        });
-
-    });
-  };
-
   const deleteProvider = (id: string) => {
     api.deleteProvider(id)
       .then(data => {
@@ -378,131 +179,9 @@ const ChatView = ({ onBack }: ChatViewProps) => {
 
   const openModelModal = (providerId?: string, model?: Model) => {
     const effectiveProviderId = providerId || '1';
-    const effectiveProvider = providers.find(p => p.id === effectiveProviderId);
-    setModelFormProviderId(effectiveProviderId);
-    
-    if (model) {
-      setEditingModel(model);
-      modelForm.setFieldsValue({
-        providerId: effectiveProviderId,
-        name: model.name,
-        modelId: model.modelId,
-        port: model.port,
-        apiKeyId: model.apiKeyId,
-        cap_tools: model.capabilities.includes('tools'),
-        cap_vision: model.capabilities.includes('vision'),
-        cap_reasoning: model.capabilities.includes('reasoning'),
-      });
-    } else {
-      setEditingModel(null);
-      modelForm.resetFields();
-      modelForm.setFieldValue('providerId', effectiveProviderId);
-      modelForm.setFieldValue('port', effectiveProvider?.type || 'openai');
-      modelForm.setFieldValue('apiKeyId', effectiveProvider?.apiKeys[0]?.id);
-      modelForm.setFieldValue('cap_tools', false);
-      modelForm.setFieldValue('cap_vision', false);
-      modelForm.setFieldValue('cap_reasoning', false);
-    }
+    setModelModalProviderId(effectiveProviderId);
+    setEditingModel(model || null);
     setModelModalVisible(true);
-  };
-
-  const saveModel = () => {
-    if (saveModelLoading) return;
-    modelForm.validate().then((values: {
-      name: string;
-      modelId: string;
-      port: string;
-      apiKeyId?: string;
-      providerId?: string;
-      cap_tools?: boolean;
-      cap_vision?: boolean;
-      cap_reasoning?: boolean;
-    }) => {
-      const targetProviderId = values.providerId || '';
-      const trimmedModelId = values.modelId.trim();
-
-      const targetProvider = providers.find(p => p.id === targetProviderId);
-      if (!targetProvider) {
-        Message.error(t('chatView.providerNotFound'));
-        return;
-      }
-
-      if (!trimmedModelId) {
-        Message.error(t('chatView.modelIdEmpty'));
-        return;
-      }
-
-      const capabilities: string[] = [];
-      if (values.cap_tools) capabilities.push('tools');
-      if (values.cap_vision) capabilities.push('vision');
-      if (values.cap_reasoning) capabilities.push('reasoning');
-
-      const modelData = {
-        id: editingModel ? editingModel.id : crypto.randomUUID(),
-        name: values.name.trim(),
-        modelId: trimmedModelId,
-        port: values.port,
-        capabilities,
-        apiKeyId: values.apiKeyId,
-        enabled: true,
-      };
-
-      const closeModal = () => {
-        setModelModalVisible(false);
-        modelForm.resetFields();
-        setEditingModel(null);
-        setModelFormProviderId('');
-      };
-
-      setSaveModelLoading(true);
-      if (editingModel) {
-        api.updateModel(targetProviderId, editingModel.id, modelData)
-          .then(data => {
-            if (data.success) {
-              Message.success(t('chatView.modelUpdated'));
-              loadProviders();
-              notifyAIConfigChanged();
-              closeModal();
-            } else {
-              Message.error(data.error || t('chatView.updateFailed'));
-            }
-          })
-          .catch(err => {
-            console.error('Failed to update model:', err);
-            Message.error(t('chatView.updateFailed'));
-          })
-          .finally(() => {
-            setSaveModelLoading(false);
-          });
-      } else {
-        api.addModel(targetProviderId, modelData)
-          .then(data => {
-            if (data.success) {
-              Message.success(t('chatView.modelAdded'));
-              loadProviders();
-              notifyAIConfigChanged();
-              closeModal();
-            } else {
-              Message.error(data.error || t('chatView.addFailed'));
-            }
-          })
-          .catch(err => {
-            console.error('Failed to add model:', err);
-            const msg = err instanceof Error ? err.message : String(err);
-            if (msg.includes('已存在')) {
-              Message.warning(t('chatView.modelAlreadyExists'));
-            } else {
-              Message.error(t('chatView.addFailed'));
-            }
-          })
-          .finally(() => {
-            setSaveModelLoading(false);
-          });
-      }
-    }).catch((err: unknown) => {
-      console.error('Model form validation failed:', err);
-      Message.error(t('chatView.formValidationFailed'));
-    });
   };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -559,10 +238,6 @@ const ChatView = ({ onBack }: ChatViewProps) => {
     }
   };
 
-  const notifyAIConfigChanged = () => {
-    window.dispatchEvent(new CustomEvent('papyrus_ai_config_changed'));
-  };
-
   const saveDefaultModel = async (modelId: string) => {
     setCurrentModelId(modelId);
     try {
@@ -603,108 +278,11 @@ const ChatView = ({ onBack }: ChatViewProps) => {
     notifyAIConfigChanged();
   };
 
-  return (
-    <div style={{
-      flex: 1,
-      display: 'flex',
-      overflow: 'hidden',
-      position: 'relative',
-      background: 'var(--color-bg-1)',
-      height: '100%',
-    }}>
-      <div style={{
-        width: 200,
-        height: '100%',
-        borderRight: '1px solid var(--color-border-2)',
-        background: 'var(--color-bg-1)',
-        display: 'flex',
-        flexDirection: 'column',
-        flexShrink: 0,
-      }}>
-        <div style={{
-          padding: 16,
-          borderBottom: '1px solid var(--color-border-2)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-        }}>
-          <Button
-            type="text"
-            icon={<IconArrowLeft />}
-            onClick={onBack}
-            style={{ padding: 0, fontSize: 14 }}
-          />
-          <Text style={{ fontSize: '14px', fontWeight: 500 }}>{t('chatView.title')}</Text>
-        </div>
-
-        <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
-          {NAV_ITEMS(t).map(({ key, label, icon: Icon }) => {
-            const isActive = activeSection === key;
-            return (
-              <button
-                key={key}
-                onClick={() => scrollToSection(key)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '10px 12px',
-                  cursor: 'pointer',
-                  borderRadius: 8,
-                  marginBottom: 4,
-                  background: isActive ? 'var(--color-primary-light)' : 'transparent',
-                  color: isActive ? 'var(--color-primary)' : 'var(--color-text-1)',
-                  border: 'none',
-                  width: '100%',
-                  textAlign: 'left',
-                  transition: 'all 0.2s',
-                  userSelect: 'none',
-                }}
-              >
-                <Icon style={{ fontSize: 16 }} />
-                <Text style={{ 
-                  fontSize: 13, 
-                  color: isActive ? 'var(--color-primary)' : 'inherit',
-                  fontWeight: isActive ? 500 : 400,
-                }}>{label}</Text>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div 
-        ref={contentRef}
-        onWheel={(e) => e.stopPropagation()}
-        style={{ 
-          flex: 1, 
-          overflowY: 'auto', 
-          padding: '32px 48px',
-        }}
-      >
-        <div style={{ marginBottom: 32 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-            <IconMessage style={{ fontSize: 32, color: 'var(--color-primary)' }} />
-            <Title heading={2} style={{ margin: 0, fontWeight: 400, fontSize: '28px' }}>
-              {t('chatView.title')}
-            </Title>
-          </div>
-          <Paragraph type="secondary">
-            {t('chatView.titleDesc')}
-          </Paragraph>
-        </div>
-
-        <div id="general-section" style={{ marginBottom: 48, scrollMarginTop: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>{t('chatView.general')}</Title>
-          </div>
-
-          <div className="settings-section" style={{ 
-            background: 'var(--color-bg-2)', 
-            borderRadius: 8, 
-            padding: '16px 20px',
-            marginBottom: 24,
-          }}>
+  const renderSection = (sectionId: string) => {
+    switch (sectionId) {
+      case 'general-section':
+        return (
+          <>
             <SettingItem title={t('chatView.agentMode')} desc={t('chatView.agentModeDesc')}>
               <Switch
                 checked={agentModeEnabled}
@@ -723,20 +301,12 @@ const ChatView = ({ onBack }: ChatViewProps) => {
             <SettingItem title={t('chatView.enterToSend')} desc={t('chatView.enterToSendDesc')} divider={false}>
               <Switch checked={sendOnEnter} onChange={setSendOnEnter} />
             </SettingItem>
-          </div>
-        </div>
+          </>
+        );
 
-        <div id="user-section" style={{ marginBottom: 48, scrollMarginTop: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>{t('chatView.user')}</Title>
-          </div>
-
-          <div className="settings-section" style={{ 
-            background: 'var(--color-bg-2)', 
-            borderRadius: 8, 
-            padding: '16px 20px',
-            marginBottom: 24,
-          }}>
+      case 'user-section':
+        return (
+          <>
             <SettingItem title={t('chatView.userId')} desc={t('chatView.userIdDesc')}>
               <Input
                 value={userProfile.userId}
@@ -813,76 +383,12 @@ const ChatView = ({ onBack }: ChatViewProps) => {
                 </Paragraph>
               </div>
             </SettingItem>
-          </div>
-        </div>
+          </>
+        );
 
-        <div id="providers-section" style={{ marginBottom: 48, scrollMarginTop: 24 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>{t('chatView.providers')}</Title>
-            <Button type="primary" icon={<IconPlus />} onClick={() => setAddModalVisible(true)} style={{ borderRadius: '999px', padding: '4px 16px', display: 'flex', alignItems: 'center' }}>
-              {t('chatView.addProvider')}
-            </Button>
-          </div>
-
-          <div className="settings-section" style={{ 
-            background: 'var(--color-bg-2)', 
-            borderRadius: 8, 
-            padding: '16px 20px',
-            marginBottom: 24,
-          }}>
-            <ProvidersSection providers={providers} loadProviders={loadProviders} deleteProvider={deleteProvider} setDefault={setDefault} syncKeyToAIConfig={syncKeyToAIConfig} t={t} />
-          </div>
-        </div>
-
-        <div id="models-section" style={{ marginBottom: 48, scrollMarginTop: 24 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>{t('chatView.models')}</Title>
-            <Button 
-              type="primary" 
-              icon={<IconPlus />} 
-              onClick={() => {
-                const enabledProvider = providers.find(p => p.enabled);
-                if (!enabledProvider) {
-                  Message.warning(t('chatView.noProviderSelected'));
-                  return;
-                }
-                openModelModal(enabledProvider.id);
-              }} 
-              style={{ borderRadius: '999px', padding: '4px 16px', display: 'flex', alignItems: 'center' }}
-            >
-              {t('chatView.addModel')}
-            </Button>
-          </div>
-
-          <div className="settings-section" style={{ 
-            background: 'var(--color-bg-2)', 
-            borderRadius: 8, 
-            padding: '16px 20px',
-            marginBottom: 24,
-          }}>
-            <ModelsSection
-              providers={providers}
-              currentModelId={currentModelId}
-              saveDefaultModel={saveDefaultModel}
-              deleteModel={deleteModel}
-              openModelModal={openModelModal}
-              renderCapabilityIcons={renderCapabilityIcons}
-              t={t}
-            />
-          </div>
-        </div>
-
-        <div id="completion-section" style={{ marginBottom: 48, scrollMarginTop: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>{t('chatView.completion')}</Title>
-          </div>
-
-          <div className="settings-section" style={{ 
-            background: 'var(--color-bg-2)', 
-            borderRadius: 8, 
-            padding: '16px 20px',
-            marginBottom: 24,
-          }}>
+      case 'completion-section':
+        return (
+          <>
             <SettingItem title={t('chatView.completionEnabled')} desc={t('chatView.completionEnabledDesc')}>
               <Switch
                 checked={completionEnabled}
@@ -934,20 +440,12 @@ const ChatView = ({ onBack }: ChatViewProps) => {
                 </SettingItem>
               </>
             )}
-          </div>
-        </div>
+          </>
+        );
 
-        <div id="parameters-section" style={{ marginBottom: 48, scrollMarginTop: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Title heading={4} style={{ margin: 0, fontSize: 20 }}>{t('chatView.parameters')}</Title>
-          </div>
-
-          <div className="settings-section" style={{ 
-            background: 'var(--color-bg-2)', 
-            borderRadius: 8, 
-            padding: '16px 20px',
-            marginBottom: 24,
-          }}>
+      case 'parameters-section':
+        return (
+          <>
             {[
               { label: t('chatView.temperature'), min: 0, max: 2, step: 0.1, default: 0.7 },
               { label: t('chatView.topP'), min: 0, max: 1, step: 0.1, default: 0.9 },
@@ -969,458 +467,103 @@ const ChatView = ({ onBack }: ChatViewProps) => {
             <SettingItem title="" desc="" divider={false}>
               <Button type="primary" shape="round">{t('chatView.saveParams')}</Button>
             </SettingItem>
-          </div>
-        </div>
-
-        <div style={{ height: 'calc(100vh - 200px)', flexShrink: 0 }} />
-      </div>
-
-      <Modal
-        title={t('chatView.addProviderTitle')}
-        visible={addModalVisible}
-        onOk={addProvider}
-        confirmLoading={addLoading}
-        onCancel={() => { setAddModalVisible(false); addForm.resetFields(); setApiKeys([{ id: '1', key: '', name: '' }]); }}
-        autoFocus={false}
-        focusLock
-      >
-        <div style={{ background: 'var(--color-fill-2)', borderRadius: '16px', padding: '16px', border: '1px solid var(--color-border-2)' }}>
-        <Form form={addForm} layout="vertical">
-          <FormItem label={<Title heading={6} style={{ margin: 0 }}>{t('chatView.port')}</Title>} field="port" initialValue="openai">
-            <Select value={newProviderType} onChange={setNewProviderType} style={{ borderRadius: '8px' }}>
-              {PORT_OPTIONS.map((opt) => (
-                <Option key={opt.value} value={opt.value}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <ProviderLogo type={opt.value} size={16} />
-                    <span>{opt.label}</span>
-                  </div>
-                </Option>
-              ))}
-            </Select>
-          </FormItem>
-          <FormItem label={<Title heading={6} style={{ margin: 0 }}>{t('chatView.providerName')}</Title>} field="name">
-            <Input placeholder={PROVIDER_PRESETS[newProviderType]?.name} style={{ borderRadius: '8px' }} />
-          </FormItem>
-          <FormItem label={<Title heading={6} style={{ margin: 0 }}>{t('chatView.apiKey')}</Title>}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {apiKeys.map((item, index) => (
-                <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Input.Password
-                    placeholder={`Enter ${t('chatView.apiKey')}`}
-                    style={{ borderRadius: '8px', flex: 1 }}
-                    value={item.key}
-                    onChange={(v) => {
-                      const newKeys = [...apiKeys];
-                      newKeys[index].key = v;
-                      setApiKeys(newKeys);
-                    }}
-                  />
-                  <span style={{ color: 'var(--color-text-3)' }}>:</span>
-                  <Input
-                    placeholder={t('chatView.apiKeyName')}
-                    style={{ borderRadius: '8px', width: 120 }}
-                    value={item.name}
-                    onChange={(v) => {
-                      const newKeys = [...apiKeys];
-                      newKeys[index].name = v;
-                      setApiKeys(newKeys);
-                    }}
-                  />
-                  {index === 0 ? (
-                    <Button
-                      type="primary"
-                      icon={<IconPlus />}
-                      size="small"
-                      onClick={() => setApiKeys([...apiKeys, { id: crypto.randomUUID(), key: '', name: '' }])}
-                      style={{ background: 'var(--color-primary)', borderRadius: '6px', padding: '0 8px' }}
-                    />
-                  ) : (
-                    <Button
-                      type="text"
-                      icon={<IconDelete />}
-                      size="small"
-                      status="danger"
-                      onClick={() => setApiKeys(apiKeys.filter((_, i) => i !== index))}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-          </FormItem>
-          <FormItem label={<Title heading={6} style={{ margin: 0 }}>{t('chatView.baseUrl')}</Title>} field="baseUrl">
-            <Input placeholder={PROVIDER_PRESETS[newProviderType]?.baseUrl} style={{ borderRadius: '8px' }} />
-          </FormItem>
-        </Form>
-        </div>
-      </Modal>
-
-      <Modal
-        title={editingModel ? t('chatView.editModel') : t('chatView.addModelTitle')}
-        visible={modelModalVisible}
-        onOk={saveModel}
-        confirmLoading={saveModelLoading}
-        onCancel={() => { setModelModalVisible(false); modelForm.resetFields(); setEditingModel(null); setModelFormProviderId(''); }}
-        autoFocus={false}
-        focusLock
-      >
-        <div style={{ background: 'var(--color-fill-2)', borderRadius: '16px', padding: '16px', border: '1px solid var(--color-border-2)' }}>
-        <Form form={modelForm} layout="vertical">
-          <FormItem label={<Title heading={6} style={{ margin: 0 }}>{t('chatView.provider')}</Title>} field="providerId" initialValue="1">
-            <Select
-              style={{ borderRadius: '8px' }}
-              onChange={(value) => {
-                setModelFormProviderId(value as string);
-                const provider = providers.find(p => p.id === value);
-                if (provider && provider.apiKeys.length > 0) {
-                  modelForm.setFieldValue('apiKeyId', provider.apiKeys[0].id);
-                }
-              }}
-            >
-              {providers.filter(p => p.enabled).map(p => (
-                <Option key={p.id} value={p.id}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <ProviderLogo type={p.type} name={p.name} size={16} />
-                    <span>{p.name}</span>
-                  </div>
-                </Option>
-              ))}
-            </Select>
-          </FormItem>
-          <FormItem label={<Title heading={6} style={{ margin: 0 }}>{t('chatView.modelName')}</Title>} field="name">
-            <Input placeholder={t('chatView.modelNamePlaceholder')} style={{ borderRadius: '8px' }} />
-          </FormItem>
-          <FormItem label={<Title heading={6} style={{ margin: 0 }}>{t('chatView.modelId')}</Title>} field="modelId">
-            <Input placeholder={t('chatView.modelIdPlaceholder')} style={{ borderRadius: '8px' }} />
-          </FormItem>
-          <FormItem label={<Title heading={6} style={{ margin: 0 }}>{t('chatView.port')}</Title>} field="port" initialValue={selected?.type || 'openai'}>
-            <Select style={{ borderRadius: '8px' }}>
-              {PORT_OPTIONS.map(opt => (
-                <Option key={opt.value} value={opt.value}>{opt.label}</Option>
-              ))}
-            </Select>
-          </FormItem>
-          <FormItem label={<Title heading={6} style={{ margin: 0 }}>{t('chatView.apiKeyScheme')}</Title>} field="apiKeyId">
-            <Select style={{ borderRadius: '8px' }}>
-              {(() => {
-                const providerId = modelFormProviderId || modelForm.getFieldValue('providerId') || '1';
-                const provider = providers.find(p => p.id === providerId);
-                return provider?.apiKeys.map(key => (
-                  <Option key={key.id} value={key.id}>{key.name || 'default'}</Option>
-                ));
-              })()}
-            </Select>
-          </FormItem>
-          <FormItem label={<Title heading={6} style={{ margin: 0 }}>{t('chatView.modelCapabilities')}</Title>} style={{ marginBottom: 0 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {Object.entries(CAPABILITIES_MAP).map(([key, cap]) => {
-                const IconComp = cap.icon;
-                return (
-                  <FormItem
-                    key={key}
-                    field={`cap_${key}`}
-                    style={{ marginBottom: 0 }}
-                    triggerPropName="checked"
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                      <Checkbox />
-                      <IconComp style={{ color: 'var(--color-primary)', fontSize: 16 }} />
-                      <Text style={{ fontSize: 14 }}>{t(cap.labelKey)}</Text>
-                    </div>
-                  </FormItem>
-                );
-              })}
-            </div>
-          </FormItem>
-        </Form>
-        </div>
-      </Modal>
-    </div>
-  );
-};
-
-const ProvidersSection = ({ providers, loadProviders, deleteProvider, setDefault, syncKeyToAIConfig, t }: {
-  providers: Provider[];
-  loadProviders: () => void;
-  deleteProvider: (id: string) => void;
-  setDefault: (id: string) => void;
-  syncKeyToAIConfig: (providerType: string, apiKey: string) => void;
-  t: (key: string) => string;
-}) => {
-  const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set());
-  const [editingProviders, setEditingProviders] = useState<Provider[]>(providers);
-  const [saveProviderLoading, setSaveProviderLoading] = useState<Set<string>>(new Set());
-  
-  useEffect(() => {
-    setEditingProviders(providers);
-  }, [providers]);
-  
-  const toggleExpand = (providerId: string) => {
-    const newExpanded = new Set(expandedProviders);
-    if (newExpanded.has(providerId)) {
-      newExpanded.delete(providerId);
-    } else {
-      newExpanded.add(providerId);
-    }
-    setExpandedProviders(newExpanded);
-  };
-  
-  const updateEditingProvider = (id: string, updates: Partial<Provider>) => {
-    setEditingProviders(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
-  };
-  
-  const addApiKey = (providerId: string) => {
-    const provider = editingProviders.find(p => p.id === providerId);
-    if (!provider) return;
-    const newKey: ApiKeyItem = {
-      id: crypto.randomUUID(),
-      name: `key-${provider.apiKeys.length + 1}`,
-      key: ''
-    };
-    updateEditingProvider(providerId, {
-      apiKeys: [...provider.apiKeys, newKey]
-    });
-  };
-  
-  const removeApiKey = (providerId: string, keyId: string) => {
-    const provider = editingProviders.find(p => p.id === providerId);
-    if (!provider) return;
-    updateEditingProvider(providerId, {
-      apiKeys: provider.apiKeys.filter(k => k.id !== keyId)
-    });
-  };
-  
-  const updateApiKey = (providerId: string, keyId: string, updates: Partial<ApiKeyItem>) => {
-    const provider = editingProviders.find(p => p.id === providerId);
-    if (!provider) return;
-    updateEditingProvider(providerId, {
-      apiKeys: provider.apiKeys.map(k => k.id === keyId ? { ...k, ...updates } : k)
-    });
-  };
-  
-  const saveProviderChanges = (providerId: string) => {
-    if (saveProviderLoading.has(providerId)) return;
-    const provider = editingProviders.find(p => p.id === providerId);
-    if (!provider) return;
-
-    setSaveProviderLoading(prev => new Set(prev).add(providerId));
-    api.updateProvider(providerId, {
-      name: provider.name,
-      baseUrl: provider.baseUrl,
-      enabled: provider.enabled,
-      apiKeys: provider.apiKeys,
-    })
-      .then(data => {
-        if (data.success) {
-          Message.success(t('chatView.supplierConfigSaved'));
-          loadProviders();
-          window.dispatchEvent(new CustomEvent('papyrus_ai_config_changed'));
-          const firstKey = provider.apiKeys.find(k => k.key.trim() !== '');
-          if (firstKey) {
-            syncKeyToAIConfig(provider.type, firstKey.key);
-          }
-        } else {
-          Message.error(data.error || t('chatView.saveFailed'));
-        }
-      })
-      .catch(err => {
-        console.error('Failed to save provider config:', err);
-        Message.error(t('chatView.saveFailed'));
-      })
-      .finally(() => {
-        setSaveProviderLoading(prev => {
-          const next = new Set(prev);
-          next.delete(providerId);
-          return next;
-        });
-      });
-  };
-  
-  return (
-    <>
-      {editingProviders.map(provider => {
-        const isExpanded = expandedProviders.has(provider.id);
-        return (
-          <Card key={provider.id} style={{ marginBottom: 12, borderRadius: 12, border: '1px solid var(--color-border-2)' }} bodyStyle={{ padding: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div 
-                style={{ flex: 1, cursor: 'pointer' }} 
-                onClick={() => toggleExpand(provider.id)}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <ProviderLogo type={provider.type} name={provider.name} size={20} />
-                  <Text bold>{provider.name}</Text>
-                  {provider.isDefault && <Tag color="arcoblue" size="small">{t('chatView.default')}</Tag>}
-                  {!provider.enabled && <Tag color="gray" size="small">{t('chatView.disabled')}</Tag>}
-                </div>
-                <Paragraph type="secondary" style={{ fontSize: 12, margin: 0 }}>
-                  {provider.baseUrl || t('chatView.notConfigured')}
-                </Paragraph>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                <Button 
-                  type="text" 
-                  size="mini" 
-                  icon={isExpanded ? <IconDown /> : <IconLeft />}
-                  onClick={() => toggleExpand(provider.id)}
-                />
-                <Switch size="small" checked={provider.enabled} onChange={(checked) => {
-                  updateEditingProvider(provider.id, { enabled: checked });
-                  api.updateProviderEnabled(provider.id, checked)
-                    .then(data => {
-                      if (data.success) {
-                        loadProviders();
-                        window.dispatchEvent(new CustomEvent('papyrus_ai_config_changed'));
-                      } else {
-                        Message.error(data.error || t('chatView.updateFailed'));
-                        loadProviders();
-                      }
-                    })
-                    .catch(err => {
-                      console.error('Failed to update provider status:', err);
-                      Message.error(t('chatView.updateFailed'));
-                      loadProviders();
-                    });
-                }} />
-                <Button type="text" size="mini" icon={<IconSafe />} onClick={() => setDefault(provider.id)} disabled={provider.isDefault} />
-                <Popconfirm title={t('chatView.confirmDeleteProvider')} onOk={() => deleteProvider(provider.id)} disabled={provider.isDefault}>
-                  <Button type="text" size="mini" icon={<IconDelete />} status="danger" disabled={provider.isDefault} />
-                </Popconfirm>
-              </div>
-            </div>
-
-            {isExpanded && (
-              <>
-                <Divider style={{ margin: '16px 0' }} />
-                <div style={{ display: 'flex', gap: 12, flexDirection: 'column' }}>
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <Text style={{ fontSize: 12 }}>API Key</Text>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {provider.apiKeys.map((apiKey, index) => (
-                        <div key={apiKey.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          <Input
-                            value={apiKey.name}
-                            onChange={(v) => updateApiKey(provider.id, apiKey.id, { name: v })}
-                            style={{ width: 100, border: '1px solid var(--color-border-2)', borderRadius: '6px', background: 'var(--color-bg-2)', fontSize: 12, textAlign: 'center' }}
-                          />
-                          <Input.Password 
-                            value={apiKey.key}
-                            onChange={(v) => updateApiKey(provider.id, apiKey.id, { key: v })}
-                            placeholder={`Enter ${t('chatView.apiKey')}`}
-                            style={{ flex: 1, border: '1px solid var(--color-border-2)', borderRadius: '6px', background: 'var(--color-bg-2)' }}
-                          />
-                          {index === 0 ? (
-                            <Button 
-                              type="primary" 
-                              icon={<IconPlus />} 
-                              size="mini"
-                              onClick={() => addApiKey(provider.id)}
-                              style={{ background: 'var(--color-primary)', borderRadius: '4px' }}
-                            />
-                          ) : (
-                            <Button 
-                              type="text" 
-                              icon={<IconDelete />} 
-                              size="mini"
-                              status="danger"
-                              onClick={() => removeApiKey(provider.id, apiKey.id)}
-                            />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <Text style={{ fontSize: 12, marginBottom: 4, display: 'block' }}>Base URL</Text>
-                    <Input 
-                      value={provider.baseUrl}
-                      onChange={(v) => updateEditingProvider(provider.id, { baseUrl: v })}
-                      placeholder="https://api.example.com/v1" 
-                      style={{ width: '100%' }} 
-                    />
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-                    <Button 
-                      type="primary" 
-                      size="small"
-                      onClick={() => saveProviderChanges(provider.id)}
-                    >
-                      {t('chatView.save')}
-                    </Button>
-                  </div>
-                </div>
-              </>
-            )}
-          </Card>
+          </>
         );
-      })}
-    </>
-  );
-};
 
-const ModelsSection = ({ providers, currentModelId, saveDefaultModel, deleteModel, openModelModal, renderCapabilityIcons, t }: {
-  providers: Provider[];
-  currentModelId: string;
-  saveDefaultModel: (id: string) => void;
-  deleteModel: (providerId: string, modelId: string) => void;
-  openModelModal: (providerId?: string, model?: Model) => void;
-  renderCapabilityIcons: (capabilities: string[], t: (key: string) => string) => React.ReactNode;
-  t: (key: string) => string;
-}) => {
-  const enabledProviders = providers.filter(p => p.enabled && p.models.length > 0);
+      default:
+        return null;
+    }
+  };
 
-  if (enabledProviders.length === 0) {
-    const hasEnabledProviders = providers.some(p => p.enabled);
-    return (
-      <div style={{ textAlign: 'center', padding: '48px 0' }}>
-        <IconSafe style={{ fontSize: 48, color: 'var(--color-text-4)', marginBottom: 16 }} />
-        <Paragraph type="secondary" style={{ fontSize: 14 }}>
-          {hasEnabledProviders
-            ? t('chatView.noModelsYet')
-            : t('chatView.noEnabledProviders')}
-        </Paragraph>
-      </div>
-    );
-  }
-  
   return (
     <>
-      {enabledProviders.map(provider => (
-        <div key={provider.id} style={{ marginBottom: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <ProviderLogo type={provider.type} name={provider.name} size={20} />
-            <Text bold style={{ fontSize: 16 }}>{provider.name}</Text>
-            {provider.isDefault && <Tag color="arcoblue" size="small">{t('chatView.default')}</Tag>}
-          </div>
-          {provider.models.map(model => {
-            const apiKey = provider.apiKeys.find(k => k.id === model.apiKeyId);
+      <SettingsViewLayout
+        title={t('chatView.title')}
+        description={t('chatView.titleDesc')}
+        icon={IconMessage}
+        navItems={NAV_ITEMS.map(item => ({ ...item, label: t(item.label) }))}
+        sections={[
+          { id: 'general-section', title: t('chatView.general') },
+          { id: 'user-section', title: t('chatView.user') },
+          { id: 'providers-section', title: t('chatView.providers'), icon: IconSafe },
+          { id: 'models-section', title: t('chatView.models'), icon: IconRobot },
+          { id: 'completion-section', title: t('chatView.completion'), icon: IconBulb },
+          { id: 'parameters-section', title: t('chatView.parameters'), icon: IconSettings },
+        ]}
+        onBack={onBack}
+      >
+        {(sectionId) => {
+          if (sectionId === 'providers-section') {
             return (
-              <Card key={model.id} style={{ marginBottom: 10, borderRadius: 12, border: currentModelId === model.id ? '1px solid var(--color-primary)' : '1px solid var(--color-border-2)' }} bodyStyle={{ padding: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <ModelLogo model={model.name} modelId={model.modelId || model.id} size={18} />
-                      <Text bold style={{ fontSize: 14 }}>{model.name}</Text>
-                      {renderCapabilityIcons(model.capabilities, t)}
-                    </div>
-                    <Paragraph type="secondary" style={{ fontSize: 12, margin: '4px 0 0 0' }}>
-                      Key: {apiKey?.name || 'default'} {apiKey?.key ? `(${t('chatView.configured')})` : `(${t('chatView.notConfigured')})`}
-                    </Paragraph>
-                  </div>
-                  <Space size={4}>
-                    <Button type="text" size="mini" icon={<IconSafe />} onClick={() => saveDefaultModel(model.id)} disabled={currentModelId === model.id} title={t('chatView.setAsDefault')} />
-                    <Button type="text" size="mini" icon={<IconEdit />} onClick={() => openModelModal(provider.id, model)} title={t('chatView.edit')} />
-                    <Popconfirm title={t('chatView.confirmDeleteModel')} onOk={() => deleteModel(provider.id, model.id)}>
-                      <Button type="text" size="mini" icon={<IconDelete />} status="danger" />
-                    </Popconfirm>
-                  </Space>
+              <>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+                  <Button type="primary" icon={<IconPlus />} onClick={() => setAddModalVisible(true)} style={{ borderRadius: '999px', padding: '4px 16px', display: 'flex', alignItems: 'center' }}>
+                    {t('chatView.addProvider')}
+                  </Button>
                 </div>
-              </Card>
+                <ProvidersSection 
+                  providers={providers} 
+                  loadProviders={loadProviders} 
+                  deleteProvider={deleteProvider} 
+                  setDefault={setDefault} 
+                  syncKeyToAIConfig={syncKeyToAIConfig} 
+                  t={t} 
+                />
+              </>
             );
-          })}
-        </div>
-      ))}
+          }
+          if (sectionId === 'models-section') {
+            return (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+                  <Button 
+                    type="primary" 
+                    icon={<IconPlus />} 
+                    onClick={() => {
+                      const enabledProvider = providers.find(p => p.enabled);
+                      if (!enabledProvider) {
+                        Message.warning(t('chatView.noProviderSelected'));
+                        return;
+                      }
+                      openModelModal(enabledProvider.id);
+                    }} 
+                    style={{ borderRadius: '999px', padding: '4px 16px', display: 'flex', alignItems: 'center' }}
+                  >
+                    {t('chatView.addModel')}
+                  </Button>
+                </div>
+                <ModelsSection
+                  providers={providers}
+                  currentModelId={currentModelId}
+                  saveDefaultModel={saveDefaultModel}
+                  deleteModel={deleteModel}
+                  openModelModal={openModelModal}
+                  renderCapabilityIcons={renderCapabilityIcons}
+                  t={t}
+                />
+              </>
+            );
+          }
+          return renderSection(sectionId);
+        }}
+      </SettingsViewLayout>
+
+      <AddProviderModal 
+        visible={addModalVisible}
+        onClose={() => setAddModalVisible(false)}
+        onProviderAdded={loadProviders}
+        t={t}
+      />
+
+      <ModelModal
+        visible={modelModalVisible}
+        onClose={() => { setModelModalVisible(false); setEditingModel(null); setModelModalProviderId(''); }}
+        onModelSaved={loadProviders}
+        providers={providers}
+        editingModel={editingModel}
+        selectedProviderId={modelModalProviderId}
+        t={t}
+      />
     </>
   );
 };

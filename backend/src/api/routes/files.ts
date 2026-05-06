@@ -2,6 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import fs from 'node:fs';
 import { listFiles, createFolder, saveFile, deleteFileItem, getFileStream, getFileById } from '../../core/files.js';
 
+const MAX_PREVIEW_SIZE = 10 * 1024 * 1024;
+
 export default async function filesRoutes(fastify: FastifyInstance): Promise<void> {
   // List all files/folders
   fastify.get('/', async (_request, reply) => {
@@ -94,6 +96,11 @@ export default async function filesRoutes(fastify: FastifyInstance): Promise<voi
       return;
     }
 
+    if (file.size > MAX_PREVIEW_SIZE) {
+      reply.status(413).send({ success: false, error: '文件过大，请下载查看' });
+      return;
+    }
+
     const content = fs.readFileSync(file.file_storage_path);
     reply.type(file.mime_type || 'application/octet-stream');
     reply.header('Content-Disposition', 'inline');
@@ -111,11 +118,19 @@ export default async function filesRoutes(fastify: FastifyInstance): Promise<voi
       return;
     }
 
-    const content = fs.readFileSync(file.file_storage_path);
+    const stream = fs.createReadStream(file.file_storage_path);
     reply.type(file.mime_type || 'application/octet-stream');
     reply.header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`);
     reply.header('Content-Length', file.size);
-    reply.send(content);
+
+    stream.on('error', (err) => {
+      request.log.error({ err }, '文件下载流错误');
+      if (!reply.sent) {
+        reply.status(500).send({ success: false, error: '文件读取失败' });
+      }
+    });
+
+    reply.send(stream);
   });
 
   // Delete file/folder

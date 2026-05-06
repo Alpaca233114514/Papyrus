@@ -1,7 +1,6 @@
 import { IconFolder, IconImage, IconFileVideo, IconMusic, IconFile } from '@arco-design/web-react/icon';
 import ZipIcon from './ZipIcon';
-
-const PRIMARY_COLOR = '#206CCF';
+import { PRIMARY_COLOR } from '../theme-constants';
 
 type FileItemType = 'folder' | 'image' | 'video' | 'audio' | 'document' | 'archive' | 'unknown';
 

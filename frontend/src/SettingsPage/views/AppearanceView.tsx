@@ -15,7 +15,8 @@ import {
   IconPalette,
   IconPlus,
 } from '@arco-design/web-react/icon';
-import { SettingItem, SettingsViewLayout, type NavItem } from '../components';
+import { SettingItem, SettingsViewLayout } from '../components';
+import { useSettingsView } from '../../hooks/useSettingsView';
 import {
   useSceneryManager,
   usePageScenery,
@@ -43,13 +44,19 @@ const FONT_SIZE_OPTIONS = (t: (key: string) => string) => [
   { label: t('appearanceView.fontSizeLarge'), value: 'large' },
 ];
 
-const NAV_ITEMS: NavItem[] = [
+const NAV_ITEMS = [
   { key: 'theme-section', label: 'appearanceView.theme', icon: IconPalette },
   { key: 'scenery-section', label: 'appearanceView.scenery', icon: IconFileImage },
 ];
 
+const SECTIONS = [
+  { id: 'theme-section', title: 'appearanceView.themeSection' },
+  { id: 'scenery-section', title: 'appearanceView.scenerySection', icon: IconFileImage },
+];
+
 const AppearanceView = ({ onBack }: AppearanceViewProps) => {
   const { t } = useTranslation();
+  const { navItems, sections } = useSettingsView({ navItems: NAV_ITEMS, sections: SECTIONS });
   const [fontSize, setFontSize] = useState(() => {
     try { return localStorage.getItem('papyrus_font_size') ?? 'medium'; }
     catch { return 'medium'; }
@@ -280,11 +287,8 @@ const AppearanceView = ({ onBack }: AppearanceViewProps) => {
         description={t('appearanceView.titleDesc')}
         icon={IconPalette}
         iconColor="var(--color-primary)"
-        navItems={NAV_ITEMS.map(item => ({ ...item, label: t(item.label) }))}
-        sections={[
-          { id: 'theme-section', title: t('appearanceView.themeSection') },
-          { id: 'scenery-section', title: t('appearanceView.scenerySection'), icon: IconFileImage },
-        ]}
+        navItems={navItems}
+        sections={sections}
         onBack={onBack}
       >
         {renderSection}

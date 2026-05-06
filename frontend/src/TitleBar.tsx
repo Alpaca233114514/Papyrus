@@ -2,10 +2,12 @@ import { Button, Space, Menu, Dropdown, Avatar, Modal, Message, Divider, Input, 
 import { IconMinus, IconExpand, IconClose, IconUser, IconUpload, IconRefresh } from '@arco-design/web-react/icon';
 import './TitleBar.css';
 import { api, type SearchResult } from './api';
+import type { UserProfile } from './types/common';
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import SearchBox from './SearchBox';
 import { useShortcuts } from './hooks/useShortcuts';
+import { saveUserProfile, loadUserProfile } from './SettingsPage/views/ChatView/utils';
 
 // 快捷键提示组件 - 使用 Tailwind
 const Shortcut = ({ keys }: { keys: string }) => (
@@ -14,68 +16,34 @@ const Shortcut = ({ keys }: { keys: string }) => (
   </span>
 );
 
-interface UserProfile {
-  userId: string;
-  avatarUrl: string | null;
-}
-
 interface TitleBarProps {
   onPageChange?: (page: string) => void;
   onNewNote?: () => void;
   onSearchResult?: (result: SearchResult) => void;
 }
 
-const DEFAULT_PROFILE: UserProfile = {
-  userId: '',
-  avatarUrl: null,
-};
-
-const STORAGE_KEY = 'papyrus_user_profile';
-
 const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) => {
   const { t } = useTranslation();
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [importContent, setImportContent] = useState('');
   const [profileModalVisible, setProfileModalVisible] = useState(false);
-  const [userProfile, setUserProfile] = useState<UserProfile>(DEFAULT_PROFILE);
+  const [userProfile, setUserProfile] = useState<UserProfile>(loadUserProfile());
   const [tempUserId, setTempUserId] = useState('');
   const [tempAvatarUrl, setTempAvatarUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { getShortcutDisplay } = useShortcuts();
 
-  // 从 localStorage 加载用户设置
   useEffect(() => {
-    const loadProfile = () => {
-      try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored) as UserProfile;
-          setUserProfile(parsed);
-        }
-      } catch (error) {
-        console.error('Failed to load user profile:', error);
-      }
+    const handleProfileChanged = () => {
+      setUserProfile(loadUserProfile());
     };
-    loadProfile();
-    window.addEventListener('papyrus_user_profile_changed', loadProfile);
-    window.addEventListener('storage', loadProfile);
+    window.addEventListener('papyrus_user_profile_changed', handleProfileChanged);
+    window.addEventListener('storage', handleProfileChanged);
     return () => {
-      window.removeEventListener('papyrus_user_profile_changed', loadProfile);
-      window.removeEventListener('storage', loadProfile);
+      window.removeEventListener('papyrus_user_profile_changed', handleProfileChanged);
+      window.removeEventListener('storage', handleProfileChanged);
     };
   }, []);
-
-  // 保存用户设置到 localStorage
-  const saveUserProfile = (profile: UserProfile) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-      setUserProfile(profile);
-      window.dispatchEvent(new CustomEvent('papyrus_user_profile_changed'));
-    } catch (error) {
-      console.error('Failed to save user profile:', error);
-      Message.error(t('titleBar.saveProfileFailed'));
-    }
-  };
 
   // 打开用户设置弹窗
   const handleOpenProfileModal = () => {
@@ -251,7 +219,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
 
   // 首选项
   const handlePreferences = () => {
-    Message.info(t('titleBar.preferencesComingSoon'));
+    onPageChange?.('settings');
   };
 
   // 文件菜单下拉内容
@@ -558,7 +526,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
               showWordLimit
             />
             <span className="tw-text-xs tw-text-arco-text-3">
-              {t('titleBar.userIdHint')}
+              {t('titleBar.userIdTip')}
             </span>
           </div>
 

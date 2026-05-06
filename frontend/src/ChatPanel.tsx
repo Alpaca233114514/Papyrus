@@ -6,54 +6,20 @@ import { ReasoningChain } from './components/ReasoningChain';
 import { ToolCallCard } from './components/ToolCallCard';
 import { ChatHistory } from './components/ChatHistory';
 import type { AIConfig } from './types/ai';
+import type { UserProfile } from './types/common';
 import { getAuthToken, BASE, api } from './api';
 import type { ChatSession, ChatBlock as ApiChatBlock } from './api';
+import { stripMdTitle, authFetch, restoreApiMessage, hydrateMessagesForSession, loadStoredSessionId, persistSessionId, loadAgentModeEnabled, loadUserProfile } from './ChatPanel/utils';
 import { MarkdownView } from './components/MarkdownView';
 import { ToolsCatalogPopover } from './components/ToolsCatalogPopover';
 import { useModelSelector } from './hooks/useModelSelector';
 import './ChatPanel.css';
-
-const SESSION_ID_STORAGE_KEY = 'papyrus_chat_session_id';
-
-function loadStoredSessionId(): string {
-  try {
-    return localStorage.getItem(SESSION_ID_STORAGE_KEY) ?? '';
-  } catch {
-    return '';
-  }
-}
-
-function persistSessionId(sessionId: string): void {
-  try {
-    if (sessionId) {
-      localStorage.setItem(SESSION_ID_STORAGE_KEY, sessionId);
-    } else {
-      localStorage.removeItem(SESSION_ID_STORAGE_KEY);
-    }
-  } catch {
-    // ignore quota / disabled storage
-  }
-}
 
 interface ChatPanelProps {
   open: boolean;
   width?: number;
   onClose?: () => void;
 }
-
-// 从 localStorage 加载 Agent 模式设置
-const loadAgentModeEnabled = (): boolean => {
-  try {
-    const saved = localStorage.getItem('papyrus_agent_settings');
-    if (saved) {
-      const settings = JSON.parse(saved);
-      return settings.agentModeEnabled ?? false;
-    }
-  } catch {
-    // ignore
-  }
-  return false;
-};
 
 const modes = [
   { key: 'agent', icon: <IconAgentMode />, label: 'Agent 模式' },
@@ -102,73 +68,6 @@ function mapApiToolStatus(
   }
 }
 
-interface RestoredMessageView {
-  content: string;
-  blocks: MessageBlock[];
-}
-
-function restoreApiMessage(blocks: ApiChatBlock[], fallbackContent: string): RestoredMessageView {
-  const localBlocks: MessageBlock[] = [];
-  let textContent = '';
-  for (const block of blocks) {
-    if (block.type === 'text') {
-      textContent += block.text ?? '';
-    } else if (block.type === 'reasoning') {
-      localBlocks.push({ type: 'reasoning', content: block.text ?? '' });
-    } else if (block.type === 'tool_call') {
-      localBlocks.push({
-        type: 'tool_call',
-        toolName: block.toolName ?? '',
-        toolCallId: block.toolCallId ?? '',
-        toolStatus: mapApiToolStatus(block.toolStatus),
-        toolParams: (block.toolParams ?? {}) as Record<string, unknown>,
-        toolResult: block.toolResult,
-        toolError: block.toolError,
-      });
-    } else if (block.type === 'tool_result') {
-      const targetIndex = [...localBlocks]
-        .reverse()
-        .findIndex(
-          (b) =>
-            b.type === 'tool_call' &&
-            (b.toolCallId === block.toolCallId || (!b.toolCallId && !block.toolCallId)),
-        );
-      if (targetIndex !== -1) {
-        const realIndex = localBlocks.length - 1 - targetIndex;
-        const target = localBlocks[realIndex];
-        if (target) {
-          localBlocks[realIndex] = {
-            ...target,
-            toolStatus: mapApiToolStatus(block.toolStatus),
-            toolResult: block.toolResult ?? target.toolResult,
-            toolError: block.toolError ?? target.toolError,
-          };
-        }
-      }
-    }
-  }
-  return {
-    content: textContent || fallbackContent,
-    blocks: localBlocks,
-  };
-}
-
-async function hydrateMessagesForSession(sessionId: string): Promise<Message[]> {
-  await api.switchChatSession(sessionId);
-  const data = await api.getChatMessages(sessionId);
-  if (!data.success) return [];
-  return data.messages.map((m) => {
-    const restored = restoreApiMessage(m.blocks ?? [], m.content);
-    return {
-      id: m.id,
-      role: m.role === 'user' ? 'user' : 'assistant',
-      content: restored.content,
-      blocks: restored.blocks,
-      model: m.role === 'assistant' ? m.model : undefined,
-    };
-  });
-}
-
 /** 已选文件 */
 interface SelectedFile {
   id: string;
@@ -190,46 +89,6 @@ const ALLOWED_DOCUMENT_TYPES = ['.pdf', '.txt', '.md', '.docx'];
 const ALLOWED_FILE_TYPES = [...ALLOWED_IMAGE_TYPES, ...ALLOWED_DOCUMENT_TYPES];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_FILES = 5;
-
-// 用户设置类型
-interface UserProfile {
-  userId: string;
-  avatarUrl: string | null;
-}
-
-// 从 localStorage 加载用户设置
-const loadUserProfile = (): UserProfile => {
-  try {
-    const saved = localStorage.getItem('papyrus_user_profile');
-    if (saved) {
-      return JSON.parse(saved);
-    }
-  } catch (err) {
-    console.error('Failed to load user profile from localStorage:', err);
-  }
-  return { userId: '', avatarUrl: null };
-};
-
-function stripMdTitle(source: string): string {
-  return source
-    .replace(/^[#\>\-*\s]+/gm, '')
-    .replace(/[*_`~]+/g, '')
-    .split('\n')[0]
-    .trim();
-}
-
-async function authFetch(url: string, init?: RequestInit): Promise<Response> {
-  const token = await getAuthToken();
-  const hasBody = init?.body !== undefined;
-  return fetch(`${BASE}${url}`, {
-    ...init,
-    headers: {
-      ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
-      ...(token ? { 'X-Papyrus-Token': token } : {}),
-      ...(init?.headers as Record<string, string> || {}),
-    },
-  });
-}
 
 const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
   const [text, setText] = useState('');
@@ -1241,8 +1100,8 @@ const ChatPanel = ({ open, width = 320, onClose }: ChatPanelProps) => {
         <Dropdown
           trigger="click"
           disabled={availableModels.length === 0}
-          popoverProps={{
-            style: { minWidth: '320px' }
+          triggerProps={{
+            popupStyle: { minWidth: '320px' }
           }}
           droplist={
             <Menu className="chat-model-menu" onClickMenuItem={(key) => handleModelSelect(key)}>

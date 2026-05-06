@@ -85,6 +85,8 @@ export default {
       animation: {
         'page-up': 'pageSlideUp 0.25s ease-out forwards',
         'page-down': 'pageSlideDown 0.25s ease-out forwards',
+        'page-exit-up': 'pageExitUp 0.25s ease-out forwards',
+        'page-exit-down': 'pageExitDown 0.25s ease-out forwards',
       },
       keyframes: {
         pageSlideUp: {
@@ -94,6 +96,14 @@ export default {
         pageSlideDown: {
           from: { opacity: '0', transform: 'translateY(-24px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        pageExitUp: {
+          from: { opacity: '1', transform: 'translateY(0)' },
+          to: { opacity: '0', transform: 'translateY(-24px)' },
+        },
+        pageExitDown: {
+          from: { opacity: '1', transform: 'translateY(0)' },
+          to: { opacity: '0', transform: 'translateY(24px)' },
         },
       },
     },

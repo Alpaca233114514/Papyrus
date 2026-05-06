@@ -1,11 +1,90 @@
 import { Typography, Card, Progress, Tooltip, Spin, Empty } from '@arco-design/web-react';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { IconFire, IconClockCircle, IconCheckCircle, IconCalendar } from '@arco-design/web-react/icon';
-import { usePageScenery } from '../hooks/useScenery';
-import { useSceneryColor, getAdaptivePrimaryColor } from '../hooks/useSceneryColor';
 import { api, type Card as CardType } from '../api';
-import { useCommonCardStyle, CommonCard } from '../components';
-import { ChartsSkeletonLoader } from './ChartsSkeletonLoader';
+import { useCommonCardStyle, CommonCard, PageLayout } from '../components';
+import { PRIMARY_COLOR, SUCCESS_COLOR } from '../theme-constants';
+
+function useAnimatedNumber(targetValue: number, duration: number = 800, delay: number = 100, dataReady: boolean = false): number {
+  const [displayValue, setDisplayValue] = useState(0);
+  const animationRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number | null>(null);
+  const startValueRef = useRef(0);
+  const targetValueRef = useRef(targetValue);
+  const lastUpdateTimeRef = useRef(0);
+  const wasLoadingRef = useRef(false);
+
+  useEffect(() => {
+    targetValueRef.current = targetValue;
+  }, [targetValue]);
+
+  useEffect(() => {
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+
+    if (!dataReady) {
+      wasLoadingRef.current = true;
+      lastUpdateTimeRef.current = 0;
+      const animateLoading = (currentTime: number) => {
+        if (currentTime - lastUpdateTimeRef.current >= 30) {
+          setDisplayValue(Math.floor(Math.random() * 10));
+          lastUpdateTimeRef.current = currentTime;
+        }
+        animationRef.current = requestAnimationFrame(animateLoading);
+      };
+      animationRef.current = requestAnimationFrame(animateLoading);
+
+      return () => {
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+          animationRef.current = null;
+        }
+      };
+    }
+
+    if (wasLoadingRef.current) {
+      wasLoadingRef.current = false;
+      setDisplayValue(targetValueRef.current);
+    }
+
+    const startAnimation = () => {
+      startValueRef.current = displayValue;
+      startTimeRef.current = performance.now();
+
+      const animate = (currentTime: number) => {
+        if (startTimeRef.current === null) return;
+
+        const elapsed = currentTime - startTimeRef.current;
+        const progress = Math.min(elapsed / duration, 1);
+        const easedProgress = 1 - Math.pow(1 - progress, 3);
+        const currentValue = Math.round(
+          startValueRef.current + (targetValueRef.current - startValueRef.current) * easedProgress
+        );
+
+        setDisplayValue(currentValue);
+
+        if (progress < 1) {
+          animationRef.current = requestAnimationFrame(animate);
+        }
+      };
+
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
+    const timer = setTimeout(startAnimation, delay);
+
+    return () => {
+      clearTimeout(timer);
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [dataReady, targetValue, duration, delay]);
+
+  return displayValue;
+}
 
 // 进度数据类型
 interface StreakData {
@@ -30,9 +109,6 @@ interface HeatmapResponse {
   total_days: number;
   total_cards: number;
 }
-
-const PRIMARY_COLOR = '#206CCF';
-const SUCCESS_COLOR = '#00B42A';
 
 // 统计数据类型
 interface StatsData {
@@ -123,10 +199,12 @@ function calculateStats(cards: CardType[], streakData: StreakData | null): Stats
 }
 
 // 简单的进度卡片
-const SimpleProgressCard = ({ title, progress, count }: { title: string; progress: number; count: number }) => {
+const SimpleProgressCard = ({ title, progress, count, dataReady }: { title: string; progress: number; count: number; dataReady: boolean }) => {
   const { hovered, setHovered, cardStyle } = useCommonCardStyle({
     borderWidth: 1,
   });
+  const animatedProgress = useAnimatedNumber(progress, 800, 300, dataReady);
+  const animatedCount = useAnimatedNumber(count, 800, 400, dataReady);
 
   return (
     <CommonCard
@@ -149,20 +227,20 @@ const SimpleProgressCard = ({ title, progress, count }: { title: string; progres
             padding: '4px 8px',
             fontSize: '11px',
           }}>
-            {count} 待复习
+            {animatedCount} 待复习
           </span>
         )}
       </div>
 
       <Progress
-        percent={progress}
+        percent={animatedProgress}
         size='large'
-        color={progress >= 80 ? SUCCESS_COLOR : PRIMARY_COLOR}
+        color={animatedProgress >= 80 ? SUCCESS_COLOR : PRIMARY_COLOR}
         style={{ marginBottom: '16px' }}
       />
 
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--color-text-3)' }}>
-        <span>进度 {progress}%</span>
+        <span>进度 {animatedProgress}%</span>
       </div>
     </CommonCard>
   );
@@ -305,163 +383,69 @@ const Heatmap = ({ data }: { data: HeatmapItem[] }) => {
   );
 };
 
-// 顶部统计栏组件
-const StatsBar = ({ stats, loading }: { stats: StatsData; loading: boolean }) => {
-  const { config: sceneryConfig, loaded } = usePageScenery('charts');
-  const { primaryTextColor, secondaryTextColor, averageBrightness } = useSceneryColor(
-    sceneryConfig.enabled ? sceneryConfig.image : undefined,
-    sceneryConfig.enabled
-  );
 
-  if (loading || !loaded) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: '24px',
-        marginBottom: '32px',
-        borderRadius: '12px',
-        border: '1px solid var(--color-text-3)',
-        background: 'var(--color-bg-1)',
-      }}>
-        <Spin size={24} />
-      </div>
-    );
-  }
-
-  const overallProgress = stats.totalCards > 0 
-    ? Math.round((stats.masteredCards / stats.totalCards) * 100) 
-    : 0;
-
-  const content = (
-    <div style={{ display: 'flex', gap: '48px' }}>
-      <StatItem label='连续学习' value={stats.streakDays} suffix='天' colorConfig={sceneryConfig.enabled ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
-      <StatItem label='已掌握' value={`${stats.masteredCards}/${stats.totalCards}`} colorConfig={sceneryConfig.enabled ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
-      <StatItem label='总进度' value={`${overallProgress}%`} colorConfig={sceneryConfig.enabled ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
-      <StatItem label='今日已复习' value={stats.todayCards} suffix={`/${stats.dailyTarget}`} colorConfig={sceneryConfig.enabled ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
-      <StatItem label='今日目标' value={`${stats.todayProgress}%`} colorConfig={sceneryConfig.enabled ? { primary: primaryTextColor, secondary: secondaryTextColor, brightness: averageBrightness } : undefined} />
-    </div>
-  );
-
-  if (!sceneryConfig.enabled) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '24px',
-        marginBottom: '32px',
-        borderRadius: '12px',
-        border: '1px solid var(--color-text-3)',
-        background: 'var(--color-bg-1)',
-      }}>
-        {content}
-      </div>
-    );
-  }
-
-  const image = sceneryConfig.image;
-  const poem = '且将新火试新茶，诗酒趁年华。';
-  const source = '[宋] 苏轼《望江南·超然台作》';
-  const overlayOpacity = Math.max(0.25, Math.min(0.75, sceneryConfig.opacity));
-
-  return (
-    <div style={{
-      position: 'relative',
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: '24px',
-      marginBottom: '32px',
-      borderRadius: '12px',
-      border: '1px solid var(--color-text-3)',
-      overflow: 'hidden',
-    }}>
-      <img
-        src={image}
-        alt={`窗景图片：${poem} —— ${source}`}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-        }}
-      />
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: `rgba(255, 255, 255, ${overlayOpacity})`,
-        }}
-      />
-      <div style={{ position: 'relative', zIndex: 1 }}>
-        {content}
-      </div>
-    </div>
-  );
-};
 
 const ChartsPage = () => {
   const [cards, setCards] = useState<CardType[]>([]);
   const [streakData, setStreakData] = useState<StreakData | null>(null);
   const [heatmapData, setHeatmapData] = useState<HeatmapItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [firstLoadComplete, setFirstLoadComplete] = useState(false);
+  const startTimeRef = useRef(Date.now());
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [cardsRes, streakRes, heatmapRes] = await Promise.all([
-          api.listCards(),
-          fetch('/api/progress/streak').then(r => r.json()),
-          fetch('/api/progress/heatmap').then(r => r.json()),
-        ]);
-        if (cardsRes.success) {
-          setCards(cardsRes.cards);
-        }
-        if (streakRes.success) {
-          setStreakData(streakRes);
-        }
-        if (heatmapRes.success) {
-          setHeatmapData(heatmapRes.data);
-        }
-      } catch (err) {
-        console.error('获取数据失败:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
+    console.log('[ChartsPage] 组件初始化完成，立即显示界面');
+  }, []);
 
-    fetchData();
+  useEffect(() => {
+    const fetchStartTime = Date.now();
+    console.log('[ChartsPage] 开始发起数据请求，距初始化:', fetchStartTime - startTimeRef.current, 'ms');
+
+    const fetchCardsPromise = api.listCards().then(res => {
+      console.log('[ChartsPage] api.listCards 完成，耗时:', Date.now() - fetchStartTime, 'ms');
+      if (res.success) setCards(res.cards);
+      return res;
+    }).catch(err => {
+      console.error('[ChartsPage] 获取卡片数据失败:', err);
+      return { success: false };
+    });
+
+    const fetchStreakPromise = fetch('/api/progress/streak').then(r => r.json()).then(res => {
+      console.log('[ChartsPage] /api/progress/streak 完成，耗时:', Date.now() - fetchStartTime, 'ms');
+      if (res.success) setStreakData(res);
+      return res;
+    }).catch(err => {
+      console.error('[ChartsPage] 获取连续学习数据失败:', err);
+      return { success: false };
+    });
+
+    const fetchHeatmapPromise = fetch('/api/progress/heatmap').then(r => r.json()).then(res => {
+      console.log('[ChartsPage] /api/progress/heatmap 完成，耗时:', Date.now() - fetchStartTime, 'ms');
+      if (res.success) setHeatmapData(res.data);
+      return res;
+    }).catch(err => {
+      console.error('[ChartsPage] 获取热力图数据失败:', err);
+      return { success: false };
+    });
+
+    Promise.all([fetchCardsPromise, fetchStreakPromise, fetchHeatmapPromise]).then(() => {
+      setFirstLoadComplete(true);
+      console.log('[ChartsPage] 首次加载完成');
+    });
   }, []);
 
   useEffect(() => {
     const handleRefresh = () => {
-      setLoading(true);
-      const fetchData = async () => {
-        try {
-          const [cardsRes, streakRes, heatmapRes] = await Promise.all([
-            api.listCards(),
-            fetch('/api/progress/streak').then(r => r.json()),
-            fetch('/api/progress/heatmap').then(r => r.json()),
-          ]);
-          if (cardsRes.success) {
-            setCards(cardsRes.cards);
-          }
-          if (streakRes.success) {
-            setStreakData(streakRes);
-          }
-          if (heatmapRes.success) {
-            setHeatmapData(heatmapRes.data);
-          }
-        } catch (err) {
-          console.error('获取数据失败:', err);
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchData();
+      api.listCards().then(res => {
+        if (res.success) setCards(res.cards);
+      }).catch(err => console.error('刷新卡片失败:', err));
+      
+      fetch('/api/progress/streak').then(r => r.json()).then(res => {
+        if (res.success) setStreakData(res);
+      }).catch(err => console.error('刷新连续学习数据失败:', err));
+      
+      fetch('/api/progress/heatmap').then(r => r.json()).then(res => {
+        if (res.success) setHeatmapData(res.data);
+      }).catch(err => console.error('刷新热力图数据失败:', err));
     };
     window.addEventListener('papyrus_cards_changed', handleRefresh);
     window.addEventListener('papyrus_notes_changed', handleRefresh);
@@ -484,34 +468,48 @@ const ChartsPage = () => {
     };
   }, [cards]);
 
-  if (loading) {
-    return <ChartsSkeletonLoader />;
-  }
+  const animatedStreakDays = useAnimatedNumber(stats.streakDays, 800, 100, firstLoadComplete);
+  const animatedMasteredCards = useAnimatedNumber(stats.masteredCards, 800, 150, firstLoadComplete);
+  const animatedTotalCards = useAnimatedNumber(stats.totalCards, 800, 200, firstLoadComplete);
+  const animatedTodayCards = useAnimatedNumber(stats.todayCards, 800, 250, firstLoadComplete);
+  const animatedTodayProgress = useAnimatedNumber(stats.todayProgress, 800, 300, firstLoadComplete);
+  const overallProgress = stats.totalCards > 0 && animatedTotalCards > 0 
+    ? Math.round((animatedMasteredCards / animatedTotalCards) * 100) 
+    : 0;
 
-  if (cards.length === 0) {
+  const animatedNewCards = useAnimatedNumber(cardGroups.new.length, 800, 200, firstLoadComplete);
+  const animatedLearningCards = useAnimatedNumber(cardGroups.learning.length, 800, 300, firstLoadComplete);
+  const animatedReviewCards = useAnimatedNumber(cardGroups.review.length, 800, 400, firstLoadComplete);
+  const animatedDueCards = useAnimatedNumber(cardGroups.due.length, 800, 500, firstLoadComplete);
+
+  if (firstLoadComplete && cards.length === 0) {
     return (
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px' }}>
+      <PageLayout title='数据' pageKey='charts'>
         <Empty description="暂无数据，请先添加卡片" />
-      </div>
+      </PageLayout>
     );
   }
 
+  const pageStats = [
+    { label: '连续学习', value: animatedStreakDays, suffix: '天' },
+    { label: '已掌握', value: `${animatedMasteredCards}/${animatedTotalCards}` },
+    { label: '总进度', value: `${overallProgress}%` },
+    { label: '今日已复习', value: animatedTodayCards, suffix: `/${stats.dailyTarget}` },
+    { label: '今日目标', value: `${animatedTodayProgress}%` },
+  ];
+
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '48px 64px 64px', background: 'var(--color-bg-1)' }}>
-      <Typography.Title
-        heading={1}
-        style={{ fontWeight: 600, lineHeight: 1, margin: 0, marginBottom: '32px', fontSize: '40px' }}
-      >
-        数据
-      </Typography.Title>
-
-      <StatsBar stats={stats} loading={loading} />
-
+    <PageLayout 
+      title='数据' 
+      pageKey='charts'
+      stats={pageStats}
+      statsLoading={!firstLoadComplete}
+    >
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
-        <StatCard title='新卡片' value={cardGroups.new.length} suffix='张' icon={<IconClockCircle />} />
-        <StatCard title='学习中' value={cardGroups.learning.length} suffix='张' icon={<IconCalendar />} />
-        <StatCard title='复习中' value={cardGroups.review.length} suffix='张' icon={<IconFire />} />
-        <StatCard title='待复习' value={cardGroups.due.length} suffix='张' icon={<IconCheckCircle />} />
+        <StatCard title='新卡片' value={animatedNewCards} suffix='张' icon={<IconClockCircle />} />
+        <StatCard title='学习中' value={animatedLearningCards} suffix='张' icon={<IconCalendar />} />
+        <StatCard title='复习中' value={animatedReviewCards} suffix='张' icon={<IconFire />} />
+        <StatCard title='待复习' value={animatedDueCards} suffix='张' icon={<IconCheckCircle />} />
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginBottom: '32px' }}>
@@ -563,22 +561,23 @@ const ChartsPage = () => {
         <SimpleProgressCard 
           title='新卡片' 
           progress={cardGroups.new.length > 0 ? 100 : 0} 
-          count={cardGroups.new.filter(c => (c.next_review || 0) <= Date.now() / 1000).length} 
+          count={cardGroups.new.filter(c => (c.next_review || 0) <= Date.now() / 1000).length}
+          dataReady={firstLoadComplete}
         />
         <SimpleProgressCard 
           title='学习中' 
           progress={Math.round((cardGroups.learning.length / Math.max(cards.length, 1)) * 100)} 
-          count={cardGroups.learning.filter(c => (c.next_review || 0) <= Date.now() / 1000).length} 
+          count={cardGroups.learning.filter(c => (c.next_review || 0) <= Date.now() / 1000).length}
+          dataReady={firstLoadComplete}
         />
         <SimpleProgressCard 
           title='复习中' 
           progress={Math.round((cardGroups.review.length / Math.max(cards.length, 1)) * 100)} 
-          count={cardGroups.review.filter(c => (c.next_review || 0) <= Date.now() / 1000).length} 
+          count={cardGroups.review.filter(c => (c.next_review || 0) <= Date.now() / 1000).length}
+          dataReady={firstLoadComplete}
         />
       </div>
-
-      <div style={{ height: '32px' }} />
-    </div>
+    </PageLayout>
   );
 };
 

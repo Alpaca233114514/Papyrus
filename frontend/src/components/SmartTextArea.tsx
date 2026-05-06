@@ -24,9 +24,12 @@ export interface SmartTextAreaRef {
  * 2. Tab 触发模式：按 Tab 触发显示补全，Enter 接受
  */
 export const SmartTextArea = forwardRef<SmartTextAreaRef, SmartTextAreaProps>(
-  ({ value, onChange, enableCompletion = true, style, ...rest }, ref) => {
+  ({ value, onChange, enableCompletion = true, style, className, ...rest }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<RefTextAreaType>(null);
+
+    // 处理 className，确保它是 string 类型
+    const stringClassName = Array.isArray(className) ? className.join(' ') : className || '';
 
     const {
       config,
@@ -154,6 +157,7 @@ export const SmartTextArea = forwardRef<SmartTextAreaRef, SmartTextAreaProps>(
     return (
       <div
         ref={containerRef}
+        className={stringClassName}
         style={{
           position: 'relative',
           width: '100%',
@@ -164,6 +168,7 @@ export const SmartTextArea = forwardRef<SmartTextAreaRef, SmartTextAreaProps>(
         <TextArea
           {...rest}
           ref={textareaRef}
+          className={stringClassName}
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}

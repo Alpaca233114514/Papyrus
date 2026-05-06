@@ -394,10 +394,7 @@
   border-color: transparent !important;
 }
 
-.settings-page .arco-input-inner-wrapper:focus-within {
-  border-color: var(--color-primary) !important;
-  box-shadow: 0 0 0 2px rgba(32, 108, 207, 0.25) !important;
-}
+/* 输入框焦点样式 - 使用全局 theme.css 定义的样式，保持一致 */
 
 .settings-page .arco-input-wrapper .arco-input:focus,
 .settings-page .arco-input-wrapper .arco-input:focus-visible,

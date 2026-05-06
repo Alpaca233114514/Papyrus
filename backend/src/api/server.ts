@@ -100,11 +100,11 @@ export async function initApp(): Promise<void> {
     credentials: true,
   });
 
-  // Rate limiting — 100 requests per minute per IP (localhost-only backend)
+  // Rate limiting — 5000 requests per minute per IP (localhost-only desktop app)
   // Disabled in test to avoid flakiness across shared test instances
   const isTestEnv = process.env.NODE_ENV === 'test';
   await app.register(rateLimit, {
-    max: isTestEnv ? Number.MAX_SAFE_INTEGER : 100,
+    max: isTestEnv ? Number.MAX_SAFE_INTEGER : 5000,
     timeWindow: '1 minute',
   });
 

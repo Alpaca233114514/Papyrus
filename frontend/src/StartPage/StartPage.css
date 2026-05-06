@@ -128,8 +128,8 @@
 .start-card-frame {
   position: absolute;
   top: 152px;
-  left: 64px;
-  right: 64px;
+  left: 96px;
+  right: 96px;
   height: calc(61.8vh - 128px);
   border: 1px solid var(--color-text-3);
   border-radius: 16px;

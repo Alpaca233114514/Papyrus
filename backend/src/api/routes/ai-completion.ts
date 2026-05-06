@@ -1,0 +1,219 @@
+import type { FastifyInstance } from 'fastify';
+import { aiConfig } from '../../ai/config-instance.js';
+import { getProviderConfigFromDB } from '../../ai/db-sync.js';
+import { isPrivateUrl } from '../../ai/config.js';
+import { fetchWithProxy } from '../../utils/proxy.js';
+import { isKeylessProvider } from './ai-common.js';
+import type { CompletionPayload } from './ai-common.js';
+
+const _completionConfig: Record<string, unknown> = {
+  enabled: true,
+  require_confirm: false,
+  trigger_delay: 500,
+  max_tokens: 50,
+};
+
+const ALLOWED_COMPLETION_KEYS = new Set(['enabled', 'require_confirm', 'trigger_delay', 'max_tokens']);
+
+export default async function aiCompletionRoutes(fastify: FastifyInstance): Promise<void> {
+  fastify.get('/completion/config', async (_request, reply) => {
+    reply.send({ success: true, config: _completionConfig });
+  });
+
+  fastify.post('/completion/config', async (request, reply) => {
+    const payload = request.body as Record<string, unknown>;
+    if ('enabled' in payload && typeof payload.enabled !== 'boolean') {
+      reply.status(400).send({ success: false, error: 'enabled 字段必须为布尔值' });
+      return;
+    }
+    for (const key of Object.keys(payload)) {
+      if (!ALLOWED_COMPLETION_KEYS.has(key)) {
+        reply.status(400).send({ success: false, error: `不允许的配置项: ${key}` });
+        return;
+      }
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+        reply.status(400).send({ success: false, error: '非法配置项名称' });
+        return;
+      }
+    }
+    for (const [key, value] of Object.entries(payload)) {
+      _completionConfig[key] = value;
+    }
+    reply.send({ success: true });
+  });
+
+  fastify.post('/completion', async (request, reply) => {
+    const payload = request.body as CompletionPayload;
+    const providerName = aiConfig.config.current_provider;
+    const providerConfig = getProviderConfigFromDB(providerName);
+    if (!providerConfig) {
+      reply.status(400).send({ success: false, error: 'Provider 未配置' });
+      return;
+    }
+
+    const systemPrompt = `你是一个智能写作助手。根据用户提供的文本上下文，预测并续写接下来的内容。
+要求：
+1. 续写内容要自然流畅，与上下文保持一致
+2. 只输出续写的文本，不要解释
+3. 如果是列表、代码块等特殊格式，保持格式一致`;
+
+    const userPrompt = `请根据以下内容续写：\n\n${payload.prefix}`;
+
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+
+    try {
+      if (providerName === 'ollama') {
+        const baseUrl = providerConfig.base_url || 'http://localhost:11434';
+        const firstOllamaModel = providerConfig.models?.[0] ?? '';
+        const model = aiConfig.config.current_model || firstOllamaModel;
+
+        const resp = await fetch(`${baseUrl}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(60000),
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt },
+            ],
+            stream: true,
+            options: { temperature: 0.7 },
+          }),
+        });
+
+        if (!resp.ok || !resp.body) {
+          reply.raw.write(`data: {"error":"Ollama API 错误: ${resp.status}"}\n\n`);
+          reply.raw.write(`data: {"done":true}\n\n`);
+          reply.raw.end();
+          return;
+        }
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const chunk = JSON.parse(line) as unknown;
+              if (chunk === null || typeof chunk !== 'object') continue;
+              const dict = chunk as Record<string, unknown>;
+              const message = dict.message as Record<string, unknown> | undefined;
+              const content = message?.content;
+              if (typeof content === 'string' && content) {
+                reply.raw.write(`data: {"text":${JSON.stringify(content)}}\n\n`);
+              }
+            } catch {
+              // ignore
+            }
+          }
+        }
+      } else {
+        if (!providerConfig.api_key && !isKeylessProvider(providerName)) {
+          reply.raw.write(`data: {"error":"AI API Key 未设置"}\n\n`);
+          reply.raw.write(`data: {"done":true}\n\n`);
+          reply.raw.end();
+          return;
+        }
+        const baseUrl = providerConfig.base_url || 'https://api.openai.com/v1';
+        if (isPrivateUrl(baseUrl)) {
+          reply.raw.write(`data: {"error":"SSRF: 禁止通过非本地 provider 访问私有地址"}\n\n`);
+          reply.raw.write(`data: {"done":true}\n\n`);
+          reply.raw.end();
+          return;
+        }
+        const apiKey = providerConfig.api_key;
+        const firstModel = providerConfig.models?.[0] ?? '';
+        const model = aiConfig.config.current_model || firstModel;
+
+        const messages = [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ];
+
+        const reqBody: Record<string, unknown> = {
+          model,
+          messages,
+          stream: true,
+          temperature: 0.7,
+          max_tokens: payload.max_tokens ?? 150,
+        };
+
+        const endpoint = providerName === 'gemini'
+          ? `${baseUrl}/openai/chat/completions`
+          : `${baseUrl}/chat/completions`;
+
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
+        const resp = await fetchWithProxy(endpoint, {
+          method: 'POST',
+          headers,
+          signal: AbortSignal.timeout(60000),
+          body: JSON.stringify(reqBody),
+        });
+
+        if (!resp.ok || !resp.body) {
+          reply.raw.write(`data: {"error":"API 错误: ${resp.status}"}\n\n`);
+          reply.raw.write(`data: {"done":true}\n\n`);
+          reply.raw.end();
+          return;
+        }
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            let lineStr = line;
+            if (lineStr.startsWith('data: ')) {
+              lineStr = lineStr.slice(6);
+            }
+            if (lineStr === '[DONE]') continue;
+            try {
+              const chunk = JSON.parse(lineStr) as unknown;
+              if (chunk === null || typeof chunk !== 'object') continue;
+              const dict = chunk as Record<string, unknown>;
+              const choices = dict.choices as Array<Record<string, unknown>> | undefined;
+              if (!choices || !choices[0]) continue;
+              const delta = choices[0].delta as Record<string, unknown> | undefined;
+              const content = delta?.content;
+              if (typeof content === 'string' && content) {
+                reply.raw.write(`data: {"text":${JSON.stringify(content)}}\n\n`);
+              }
+            } catch {
+              // ignore
+            }
+          }
+        }
+      }
+
+      reply.raw.write(`data: {"done":true}\n\n`);
+      reply.raw.end();
+    } catch (e) {
+      reply.raw.write(`data: {"error":${JSON.stringify(e instanceof Error ? e.message : String(e))}}\n\n`);
+      reply.raw.write(`data: {"done":true}\n\n`);
+      reply.raw.end();
+    }
+  });
+}

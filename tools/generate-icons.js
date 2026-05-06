@@ -10,7 +10,7 @@ const FRONTEND_PUBLIC_DIR = path.join(__dirname, '..', 'frontend', 'public');
 const TEMP_DIR = path.join(__dirname, '..', 'temp-icons');
 
 const CANVAS_SIZE = 1024;
-const CONTENT_SCALE = 0.82;
+const CONTENT_SCALE = 1.0;
 
 const ICNS_SIZES = [
   { size: 16, type: 'icp4' },

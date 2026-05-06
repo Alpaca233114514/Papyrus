@@ -5,11 +5,12 @@ import { NoteListView } from './views/NoteListView';
 import { NoteDetailView } from './views/NoteDetailView';
 import { FileTree } from './components/FileTree';
 import { useNotes } from './useNotes';
+import { PRIMARY_COLOR } from '../theme-constants';
 
 import type { Note } from './types';
 
-// 视图模式
 type ViewMode = 'list' | 'detail';
+type AnimationDirection = 'in' | 'out';
 
 const NotesPage = () => {
   const { t } = useTranslation();
@@ -18,6 +19,7 @@ const NotesPage = () => {
   const [isCreateMode, setIsCreateMode] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(240);
   const [isResizing, setIsResizing] = useState(false);
+  const [animationDirection, setAnimationDirection] = useState<AnimationDirection>('in');
 
   const {
     notes,
@@ -34,7 +36,7 @@ const NotesPage = () => {
     refreshNotes,
   } = useNotes();
 
-  console.log('[NotesPage] isLoading:', isLoading, 'notes count:', notes.length);
+  
 
   // 获取所有文件夹名称
   const allFolders = useMemo(() => 
@@ -42,29 +44,29 @@ const NotesPage = () => {
     [folders, t]
   );
 
-  // 打开笔记详情
   const handleNoteClick = useCallback((note: Note) => {
+    setAnimationDirection('in');
     setSelectedNote(note);
     setIsCreateMode(false);
     setViewMode('detail');
   }, []);
 
-  // 新建笔记
   const handleCreateClick = useCallback(() => {
+    setAnimationDirection('in');
     setSelectedNote(null);
     setIsCreateMode(true);
     setViewMode('detail');
   }, []);
 
-  // 在指定文件夹新建笔记
   const handleCreateInFolder = useCallback((folder: string) => {
+    setAnimationDirection('in');
     setSelectedNote({
       id: 'temp',
       title: '',
       folder,
       preview: '',
       tags: [],
-      updatedAt: '今天',
+      updatedAtTimestamp: Math.floor(Date.now() / 1000),
       wordCount: 0,
       content: '',
     });
@@ -72,18 +74,24 @@ const NotesPage = () => {
     setViewMode('detail');
   }, []);
 
-  // 返回列表
   const handleBack = useCallback(() => {
-    setViewMode('list');
-    setSelectedNote(null);
-    setIsCreateMode(false);
+    setAnimationDirection('out');
+    setTimeout(() => {
+      setAnimationDirection('in');
+      setViewMode('list');
+      setSelectedNote(null);
+      setIsCreateMode(false);
+    }, 150);
   }, []);
 
-  // 删除后返回列表
   const handleDelete = useCallback(async (id: string) => {
     try {
       await deleteNote(id);
-      setViewMode('list');
+      setAnimationDirection('out');
+      setTimeout(() => {
+        setAnimationDirection('in');
+        setViewMode('list');
+      }, 150);
       Message.success(t('notesPage.deleteSuccess'));
     } catch (err) {
       Message.error(err instanceof Error ? err.message : t('notesPage.deleteFailed'));
@@ -99,7 +107,6 @@ const NotesPage = () => {
     return () => window.removeEventListener('papyrus_new_note', handleGlobalNewNote);
   }, [handleCreateClick]);
 
-  // 保存笔记（可选是否返回列表）
   const handleSave = useCallback(async (
     params: Parameters<typeof saveNote>[0],
     isCreate: Parameters<typeof saveNote>[1],
@@ -107,7 +114,11 @@ const NotesPage = () => {
   ) => {
     await saveNote(params, isCreate);
     if (shouldReturnToList) {
-      setViewMode('list');
+      setAnimationDirection('out');
+      setTimeout(() => {
+        setAnimationDirection('in');
+        setViewMode('list');
+      }, 150);
     }
   }, [saveNote]);
 
@@ -142,66 +153,90 @@ const NotesPage = () => {
       background: 'var(--color-bg-1)',
     }}>
       {/* 文件树侧边栏 - 只在详情模式显示 */}
-      {viewMode === 'detail' && (
-        <>
-          <FileTree
-            notes={notes}
-            selectedNoteId={selectedNote?.id || null}
-            onSelectNote={handleNoteClick}
-            onCreateNote={handleCreateInFolder}
-            width={sidebarWidth}
-          />
-          {/* 拖拽条 */}
-          <div
-            onMouseDown={handleMouseDown}
-            style={{
-              width: '4px',
-              cursor: isResizing ? 'col-resize' : 'ew-resize',
-              background: isResizing ? PRIMARY_COLOR : 'transparent',
-              transition: 'background 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              if (!isResizing) e.currentTarget.style.background = 'var(--color-border-2)';
-            }}
-            onMouseLeave={(e) => {
-              if (!isResizing) e.currentTarget.style.background = 'transparent';
-            }}
-          />
-        </>
-      )}
+      <div
+        style={{
+          display: 'flex',
+          overflow: 'hidden',
+          transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          width: viewMode === 'detail' ? sidebarWidth + 4 : 0,
+        }}
+      >
+        {viewMode === 'detail' && (
+          <>
+            <FileTree
+              notes={notes}
+              selectedNoteId={selectedNote?.id || null}
+              onSelectNote={handleNoteClick}
+              onCreateNote={handleCreateInFolder}
+              width={sidebarWidth}
+            />
+            <div
+              onMouseDown={handleMouseDown}
+              style={{
+                width: '4px',
+                cursor: isResizing ? 'col-resize' : 'ew-resize',
+                background: isResizing ? PRIMARY_COLOR : 'transparent',
+                transition: 'background 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                if (!isResizing) e.currentTarget.style.background = 'var(--color-border-2)';
+              }}
+              onMouseLeave={(e) => {
+                if (!isResizing) e.currentTarget.style.background = 'transparent';
+              }}
+            />
+          </>
+        )}
+      </div>
 
       {/* 主内容区 */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {viewMode === 'list' ? (
-          <NoteListView
-            folders={folders}
-            allTags={allTags}
-            notes={filteredNotes}
-            activeFolder={activeFolder}
-            totalWords={totalWords}
-            todayNotes={todayNotes}
-            isLoading={isLoading}
-            onFolderChange={setActiveFolder}
-            onNoteClick={handleNoteClick}
-            onCreateClick={handleCreateClick}
-            onNotesDeleted={refreshNotes}
-          />
-        ) : (
-          <NoteDetailView
-            note={selectedNote}
-            isCreateMode={isCreateMode}
-            allFolders={allFolders}
-            onBack={handleBack}
-            onSave={handleSave}
-            onDelete={handleDelete}
-          />
+        {viewMode === 'list' && (
+          <div
+            style={{
+              flex: 1,
+              opacity: animationDirection === 'out' ? 0 : 1,
+              transform: animationDirection === 'out' ? 'translateX(20px)' : 'translateX(0)',
+              transition: 'opacity 0.15s ease-out, transform 0.15s ease-out',
+            }}
+          >
+            <NoteListView
+              folders={folders}
+              allTags={allTags}
+              notes={filteredNotes}
+              activeFolder={activeFolder}
+              totalWords={totalWords}
+              todayNotes={todayNotes}
+              isLoading={isLoading}
+              onFolderChange={setActiveFolder}
+              onNoteClick={handleNoteClick}
+              onCreateClick={handleCreateClick}
+              onNotesDeleted={refreshNotes}
+            />
+          </div>
+        )}
+        {viewMode === 'detail' && (
+          <div
+            style={{
+              flex: 1,
+              opacity: animationDirection === 'in' ? 1 : 0,
+              transform: animationDirection === 'in' ? 'translateX(0)' : 'translateX(-20px)',
+              transition: 'opacity 0.2s ease-out, transform 0.2s ease-out',
+            }}
+          >
+            <NoteDetailView
+              note={selectedNote}
+              isCreateMode={isCreateMode}
+              allFolders={allFolders}
+              onBack={handleBack}
+              onSave={handleSave}
+              onDelete={handleDelete}
+            />
+          </div>
         )}
       </div>
     </div>
   );
 };
-
-const PRIMARY_COLOR = '#206CCF';
-const SECONDARY_COLOR = '#9FD4FD';
 
 export default NotesPage;

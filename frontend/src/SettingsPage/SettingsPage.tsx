@@ -87,6 +87,70 @@ const getSettingCategories = (t: (key: string) => string) => [
   },
 ];
 
+interface CategoryCardProps {
+  category: {
+    key: string;
+    title: string;
+    desc: string;
+    icon: React.ComponentType<{ className?: string }>;
+    color: string;
+  };
+  onCategoryClick: (key: string) => void;
+}
+
+const CategoryCard = ({ category, onCategoryClick }: CategoryCardProps) => {
+  const Icon = category.icon;
+
+  return (
+    <div
+      className="settings-category-card"
+      onClick={() => onCategoryClick(category.key)}
+      role="button"
+      tabIndex={0}
+      aria-label={`${category.title}: ${category.desc}`}
+      onKeyDown={(e) => e.key === 'Enter' && onCategoryClick(category.key)}
+    >
+      <div 
+        className="settings-category-icon"
+        style={{ 
+          color: category.color,
+        }}
+      >
+        <Icon className="settings-category-icon-svg" />
+      </div>
+      <div className="settings-category-content">
+        <Text bold className="settings-category-title">{category.title}</Text>
+        <Paragraph type="secondary" className="settings-category-desc">
+          {category.desc}
+        </Paragraph>
+      </div>
+    </div>
+  );
+};
+
+interface MainViewProps {
+  title: string;
+  categories: Array<{
+    key: string;
+    title: string;
+    desc: string;
+    icon: React.ComponentType<{ className?: string }>;
+    color: string;
+  }>;
+  onCategoryClick: (key: string) => void;
+}
+
+const MainView = ({ title, categories, onCategoryClick }: MainViewProps) => (
+  <div className="settings-main settings-main-scrollable">
+    <Title heading={1} className="settings-page-title">{title}</Title>
+    <div className="settings-categories-grid">
+      {categories.map(category => (
+        <CategoryCard key={category.key} category={category} onCategoryClick={onCategoryClick} />
+      ))}
+    </div>
+  </div>
+);
+
 const SettingsPage = () => {
   const { t } = useTranslation();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -115,47 +179,6 @@ const SettingsPage = () => {
     return () => clearTimeout(timer);
   }, [animating, activeCategory]);
 
-  const CategoryCard = ({ category }: { category: typeof SETTING_CATEGORIES[0] }) => {
-    const Icon = category.icon;
-
-    return (
-      <div
-        className="settings-category-card"
-        onClick={() => handleCategoryClick(category.key)}
-        role="button"
-        tabIndex={0}
-        aria-label={`${category.title}: ${category.desc}`}
-        onKeyDown={(e) => e.key === 'Enter' && handleCategoryClick(category.key)}
-      >
-        <div 
-          className="settings-category-icon"
-          style={{ 
-            color: category.color,
-          }}
-        >
-          <Icon className="settings-category-icon-svg" />
-        </div>
-        <div className="settings-category-content">
-          <Text bold className="settings-category-title">{category.title}</Text>
-          <Paragraph type="secondary" className="settings-category-desc">
-            {category.desc}
-          </Paragraph>
-        </div>
-      </div>
-    );
-  };
-
-  const MainView = () => (
-    <div className="settings-main settings-main-scrollable">
-      <Title heading={1} className="settings-page-title">{t('settings.title')}</Title>
-      <div className="settings-categories-grid">
-        {SETTING_CATEGORIES.map(category => (
-          <CategoryCard key={category.key} category={category} />
-        ))}
-      </div>
-    </div>
-  );
-
   const getViewComponent = (key: string) => {
     const views: Record<string, React.ReactNode> = {
       appearance: <AppearanceView onBack={handleBack} />,
@@ -172,13 +195,19 @@ const SettingsPage = () => {
 
   return (
     <div className="settings-page">
-      {activeCategory === null && !animating && <MainView />}
+      {activeCategory === null && !animating && (
+        <MainView 
+          title={t('settings.title')}
+          categories={SETTING_CATEGORIES}
+          onCategoryClick={handleCategoryClick}
+        />
+      )}
       {activeCategory === null && animating && direction === 'out' && (
         <div className="settings-main settings-main-scrollable settings-page-exit">
           <Title heading={1} className="settings-page-title">{t('settings.title')}</Title>
           <div className="settings-categories-grid">
             {SETTING_CATEGORIES.map(category => (
-              <CategoryCard key={category.key} category={category} />
+              <CategoryCard key={category.key} category={category} onCategoryClick={handleCategoryClick} />
             ))}
           </div>
         </div>

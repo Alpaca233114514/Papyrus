@@ -6,9 +6,9 @@ export interface Note {
   folder: string;
   preview: string;
   tags: string[];
-  updatedAt: string;
+  updatedAtTimestamp: number;
   wordCount: number;
-  content?: string; // 完整内容，编辑时使用
+  content?: string;
 }
 
 export interface Folder {

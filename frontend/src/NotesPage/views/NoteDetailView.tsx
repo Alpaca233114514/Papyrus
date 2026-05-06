@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Typography, Input, Tag, Button, Breadcrumb, Message, Modal, Dropdown } from '@arco-design/web-react';
 import SmartTextArea, { type SmartTextAreaRef } from '../../components/SmartTextArea';
+import { useTranslation } from 'react-i18next';
 const BreadcrumbItem = Breadcrumb.Item;
 import {
   IconLeft,
@@ -29,6 +30,19 @@ interface NoteDetailViewProps {
   onDelete?: (id: string) => void;
 }
 
+function formatTimestamp(timestamp: number, t: (key: string, options?: Record<string, unknown>) => string): string {
+  const now = new Date();
+  const date = new Date(timestamp * 1000);
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return t('notesPage.today');
+  if (diffDays === 1) return t('notesPage.yesterday');
+  if (diffDays < 7) return t('notesPage.daysAgo', { count: diffDays });
+  if (diffDays < 30) return t('notesPage.weeksAgo', { count: Math.floor(diffDays / 7) });
+  return t('notesPage.monthsAgo', { count: Math.floor(diffDays / 30) });
+}
+
 export const NoteDetailView = ({
   note,
   isCreateMode,
@@ -37,6 +51,7 @@ export const NoteDetailView = ({
   onSave,
   onDelete,
 }: NoteDetailViewProps) => {
+  const { t } = useTranslation();
   // 表单状态
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -496,7 +511,7 @@ export const NoteDetailView = ({
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
                   <IconHistory style={{ fontSize: '14px' }} />
-                  {note?.updatedAt}
+                  {note ? formatTimestamp(note.updatedAtTimestamp, t) : ''}
                 </div>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   {note?.tags.map(tag => (
@@ -512,6 +527,7 @@ export const NoteDetailView = ({
           {/* 标题 */}
           {isEditable ? (
             <Input
+              className='no-border-input'
               value={title}
               onChange={setTitle}
               placeholder='输入标题...'
@@ -536,6 +552,7 @@ export const NoteDetailView = ({
           {/* 内容 - 编辑模式：显示 SmartTextArea，预览模式：显示渲染后的 Markdown */}
           {isEditable ? (
             <SmartTextArea
+              className='no-border-textarea'
               ref={textAreaRef}
               value={content}
               onChange={setContent}

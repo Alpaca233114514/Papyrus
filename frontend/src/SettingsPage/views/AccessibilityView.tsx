@@ -24,6 +24,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'aa-section', label: 'accessibilityView.aaLevel', icon: IconEye },
   { key: 'aaa-section', label: 'accessibilityView.aaaLevel', icon: IconSun },
   { key: 'motion-section', label: 'accessibilityView.motion', icon: IconMoon },
+  { key: 'font-section', label: 'accessibilityView.fontSizeLink', icon: IconAccessibility },
 ];
 
 const AccessibilityView = ({ onBack }: AccessibilityViewProps) => {
@@ -159,6 +160,28 @@ const AccessibilityView = ({ onBack }: AccessibilityViewProps) => {
           </>
         );
 
+      case 'font-section':
+        return (
+          <div className="settings-tip" style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 12,
+            padding: 16,
+            background: 'var(--color-fill-2)',
+            borderRadius: 8,
+          }}>
+            <IconAccessibility style={{ color: 'var(--color-text-3)', fontSize: 20, marginTop: 2 }} />
+            <div>
+              <Text style={{ fontSize: 13, fontWeight: 500, marginBottom: 4, display: 'block' }}>
+                {t('accessibilityView.fontSizeLink')}
+              </Text>
+              <Text type="secondary" style={{ fontSize: 13 }}>
+                {t('accessibilityView.fontSizeLinkDesc')}
+              </Text>
+            </div>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -176,6 +199,7 @@ const AccessibilityView = ({ onBack }: AccessibilityViewProps) => {
           { id: 'aa-section', title: t('accessibilityView.aaLevel'), icon: IconEye },
           { id: 'aaa-section', title: t('accessibilityView.aaaLevel'), icon: IconSun },
           { id: 'motion-section', title: t('accessibilityView.motion'), icon: IconMoon },
+          { id: 'font-section', title: t('accessibilityView.fontSizeLink'), icon: IconAccessibility },
         ]}
         onBack={onBack}
         sidebarWidth={220}
@@ -201,30 +225,6 @@ const AccessibilityView = ({ onBack }: AccessibilityViewProps) => {
         >
           {t('accessibilityView.restoreDefaults')}
         </Button>
-      </div>
-
-      <div className="settings-tip" style={{
-        position: 'absolute',
-        bottom: 80,
-        left: 220,
-        right: 48,
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: 12,
-        padding: 16,
-        background: 'var(--color-fill-2)',
-        borderRadius: 8,
-        marginRight: 48,
-      }}>
-        <IconAccessibility style={{ color: 'var(--color-text-3)', fontSize: 20, marginTop: 2 }} />
-        <div>
-          <Text style={{ fontSize: 13, fontWeight: 500, marginBottom: 4, display: 'block' }}>
-            {t('accessibilityView.fontSizeLink')}
-          </Text>
-          <Text type="secondary" style={{ fontSize: 13 }}>
-            {t('accessibilityView.fontSizeLinkDesc')}
-          </Text>
-        </div>
       </div>
     </>
   );

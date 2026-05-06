@@ -41,9 +41,7 @@
   height: 24px;
 }
 
-body[arco-theme="dark"] .titlebar-logo-icon {
-  filter: invert(1) brightness(1.2);
-}
+
 
 .titlebar-logo:hover,
 .titlebar-logo:active {
@@ -78,18 +76,23 @@ body[arco-theme="dark"] .titlebar-logo-icon {
 
 /* search - takes center */
 .titlebar-center {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  flex: 1;
   display: flex;
-  justify-content: center;
-  padding: 0;
+  align-items: center;
+  min-width: 200px;
+  padding: 0 8px;
 }
 
 .titlebar-search,
 .titlebar-center .arco-input-wrapper {
   width: 100%;
-  max-width: 280px;
+  min-width: 180px;
+  flex-shrink: 1;
+}
+
+.titlebar-search-input {
+  width: 100% !important;
+  min-width: 180px !important;
 }
 
 .titlebar-search .arco-input-inner-wrapper,
@@ -176,4 +179,35 @@ body[arco-theme="dark"] .titlebar-logo-icon {
 .titlebar-menu-item:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: -2px;
+}
+
+/* 搜索下拉菜单动画 */
+@keyframes searchDropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes searchDropdownFadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+.search-dropdown-enter {
+  animation: searchDropdownFadeIn 0.15s ease-out forwards;
+}
+
+.search-dropdown-leave {
+  animation: searchDropdownFadeOut 0.15s ease-in forwards;
 }

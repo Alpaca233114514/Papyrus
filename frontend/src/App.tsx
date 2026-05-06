@@ -26,14 +26,39 @@ import type { SearchResult } from './api';
 
 const PAGE_ORDER = ['start', 'scroll', 'notes', 'charts', 'files', 'extensions', 'settings'];
 
+const CHAT_WIDTH_STORAGE_KEY = 'papyrus_chat_width';
+const CHAT_DEFAULT_WIDTH = 320;
+
+const loadChatWidth = (): number => {
+  try {
+    const saved = localStorage.getItem(CHAT_WIDTH_STORAGE_KEY);
+    if (saved) {
+      const width = parseInt(saved, 10);
+      if (width >= 280 && width <= 600) {
+        return width;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return CHAT_DEFAULT_WIDTH;
+};
+
+const saveChatWidth = (width: number): void => {
+  try {
+    localStorage.setItem(CHAT_WIDTH_STORAGE_KEY, String(width));
+  } catch {
+    // ignore
+  }
+};
+
 const App = () => {
   const { t } = useTranslation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [todayDone, setTodayDone] = useState(false);
   const [activePage, setActivePage] = useState('start');
   const [chatOpen, setChatOpen] = useState(true);
-  const CHAT_DEFAULT_WIDTH = 320;
-  const [chatWidth, setChatWidth] = useState(CHAT_DEFAULT_WIDTH);
+  const [chatWidth, setChatWidth] = useState(loadChatWidth);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartX = useRef<number>(0);
   const dragStartWidth = useRef<number>(0);
@@ -42,9 +67,14 @@ const App = () => {
   const mainContentRef = useRef<HTMLDivElement>(null);
   const prevPageIndexRef = useRef<number>(0);
   const [animationDirection, setAnimationDirection] = useState<'up' | 'down' | null>(null);
+  const [prevPage, setPrevPage] = useState<string | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [nextPage, setNextPage] = useState<string | null>(null);
 
-  // 处理页面切换动画
+  // 处理页面切换动画 - 串行执行，先退出再进入（新页面预加载但不显示）
   const handlePageChange = useCallback((newPage: string) => {
+    if (isTransitioning) return;
+    
     const newIndex = PAGE_ORDER.indexOf(newPage);
     if (newIndex === -1) {
       console.warn(t('app.pageNotFound', { page: newPage }));
@@ -52,18 +82,27 @@ const App = () => {
       return;
     }
     const prevIndex = prevPageIndexRef.current;
+    const prevPageValue = activePage;
     
+    let direction: 'up' | 'down' | null = null;
     if (newIndex > prevIndex) {
-      setAnimationDirection('up');
+      direction = 'up';
     } else if (newIndex < prevIndex) {
-      setAnimationDirection('down');
-    } else {
-      setAnimationDirection(null);
+      direction = 'down';
+    }
+    
+    if (!direction) {
+      setActivePage(newPage);
+      return;
     }
     
     prevPageIndexRef.current = newIndex;
-    setActivePage(newPage);
-  }, []);
+    
+    setAnimationDirection(direction);
+    setPrevPage(prevPageValue);
+    setNextPage(newPage);
+    setIsTransitioning(true);
+  }, [activePage, isTransitioning]);
 
   // 处理搜索结果点击
   const handleSearchResult = useCallback((result: SearchResult) => {
@@ -104,7 +143,9 @@ const App = () => {
     };
     const onMove = (ev: MouseEvent) => {
       const delta = dragStartX.current - ev.clientX;
-      setChatWidth(Math.min(600, Math.max(280, dragStartWidth.current + delta)));
+      const newWidth = Math.min(600, Math.max(280, dragStartWidth.current + delta));
+      setChatWidth(newWidth);
+      saveChatWidth(newWidth);
     };
     const onUp = () => cleanup();
     const onLeave = () => cleanup();
@@ -131,10 +172,6 @@ const App = () => {
 
   // 渲染当前页面
   const renderPage = () => {
-    const animationClass =
-      animationDirection === 'up' ? 'motion-safe:tw-animate-page-up' :
-      animationDirection === 'down' ? 'motion-safe:tw-animate-page-down' : '';
-
     const pages: Record<string, React.ReactNode> = {
       start: <StartPage onDoneChange={setTodayDone} onNavigate={handlePageChange} />,
       scroll: <ScrollPage initialTag={initialScrollTag} onInitialTagUsed={() => setInitialScrollTag(undefined)} />,
@@ -145,13 +182,62 @@ const App = () => {
       settings: <SettingsPage />,
     };
 
+    const exitAnimationClass =
+      animationDirection === 'up' ? 'motion-safe:tw-animate-page-exit-up' :
+      animationDirection === 'down' ? 'motion-safe:tw-animate-page-exit-down' : '';
+
+    const enterAnimationClass =
+      animationDirection === 'up' ? 'motion-safe:tw-animate-page-up' :
+      animationDirection === 'down' ? 'motion-safe:tw-animate-page-down' : '';
+
+    const handleExitAnimationEnd = (e: React.AnimationEvent) => {
+      if (e.animationName.includes('pageExitUp') || e.animationName.includes('pageExitDown')) {
+        setPrevPage(null);
+        if (nextPage) {
+          setActivePage(nextPage);
+          setNextPage(null);
+        }
+        setTimeout(() => {
+          setIsTransitioning(false);
+        }, 50);
+      }
+    };
+
+    const handleEnterAnimationEnd = () => {
+      setAnimationDirection(null);
+    };
+
+    const isStartExiting = isTransitioning && prevPage === 'start';
+
     return (
-      <div
-        key={activePage}
-        className={`tw-absolute tw-inset-0 tw-flex tw-flex-col ${animationClass}`}
-      >
-        {pages[activePage]}
-      </div>
+      <>
+        <div
+          key={`page-${activePage}`}
+          className={`tw-absolute tw-inset-0 tw-flex tw-flex-col ${isTransitioning && prevPage ? exitAnimationClass : (animationDirection ? enterAnimationClass : '')}`}
+          onAnimationEnd={isTransitioning && prevPage ? handleExitAnimationEnd : (animationDirection ? handleEnterAnimationEnd : undefined)}
+        >
+          {activePage === 'start' && todayDone && (
+            <div
+              className={`tw-absolute tw-inset-x-0 tw-top-0 tw-h-[160px] tw-pointer-events-none tw-z-0 tw-bg-gradient-to-b tw-from-[rgba(232,255,234,0.45)] tw-to-transparent${isStartExiting ? ` ${exitAnimationClass}` : ''}`}
+              aria-hidden="true"
+            />
+          )}
+          {pages[activePage]}
+        </div>
+        {isTransitioning && nextPage && (
+          <div
+            key={`next-${nextPage}`}
+            className="tw-absolute tw-inset-0 tw-flex tw-flex-col"
+            style={{
+              opacity: 0,
+              animation: animationDirection ? (animationDirection === 'up' ? 'pageSlideUp 0.25s ease-out forwards' : 'pageSlideDown 0.25s ease-out forwards') : 'none',
+              animationDelay: '0.05s',
+            }}
+          >
+            {pages[nextPage]}
+          </div>
+        )}
+      </>
     );
   };
 
@@ -196,22 +282,14 @@ const App = () => {
         />
         
         {/* 主内容区域 */}
-        <main 
-          id="main-content" 
+        <main
+          id="main-content"
           ref={mainContentRef}
           tabIndex={-1}
           className="tw-relative tw-flex-1 tw-flex tw-overflow-hidden tw-outline-none"
           role="main"
           aria-label={`${pageTitles[activePage] || t('app.mainContent')}页面`}
         >
-          {/* 完成状态光晕 */}
-          {activePage === 'start' && todayDone && (
-            <div
-              className="tw-absolute tw-inset-x-0 tw-top-0 tw-h-[160px] tw-pointer-events-none tw-z-0 tw-bg-gradient-to-b tw-from-[rgba(232,255,234,0.45)] tw-to-transparent"
-              aria-hidden="true"
-            />
-          )}
-
           {/* 页面内容 */}
           {renderPage()}
         </main>
@@ -224,27 +302,24 @@ const App = () => {
         />
         
         {/* 聊天面板 */}
-        <div 
+        <div
           className="tw-flex tw-flex-shrink-0 tw-overflow-hidden"
-          style={{ width: chatOpen ? (activePage === 'start' ? CHAT_DEFAULT_WIDTH + 4 : chatWidth + 4) : 0, opacity: chatOpen ? 1 : 0.01, transition: isDragging ? 'none' : 'width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease' }}
+          style={{ width: chatOpen ? chatWidth + 4 : 0, opacity: chatOpen ? 1 : 0.01, transition: isDragging ? 'none' : 'width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease' }}
           role="complementary"
           aria-label="AI 助手聊天面板"
         >
           <div
-            className={[
-              "tw-flex-shrink-0 tw-w-1 tw-transition-colors tw-duration-200",
-              activePage === 'start' ? "tw-cursor-default" : "tw-cursor-ew-resize hover:tw-bg-arco-border-2"
-            ].join(" ")}
-            onMouseDown={activePage !== 'start' ? onChatDragStart : undefined}
+            className="tw-flex-shrink-0 tw-w-1 tw-cursor-ew-resize hover:tw-bg-arco-border-2 tw-transition-colors tw-duration-200"
+            onMouseDown={onChatDragStart}
             role="separator"
             aria-orientation="vertical"
             aria-label="调整聊天面板宽度"
             tabIndex={0}
           />
-          <ChatPanel 
-            open={chatOpen} 
-            width={activePage === 'start' ? CHAT_DEFAULT_WIDTH : chatWidth} 
-            onClose={() => setChatOpen(false)} 
+          <ChatPanel
+            open={chatOpen}
+            width={chatWidth}
+            onClose={() => setChatOpen(false)}
           />
         </div>
       </div>

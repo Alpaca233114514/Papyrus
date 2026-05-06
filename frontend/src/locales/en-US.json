@@ -282,7 +282,8 @@
     "reset": "Reset",
     "shortcutSet": "Shortcut set to {{shortcut}}",
     "shortcutsReset": "Reset to default shortcuts",
-    "studyModeEditing": "Study mode shortcut editing feature under development"
+    "studyModeEditing": "Study mode shortcut editing feature under development",
+    "cancel": "Cancel"
   },
   "accessibilityView": {
     "title": "Accessibility Settings",

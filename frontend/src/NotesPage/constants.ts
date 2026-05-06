@@ -1,6 +1,6 @@
-// 笔记页面常量
+import { PRIMARY_COLOR } from '../theme-constants';
 
-export const PRIMARY_COLOR = '#206CCF';
+export { PRIMARY_COLOR };
 
 // 统一按钮样式
 export const UNIFIED_BTN_STYLE = {

@@ -7,8 +7,8 @@ interface IconAccessibilityProps {
 
 const IconAccessibility: React.FC<IconAccessibilityProps> = ({ style, className }) => (
   <svg
-    width="24"
-    height="24"
+    width="1em"
+    height="1em"
     viewBox="0 0 48 48"
     fill="currentColor"
     style={style}

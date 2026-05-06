@@ -2,9 +2,10 @@ import { useState, useCallback } from 'react';
 import { Typography, Button, Tag, Message, Modal } from '@arco-design/web-react';
 import { IconPlus, IconDelete, IconClose } from '@arco-design/web-react/icon';
 import type { Note, Folder } from '../types';
-import { NoteCard, FolderTab, AddCard, StatsBar, SkeletonLoader } from '../components';
+import { NoteCard, FolderTab, AddCard } from '../components';
 import { PRIMARY_COLOR, UNIFIED_BTN_STYLE } from '../constants';
 import { api } from '../../api';
+import { PageLayout } from '../../components';
 
 interface NoteListViewProps {
   folders: Folder[];
@@ -33,8 +34,6 @@ export const NoteListView = ({
   onCreateClick,
   onNotesDeleted,
 }: NoteListViewProps) => {
-  console.log('[NoteListView] isLoading:', isLoading);
-
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -74,84 +73,60 @@ export const NoteListView = ({
     });
   }, [selectedIds, onNotesDeleted]);
 
-  if (isLoading) {
-    console.log('[NoteListView] Rendering SkeletonLoader because isLoading is true');
-    return <SkeletonLoader />;
-  }
+  const actions = (
+    <>
+      <Button
+        onClick={() => setSelecting(true)}
+        style={UNIFIED_BTN_STYLE}
+      >
+        批量选择
+      </Button>
+      <Button
+        type='primary'
+        icon={<IconPlus />}
+        onClick={onCreateClick}
+        style={{ ...UNIFIED_BTN_STYLE, backgroundColor: PRIMARY_COLOR }}
+      >
+        新建笔记
+      </Button>
+    </>
+  );
+
+  const pageStats = [
+    { label: '笔记数', value: notes.length },
+    { label: '总字数', value: totalWords > 1000 ? `${(totalWords / 1000).toFixed(1)}k` : totalWords },
+    { label: '今日更新', value: todayNotes },
+    { label: '标签', value: allTags.length },
+  ];
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '48px 64px 64px' }}>
-      {/* 标题栏 */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '32px'
-      }}>
-        <div>
-          <Typography.Title
-            heading={1}
-            style={{ fontWeight: 600, lineHeight: 1, margin: 0, fontSize: '40px' }}
+    <PageLayout
+      title='笔记库'
+      pageKey='notes'
+      actions={selecting ? (
+        <>
+          <Button
+            type='primary'
+            status='danger'
+            icon={<IconDelete />}
+            onClick={handleBatchDelete}
+            disabled={selectedIds.size === 0}
+            style={{ ...UNIFIED_BTN_STYLE }}
           >
-            笔记库
-          </Typography.Title>
-          <Typography.Text
-            type='secondary'
-            style={{ fontSize: '14px', marginTop: '8px', display: 'block' }}
+            删除选中 ({selectedIds.size})
+          </Button>
+          <Button
+            icon={<IconClose />}
+            onClick={cancelSelect}
+            style={UNIFIED_BTN_STYLE}
           >
-            {activeFolder} · {notes.length} 篇 · {totalWords.toLocaleString()} 字
-          </Typography.Text>
-        </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          {selecting ? (
-            <>
-              <Button
-                type='primary'
-                status='danger'
-                icon={<IconDelete />}
-                onClick={handleBatchDelete}
-                disabled={selectedIds.size === 0}
-                style={{ ...UNIFIED_BTN_STYLE }}
-              >
-                删除选中 ({selectedIds.size})
-              </Button>
-              <Button
-                icon={<IconClose />}
-                onClick={cancelSelect}
-                style={UNIFIED_BTN_STYLE}
-              >
-                取消
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                onClick={() => setSelecting(true)}
-                style={UNIFIED_BTN_STYLE}
-              >
-                批量选择
-              </Button>
-              <Button
-                type='primary'
-                icon={<IconPlus />}
-                onClick={onCreateClick}
-                style={{ ...UNIFIED_BTN_STYLE, backgroundColor: PRIMARY_COLOR }}
-              >
-                新建笔记
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* 统计栏 */}
-      <StatsBar
-        noteCount={notes.length}
-        totalWords={totalWords}
-        todayNotes={todayNotes}
-        tagCount={allTags.length}
-      />
-
+            取消
+          </Button>
+        </>
+      ) : actions}
+      stats={pageStats}
+      statsLoading={isLoading}
+    >
       {/* 文件夹标签 */}
       <div style={{
         display: 'flex',
@@ -198,8 +173,6 @@ export const NoteListView = ({
         ))}
         <AddCard onClick={onCreateClick} />
       </div>
-
-      <div style={{ height: '32px' }} />
-    </div>
+    </PageLayout>
   );
 };

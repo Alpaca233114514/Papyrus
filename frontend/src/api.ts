@@ -7,7 +7,11 @@ export function getFileUrl(fileId: string, action: 'preview' | 'download'): stri
   return `${BASE}/files/${fileId}/${action}`;
 }
 
-let cachedToken: string | null | undefined;
+export let cachedToken: string | null | undefined;
+
+export function clearAuthTokenCache(): void {
+  cachedToken = undefined;
+}
 
 export async function getAuthToken(): Promise<string | null> {
   if (cachedToken) {

@@ -56,11 +56,9 @@ export const useNotes = (): UseNotesReturn => {
   // 从 API 加载笔记
   const refreshNotes = useCallback(async () => {
     try {
-      console.log('[useNotes] Starting refreshNotes, setting isLoading to true');
       setIsLoading(true);
       setError(null);
       const response = await api.listNotes();
-      console.log('[useNotes] Received response, success:', response.success, 'notes count:', response.notes?.length);
       if (response.success) {
         // 转换后端数据格式到前端格式
         const formattedNotes: Note[] = response.notes.map(n => ({
@@ -69,7 +67,7 @@ export const useNotes = (): UseNotesReturn => {
           folder: n.folder,
           preview: n.preview,
           tags: n.tags,
-          updatedAt: formatTimestamp(n.updated_at),
+          updatedAtTimestamp: n.updated_at,
           wordCount: n.word_count,
           content: n.content,
         }));
@@ -79,25 +77,19 @@ export const useNotes = (): UseNotesReturn => {
       console.error('[useNotes] Error loading notes:', err);
       setError(err instanceof Error ? err.message : '加载失败');
     } finally {
-      console.log('[useNotes] Finished refreshNotes, setting isLoading to false');
       setIsLoading(false);
     }
   }, []);
 
-  // WebSocket 实时监听文件变更
   useWebSocket({
     onFileChange: (event) => {
-      // 数据库文件变更时自动刷新
       if (event.path.includes('.db') || event.path.includes('sqlite')) {
-        console.log('[WebSocket] 检测到数据变更，自动刷新');
         refreshNotes();
       }
     },
   });
 
-  // 初始加载
   useEffect(() => {
-    console.log('[useNotes] Mounted, calling refreshNotes');
     refreshNotes();
   }, [refreshNotes]);
 
@@ -116,8 +108,9 @@ export const useNotes = (): UseNotesReturn => {
   );
 
   const todayNotes = useMemo(() => {
-    // 使用 updatedAt 字符串判断是否为今天
-    return filteredNotes.filter(n => n.updatedAt === '今天').length;
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000;
+    return filteredNotes.filter(n => n.updatedAtTimestamp >= startOfToday).length;
   }, [filteredNotes]);
 
   // 保存笔记
@@ -186,17 +179,3 @@ export const useNotes = (): UseNotesReturn => {
     importFromObsidian,
   };
 };
-
-// 辅助函数：时间戳转换为相对时间字符串
-function formatTimestamp(timestamp: number): string {
-  const now = new Date();
-  const date = new Date(timestamp * 1000);
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  
-  if (diffDays === 0) return '今天';
-  if (diffDays === 1) return '昨天';
-  if (diffDays < 7) return `${diffDays}天前`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}周前`;
-  return `${Math.floor(diffDays / 30)}月前`;
-}

@@ -93,5 +93,4 @@ export const CommonCard = ({
   );
 };
 
-export const SECONDARY_COLOR = '#9FD4FD';
-export const PRIMARY_COLOR = 'var(--color-primary)';
+export { SECONDARY_COLOR, PRIMARY_COLOR } from '../theme-constants';

@@ -14,7 +14,8 @@ import {
 } from '@arco-design/web-react/icon';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SettingItem, SettingsViewLayout, type NavItem } from '../components';
+import { SettingItem, SettingsViewLayout } from '../components';
+import { useSettingsView } from '../../hooks/useSettingsView';
 import { api } from '../../api';
 
 const { Option } = Select;
@@ -30,14 +31,21 @@ interface LogsConfig {
   max_log_files: number;
 }
 
-const NAV_ITEMS: NavItem[] = [
+const NAV_ITEMS = [
   { key: 'startup-section', label: 'generalView.startup', icon: IconClockCircle },
   { key: 'language-section', label: 'generalView.language', icon: IconNotification },
   { key: 'logs-section', label: 'generalView.logs', icon: IconFile },
 ];
 
+const SECTIONS = [
+  { id: 'startup-section', title: 'generalView.startup' },
+  { id: 'language-section', title: 'generalView.language' },
+  { id: 'logs-section', title: 'generalView.logs', icon: IconFile },
+];
+
 const GeneralView = ({ onBack }: GeneralViewProps) => {
   const { t, i18n } = useTranslation();
+  const { navItems, sections } = useSettingsView({ navItems: NAV_ITEMS, sections: SECTIONS });
   const [autoStart, setAutoStart] = useState(false);
   const [minimizeToTray, setMinimizeToTray] = useState(() => {
     const saved = localStorage.getItem('papyrus_minimize_to_tray');
@@ -241,12 +249,8 @@ const GeneralView = ({ onBack }: GeneralViewProps) => {
       title={t('settings.general')}
       icon={IconSettings}
       iconColor="var(--color-success)"
-      navItems={NAV_ITEMS.map(item => ({ ...item, label: t(item.label) }))}
-      sections={[
-        { id: 'startup-section', title: t('generalView.startup') },
-        { id: 'language-section', title: t('generalView.language') },
-        { id: 'logs-section', title: t('generalView.logs'), icon: IconFile },
-      ]}
+      navItems={navItems}
+      sections={sections}
       onBack={onBack}
     >
       {renderSection}

@@ -282,7 +282,8 @@
     "reset": "リセット",
     "shortcutSet": "ショートカットを {{shortcut}} に設定しました",
     "shortcutsReset": "デフォルトショートカットにリセットしました",
-    "studyModeEditing": "学習モードショートカット編集機能は開発中です"
+    "studyModeEditing": "学習モードショートカット編集機能は開発中です",
+    "cancel": "キャンセル"
   },
   "accessibilityView": {
     "title": "アクセシビリティ設定",

@@ -1,8 +1,22 @@
 import { useState } from 'react';
 import { Typography, Tag, Checkbox } from '@arco-design/web-react';
 import { IconFolder } from '@arco-design/web-react/icon';
+import { useTranslation } from 'react-i18next';
 import type { Note } from '../types';
 import { PRIMARY_COLOR } from '../constants';
+
+function formatTimestamp(timestamp: number, t: (key: string, options?: Record<string, unknown>) => string): string {
+  const now = new Date();
+  const date = new Date(timestamp * 1000);
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return t('notesPage.today');
+  if (diffDays === 1) return t('notesPage.yesterday');
+  if (diffDays < 7) return t('notesPage.daysAgo', { count: diffDays });
+  if (diffDays < 30) return t('notesPage.weeksAgo', { count: Math.floor(diffDays / 7) });
+  return t('notesPage.monthsAgo', { count: Math.floor(diffDays / 30) });
+}
 
 interface NoteCardProps {
   note: Note;
@@ -13,6 +27,7 @@ interface NoteCardProps {
 }
 
 export const NoteCard = ({ note, onClick, selectable, selected, onToggleSelect }: NoteCardProps) => {
+  const { t } = useTranslation();
   const [hovered, setHovered] = useState(false);
 
   const cardStyle = {
@@ -65,7 +80,7 @@ export const NoteCard = ({ note, onClick, selectable, selected, onToggleSelect }
           {note.folder}
         </div>
         <Typography.Text type='secondary' style={{ fontSize: '12px' }}>
-          {note.updatedAt}
+          {formatTimestamp(note.updatedAtTimestamp, t)}
         </Typography.Text>
       </div>
 

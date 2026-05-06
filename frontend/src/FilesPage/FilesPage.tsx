@@ -1,16 +1,14 @@
 import { Typography, Button, Tag, Radio, Empty, Tooltip, Message, Modal, Input, Breadcrumb } from '@arco-design/web-react';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { IconFolderAdd, IconUpload, IconFolder, IconImage, IconFileVideo, IconMusic, IconFile, IconDownload, IconDelete, IconLeft } from '@arco-design/web-react/icon';
-import { usePageScenery } from '../hooks/useScenery';
-import { useSceneryColor } from '../hooks/useSceneryColor';
 import { api, getFileUrl } from '../api';
 import type { FileItemData } from '../api';
+import { PageLayout } from '../components';
+import { PRIMARY_COLOR } from '../theme-constants';
 
 import ZipIcon from './ZipIcon';
 import FilePreviewModal from './FilePreviewModal';
 import './FilesPage.css';
-
-const PRIMARY_COLOR = '#206CCF';
 
 // 文件图标
 const FileTypeIcon = ({ type, size = 48 }: { type: string; size?: number }) => {
@@ -104,81 +102,7 @@ const FILTER_MAP: Record<FilterTag, (f: FileItemData) => boolean> = {
   '音频': (f) => !f.is_folder && f.type === 'audio',
 };
 
-// 统计栏组件
-interface StatsBarProps {
-  stats: { totalFiles: number; totalFolders: number; totalSize: string };
-  viewMode: 'grid' | 'list';
-  setViewMode: (mode: 'grid' | 'list') => void;
-  loading: boolean;
-}
 
-const StatsBar = ({ stats, viewMode, setViewMode, loading }: StatsBarProps) => {
-  const { config: sceneryConfig, loaded } = usePageScenery('files');
-  const { primaryTextColor, secondaryTextColor, averageBrightness } = useSceneryColor(
-    sceneryConfig.enabled ? sceneryConfig.image : undefined,
-    sceneryConfig.enabled
-  );
-
-  if (loading || !loaded) {
-    return (
-      <div className="files-stats-loading">
-        <Typography.Text type="secondary">加载中...</Typography.Text>
-      </div>
-    );
-  }
-
-  const content = (
-    <div style={{ display: 'flex', gap: '64px' }}>
-      <div>
-        <Typography.Text style={{ fontSize: '28px', fontWeight: 600, color: sceneryConfig.enabled ? primaryTextColor : undefined }}>{stats.totalFiles}</Typography.Text>
-        <Typography.Text type='secondary' style={{ fontSize: '13px', display: 'block', marginTop: '4px', color: sceneryConfig.enabled ? secondaryTextColor : undefined }}>文件</Typography.Text>
-      </div>
-      <div>
-        <Typography.Text style={{ fontSize: '28px', fontWeight: 600, color: sceneryConfig.enabled ? primaryTextColor : undefined }}>{stats.totalFolders}</Typography.Text>
-        <Typography.Text type='secondary' style={{ fontSize: '13px', display: 'block', marginTop: '4px', color: sceneryConfig.enabled ? secondaryTextColor : undefined }}>文件夹</Typography.Text>
-      </div>
-      <div>
-        <Typography.Text style={{ fontSize: '28px', fontWeight: 600, color: sceneryConfig.enabled ? primaryTextColor : undefined }}>{stats.totalSize}</Typography.Text>
-        <Typography.Text type='secondary' style={{ fontSize: '13px', display: 'block', marginTop: '4px', color: sceneryConfig.enabled ? secondaryTextColor : undefined }}>占用空间</Typography.Text>
-      </div>
-    </div>
-  );
-
-  if (!sceneryConfig.enabled) {
-    return (
-      <div className="files-stats-bar" style={{ background: 'var(--color-fill-2)' }}>
-        {content}
-        <Radio.Group type='button' value={viewMode} onChange={setViewMode} options={[{ label: '网格', value: 'grid' }, { label: '列表', value: 'list' }]} />
-      </div>
-    );
-  }
-
-  const image = sceneryConfig.image;
-  const poem = '且将新火试新茶，诗酒趁年华。';
-  const source = '[宋] 苏轼《望江南·超然台作》';
-  const overlayOpacity = Math.max(0.25, Math.min(0.75, sceneryConfig.opacity));
-  const overlayColor = `rgba(255, 255, 255, ${overlayOpacity})`;
-
-  return (
-    <div className="files-stats-bar">
-      <img
-        src={image}
-        alt={`窗景图片：${poem} —— ${source}`}
-        className="files-stats-bg"
-      />
-      <div
-        className="files-stats-overlay"
-        style={{ background: overlayColor }}
-      />
-      <div className="files-stats-content-wrapper">
-        {content}
-      </div>
-      <div className="files-stats-controls">
-        <Radio.Group type='button' value={viewMode} onChange={setViewMode} options={[{ label: '网格', value: 'grid' }, { label: '列表', value: 'list' }]} />
-      </div>
-    </div>
-  );
-};
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -391,50 +315,58 @@ const FilesPage = () => {
     };
   }, [allFiles, currentFolder]);
 
-  return (
-    <div className="files-page">
-      {/* 标题栏 */}
-      <div className="files-page-header">
-        <div>
-          <Typography.Title heading={1} className="files-page-title">
-            文件库
-          </Typography.Title>
-          <Typography.Text type='secondary' className="files-page-subtitle">
-            {currentFolderStats.totalFiles} 个文件 · {currentFolderStats.totalFolders} 个文件夹
-          </Typography.Text>
-        </div>
-        <div className="files-page-actions">
-          <Button
-            shape='round'
-            size='large'
-            type='secondary'
-            icon={<IconFolderAdd />}
-            style={{ height: '40px', padding: '0 20px', fontSize: '14px' }}
-            onClick={handleNewFolder}
-          >
-            新建文件夹
-          </Button>
-          <Button
-            shape='round'
-            size='large'
-            type='primary'
-            icon={<IconUpload />}
-            style={{ height: '40px', padding: '0 20px', fontSize: '14px', backgroundColor: PRIMARY_COLOR }}
-            onClick={handleUploadClick}
-          >
-            上传文件
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            style={{ display: 'none' }}
-            onChange={handleFileChange}
-            aria-label="选择上传文件"
-          />
-        </div>
-      </div>
+  const actions = (
+    <>
+      <Button
+        shape='round'
+        size='large'
+        type='secondary'
+        icon={<IconFolderAdd />}
+        style={{ height: '40px', padding: '0 20px', fontSize: '14px' }}
+        onClick={handleNewFolder}
+      >
+        新建文件夹
+      </Button>
+      <Button
+        shape='round'
+        size='large'
+        type='primary'
+        icon={<IconUpload />}
+        style={{ height: '40px', padding: '0 20px', fontSize: '14px', backgroundColor: PRIMARY_COLOR }}
+        onClick={handleUploadClick}
+      >
+        上传文件
+      </Button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+        aria-label="选择上传文件"
+      />
+    </>
+  );
 
+  const pageStats = [
+    { label: '文件', value: currentFolderStats.totalFiles },
+    { label: '文件夹', value: currentFolderStats.totalFolders },
+    { label: '占用空间', value: currentFolderStats.totalSize },
+  ];
+
+  const extraStatsContent = (
+    <Radio.Group type='button' value={viewMode} onChange={setViewMode} options={[{ label: '网格', value: 'grid' }, { label: '列表', value: 'list' }]} />
+  );
+
+  return (
+    <PageLayout 
+      title='文件库' 
+      pageKey='files'
+      actions={actions}
+      stats={pageStats}
+      statsLoading={loading}
+      extraStatsContent={extraStatsContent}
+    >
       {/* 面包屑导航 */}
       {folderStack.length > 1 && (
         <div className="files-breadcrumb-wrapper">
@@ -451,8 +383,6 @@ const FilesPage = () => {
           </Breadcrumb>
         </div>
       )}
-
-      <StatsBar stats={currentFolderStats} viewMode={viewMode} setViewMode={setViewMode} loading={loading} />
 
       {/* 筛选标签 */}
       {!loading && (
@@ -510,7 +440,7 @@ const FilesPage = () => {
       </Modal>
 
       <FilePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />
-    </div>
+    </PageLayout>
   );
 };
 

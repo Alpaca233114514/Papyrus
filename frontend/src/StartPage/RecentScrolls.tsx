@@ -2,6 +2,7 @@ import { Typography, Spin, Message } from '@arco-design/web-react';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, type Card } from '../api';
+import { PRIMARY_COLOR, SECONDARY_COLOR } from '../theme-constants';
 
 interface Collection {
   id: string;
@@ -11,9 +12,6 @@ interface Collection {
   lastUsed: string;
   color: string;
 }
-
-const SECONDARY_COLOR = '#9FD4FD';
-const PRIMARY_COLOR = '#206CCF';
 
 const CollectionCard = ({ collection, onClick, t }: { collection: Collection; onClick?: () => void; t: (key: string, options?: Record<string, unknown>) => string }) => {
   const [hovered, setHovered] = useState(false);

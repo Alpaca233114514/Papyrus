@@ -282,7 +282,8 @@
     "reset": "重置",
     "shortcutSet": "已將快捷鍵設置為 {{shortcut}}",
     "shortcutsReset": "已重置為默認快捷鍵",
-    "studyModeEditing": "學習模式快捷鍵編輯功能開發中"
+    "studyModeEditing": "學習模式快捷鍵編輯功能開發中",
+    "cancel": "取消"
   },
   "accessibilityView": {
     "title": "無障礙設置",
