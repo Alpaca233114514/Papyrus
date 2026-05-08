@@ -22,7 +22,7 @@ export interface UseNotesReturn {
   
   // 操作方法
   setActiveFolder: (folder: string) => void;
-  saveNote: (params: UpdateNoteParams | CreateNoteParams, isCreate: boolean) => Promise<void>;
+  saveNote: (params: UpdateNoteParams | CreateNoteParams, isCreate: boolean) => Promise<{ id: string } | undefined>;
   deleteNote: (id: string) => Promise<void>;
   refreshNotes: () => Promise<void>;
   importFromObsidian: (vaultPath: string) => Promise<{ imported: number; skipped: number }>;
@@ -119,25 +119,29 @@ export const useNotes = (): UseNotesReturn => {
     isCreate: boolean
   ) => {
     try {
+      let createdNote = null;
       if (isCreate) {
         const createParams = params as CreateNoteParams;
-        await api.createNote(
+        const result = await api.createNote(
           createParams.title,
           createParams.folder,
           createParams.content,
           createParams.tags
         );
+        createdNote = result.note;
       } else {
         const updateParams = params as UpdateNoteParams;
-        await api.updateNote(updateParams.id, {
+        const result = await api.updateNote(updateParams.id, {
           title: updateParams.title,
           folder: updateParams.folder,
           content: updateParams.content,
           tags: updateParams.tags,
         });
+        createdNote = result.note;
       }
       await refreshNotes();
       window.dispatchEvent(new CustomEvent('papyrus_notes_changed'));
+      return createdNote;
     } catch (err) {
       const message = err instanceof Error ? err.message : '保存失败';
       throw new Error(message);

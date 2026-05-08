@@ -574,6 +574,10 @@
   "notesPage": {
     "deleteSuccess": "削除しました",
     "deleteFailed": "削除に失敗しました",
-    "allNotes": "すべてのノート"
+    "allNotes": "すべてのノート",
+    "today": "今日",
+    "yesterday": "昨日",
+    "daysAgo": "{{count}} 日前",
+    "weeksAgo": "{{count}} 週間前"
   }
 }

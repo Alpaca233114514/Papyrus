@@ -574,6 +574,10 @@
   "notesPage": {
     "deleteSuccess": "Deleted successfully",
     "deleteFailed": "Delete failed",
-    "allNotes": "All Notes"
+    "allNotes": "All Notes",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "daysAgo": "{{count}} days ago",
+    "weeksAgo": "{{count}} weeks ago"
   }
 }

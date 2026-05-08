@@ -80,7 +80,7 @@
   display: flex;
   align-items: center;
   min-width: 200px;
-  padding: 0 8px;
+  padding: 0 16px;
 }
 
 .titlebar-search,

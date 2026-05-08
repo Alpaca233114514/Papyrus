@@ -105,7 +105,14 @@ export function useCompletion() {
       });
 
       if (!response.ok) {
-        throw new Error('Completion request failed');
+        const errorMessage = response.status === 403 
+          ? 'API 认证失败，请检查 API Key 配置'
+          : response.status === 400
+            ? '请求参数错误'
+            : response.status === 500
+              ? '服务器内部错误'
+              : `请求失败: ${response.status}`;
+        throw new Error(errorMessage);
       }
 
       const reader = response.body?.getReader();

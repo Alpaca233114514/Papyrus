@@ -20,19 +20,15 @@ module.exports = {
   copyright: 'Copyright © 2026 Papyrus Team',
   
   directories: {
-    output: 'dist-electron',
+    output: 'dist-test',
     buildResources: 'build',
   },
   
   files: [
     'electron/**/*',
-    'frontend/dist/**/*',
-    'backend/dist/**/*',
-    'backend/package.json',
     {
-      from: 'backend/node_modules',
-      to: 'backend/node_modules',
-      filter: ['**/*'],
+      from: 'frontend/dist',
+      to: 'frontend/dist',
     },
     '!frontend/node_modules/**/*',
     '!**/*.map',
@@ -42,16 +38,26 @@ module.exports = {
     {
       from: 'assets',
       to: 'assets',
-      filter: ['**/*'],
+    },
+    {
+      from: 'backend/dist',
+      to: 'backend/dist',
+    },
+    {
+      from: 'backend/package.json',
+      to: 'backend/package.json',
+    },
+    {
+      from: 'backend/node_modules',
+      to: 'backend/node_modules',
+    },
+    {
+      from: 'frontend/dist',
+      to: 'app/frontend/dist',
     },
   ],
 
-  asar: true,
-  asarUnpack: [
-    'backend/dist',
-    'backend/package.json',
-    'backend/node_modules',
-  ],
+  asar: false,
   
   // Windows configuration - 仅 NSIS 安装器
   win: {
@@ -77,7 +83,7 @@ module.exports = {
     shortcutName: 'Papyrus Desktop',
     uninstallDisplayName: 'Papyrus Desktop',
     include: 'build/installer.nsh',
-    deleteAppDataOnUninstall: false,
+    deleteAppDataOnUninstall: true,
     artifactName: '${productName}-Setup.${ext}',
   },
   

@@ -39,6 +39,7 @@ type PendingCardProps = {
   solarTerm: string | null;
   loading: boolean;
   onStartStudy?: () => void;
+  scenery: SceneryContent | null;
 };
 
 function getGreeting(hour: number, t: (key: string) => string): string {
@@ -252,21 +253,41 @@ const LatticeBackground = () => {
   );
 };
 
-const PendingCard = ({ stats, greeting, dateLabel, solarTerm, loading, onStartStudy }: PendingCardProps) => {
+const PendingCard = ({ stats, greeting, dateLabel, solarTerm, loading, onStartStudy, scenery }: PendingCardProps) => {
   const { t } = useTranslation();
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
   const [rippleKey, setRippleKey] = useState(0);
+  const [imageError, setImageError] = useState(false);
 
   const highlighted = hovered || pressed;
+  const showScenery = scenery !== null;
+  const defaultImage = './scenery/image.png';
+  const image = imageError ? defaultImage : scenery?.image;
+  const poem = scenery?.poem ?? '且将新火试新茶，诗酒趁年华。';
+  const source = scenery?.source ?? '[宋] 苏轼《望江南·超然台作》';
 
   const handleClick = () => {
     onStartStudy?.();
   };
 
   return (
-    <div className="start-card-frame start-card-frame--pending">
-      <LatticeBackground />
+    <div
+      className={`start-card-frame ${showScenery ? 'start-card-frame--scenery' : 'start-card-frame--pending'}`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => { setHovered(false); setPressed(false); }}
+    >
+      {!showScenery && <LatticeBackground />}
+
+      {showScenery && (
+        <img
+          src={image}
+          alt={`窗景图片：${poem} —— ${source}`}
+          className="start-scenery-image"
+          data-hovered={hovered ? 'true' : 'false'}
+          onError={() => setImageError(true)}
+        />
+      )}
 
       <div className="start-card-top">
         <Typography.Paragraph
@@ -316,6 +337,21 @@ const PendingCard = ({ stats, greeting, dateLabel, solarTerm, loading, onStartSt
           <span className="start-cta-button-label">{t('startPage.start')}</span>
         </Button>
       </div>
+
+      {showScenery && (
+        <div className="start-poem-container" data-hovered={hovered ? 'true' : 'false'}>
+          <div className="start-poem-inner">
+            <div className="start-poem-text">
+              {poem}
+            </div>
+            {source && (
+              <div className="start-poem-source">
+                {'——'}{source}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -450,6 +486,7 @@ const StartPage = ({ onDoneChange, onNavigate }: StartPageProps) => {
             dateLabel={data.dateLabel}
             solarTerm={data.solarTerm}
             loading={data.loading}
+            scenery={data.scenery}
             onStartStudy={() => {
               setStudyTag(undefined);
               setIsStudying(true);

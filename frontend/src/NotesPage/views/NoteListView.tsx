@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Typography, Button, Tag, Message, Modal } from '@arco-design/web-react';
-import { IconPlus, IconDelete, IconClose } from '@arco-design/web-react/icon';
+import { IconPlus, IconDelete, IconClose, IconCheckSquare } from '@arco-design/web-react/icon';
 import type { Note, Folder } from '../types';
 import { NoteCard, FolderTab, AddCard } from '../components';
 import { PRIMARY_COLOR, UNIFIED_BTN_STYLE } from '../constants';
@@ -54,6 +54,27 @@ export const NoteListView = ({
     setSelectedIds(new Set());
   }, []);
 
+  const selectAll = useCallback(() => {
+    const allIds = new Set(notes.map(note => note.id));
+    setSelectedIds(allIds);
+  }, [notes]);
+
+  const deselectAll = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const isAllSelected = useMemo(() => {
+    return notes.length > 0 && selectedIds.size === notes.length;
+  }, [notes, selectedIds]);
+
+  const toggleSelectAll = useCallback(() => {
+    if (isAllSelected) {
+      deselectAll();
+    } else {
+      selectAll();
+    }
+  }, [isAllSelected, selectAll, deselectAll]);
+
   const handleBatchDelete = useCallback(() => {
     if (selectedIds.size === 0) return;
     Modal.confirm({
@@ -105,6 +126,13 @@ export const NoteListView = ({
       pageKey='notes'
       actions={selecting ? (
         <>
+          <Button
+            icon={isAllSelected ? <IconCheckSquare /> : undefined}
+            onClick={toggleSelectAll}
+            style={UNIFIED_BTN_STYLE}
+          >
+            {isAllSelected ? '取消全选' : '全选'}
+          </Button>
           <Button
             type='primary'
             status='danger'

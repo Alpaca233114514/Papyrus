@@ -54,7 +54,7 @@ const getPaths = () => {
     assetsPath: path.join(resourcesPath, 'assets'),
     frontendDistPath: isDevMode
       ? path.join(__dirname, '..', 'frontend', 'dist')
-      : path.join(__dirname, '..', 'frontend', 'dist'),
+      : path.join(resourcesPath, 'app', 'frontend', 'dist'),
     iconPath: path.join(resourcesPath, 'assets', getIconName()),
   };
 };
@@ -78,13 +78,13 @@ function getBackendExecutableInfo() {
     };
   }
 
-  const prodAppRoot = path.join(process.resourcesPath, 'app.asar.unpacked');
+  // In production, backend is placed in resources/backend via extraResources
   return {
     // In production, process.execPath is the Electron executable itself.
     // We set ELECTRON_RUN_AS_NODE=1 so it runs in Node.js mode.
     command: process.execPath,
-    args: [path.join(prodAppRoot, 'backend', 'dist', 'api', 'server.js')],
-    cwd: path.join(prodAppRoot, 'backend'),
+    args: [path.join(process.resourcesPath, 'backend', 'dist', 'api', 'server.js')],
+    cwd: path.join(process.resourcesPath, 'backend'),
   };
 }
 
@@ -617,6 +617,8 @@ app.on('second-instance', () => {
     mainWindow.focus();
   }
 });
+
+
 
 // App event handlers
 app.whenReady().then(async () => {

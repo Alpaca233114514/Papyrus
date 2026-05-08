@@ -112,7 +112,7 @@ const NotesPage = () => {
     isCreate: Parameters<typeof saveNote>[1],
     shouldReturnToList = true
   ) => {
-    await saveNote(params, isCreate);
+    const result = await saveNote(params, isCreate);
     if (shouldReturnToList) {
       setAnimationDirection('out');
       setTimeout(() => {
@@ -120,6 +120,7 @@ const NotesPage = () => {
         setViewMode('list');
       }, 150);
     }
+    return result;
   }, [saveNote]);
 
   // 侧边栏拖拽调整
@@ -190,7 +191,7 @@ const NotesPage = () => {
       </div>
 
       {/* 主内容区 */}
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
         {viewMode === 'list' && (
           <div
             style={{

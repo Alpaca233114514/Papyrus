@@ -26,7 +26,7 @@ interface NoteDetailViewProps {
   isCreateMode: boolean;
   allFolders: string[];
   onBack: () => void;
-  onSave: (params: UpdateNoteParams | CreateNoteParams, isCreate: boolean, shouldReturnToList?: boolean) => Promise<void>;
+  onSave: (params: UpdateNoteParams | CreateNoteParams, isCreate: boolean, shouldReturnToList?: boolean) => Promise<{ id: string } | undefined>;
   onDelete?: (id: string) => void;
 }
 
@@ -45,7 +45,7 @@ function formatTimestamp(timestamp: number, t: (key: string, options?: Record<st
 
 export const NoteDetailView = ({
   note,
-  isCreateMode,
+  isCreateMode: initialIsCreateMode,
   allFolders,
   onBack,
   onSave,
@@ -69,6 +69,10 @@ export const NoteDetailView = ({
   // 脏状态跟踪与防抖自动保存
   const isDirty = useRef(false);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // 创建模式状态和已创建笔记的 ID（用于创建后的自动保存）
+  const [isCreateMode, setIsCreateMode] = useState(initialIsCreateMode);
+  const [createdNoteId, setCreatedNoteId] = useState<string | null>(null);
 
   // 插入标题
   const insertHeading = (level: number) => {
@@ -88,16 +92,17 @@ export const NoteDetailView = ({
   
   useEffect(() => {
     const handleLockChange = (e: CustomEvent<{ locked: boolean }>) => {
-      setIsGloballyLocked(e.detail.locked);
-      // 如果全局锁定且当前可编辑（非创建模式且之前未锁定），自动保存
-      if (e.detail.locked && !isGloballyLocked && !isCreateMode) {
+      const newLockedState = e.detail.locked;
+      setIsGloballyLocked(newLockedState);
+      // 如果全局锁定且当前可编辑（非创建模式），自动保存
+      if (newLockedState && !isCreateMode) {
         void handleSave(false);
       }
     };
 
     window.addEventListener('papyrus_edit_lock_changed', handleLockChange as EventListener);
     return () => window.removeEventListener('papyrus_edit_lock_changed', handleLockChange as EventListener);
-  }, [isGloballyLocked, isCreateMode]);
+  }, [isCreateMode]);
 
   // 初始化表单 - 编辑模式
   useEffect(() => {
@@ -131,20 +136,30 @@ export const NoteDetailView = ({
 
     try {
       if (isCreateMode) {
-        await onSave({
+        // 创建新笔记
+        const createdNote = await onSave({
           title: title.trim(),
           folder: folder.trim() || '默认文件夹',
           content: content.trim(),
           tags,
         }, true, shouldReturnToList);
-      } else if (note) {
-        await onSave({
-          id: note.id,
-          title: title.trim(),
-          folder: folder.trim(),
-          content: content.trim(),
-          tags,
-        }, false, shouldReturnToList);
+        // 创建成功后，切换到编辑模式并记录笔记 ID
+        if (createdNote?.id) {
+          setCreatedNoteId(createdNote.id);
+          setIsCreateMode(false);
+        }
+      } else {
+        // 更新已存在的笔记（可能是创建后继续编辑，或直接编辑现有笔记）
+        const targetNoteId = createdNoteId || note?.id;
+        if (targetNoteId) {
+          await onSave({
+            id: targetNoteId,
+            title: title.trim(),
+            folder: folder.trim(),
+            content: content.trim(),
+            tags,
+          }, false, shouldReturnToList);
+        }
       }
       if (showMessage) {
         Message.success('保存成功');
@@ -295,7 +310,9 @@ export const NoteDetailView = ({
           background: 'var(--color-bg-1)',
           display: 'flex',
           alignItems: 'center',
-          position: 'relative',
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
         }}
       >
         {/* 返回按钮 - 左侧 */}
@@ -311,13 +328,14 @@ export const NoteDetailView = ({
         <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
           <Breadcrumb>
             <BreadcrumbItem
+              key="notebook"
               style={{ cursor: 'pointer' }}
               onClick={handleBackWithSave}
             >
               笔记库
             </BreadcrumbItem>
-            <BreadcrumbItem>{folder || note?.folder || '默认'}</BreadcrumbItem>
-            <BreadcrumbItem>{title || note?.title || '新笔记'}</BreadcrumbItem>
+            <BreadcrumbItem key="folder">{folder || note?.folder || '默认'}</BreadcrumbItem>
+            <BreadcrumbItem key="title">{title || note?.title || '新笔记'}</BreadcrumbItem>
           </Breadcrumb>
         </div>
 
@@ -560,9 +578,9 @@ export const NoteDetailView = ({
               onChange={setContent}
               placeholder='# 开始写作...'
               enableCompletion={true}
+              autoSize={{ minRows: 20, maxRows: 100 }}
               style={{
                 width: '100%',
-                minHeight: '500px',
                 border: 'none',
                 background: 'transparent',
                 fontSize: '15px',

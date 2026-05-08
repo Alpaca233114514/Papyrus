@@ -63,7 +63,7 @@ function commandExists(command) {
 function exec(command, options = {}) {
   const defaultOptions = {
     stdio: 'inherit',
-    shell: false,
+    shell: true,  // 修复：改为 true 以支持 && 等 shell 语法
     cwd: process.cwd(),
   };
   
@@ -80,7 +80,7 @@ function exec(command, options = {}) {
 
 // Get platform-specific build command
 function getBuildCommand(target) {
-  const baseCommand = 'npx electron-builder';
+  const baseCommand = 'npx electron-builder --config .electron-builder.config.js';
   
   switch (target) {
     case 'win':
@@ -182,7 +182,7 @@ function buildBackend() {
   return true;
 }
 
-// Kill process on port (cross-platform)
+// Kill process on port (cross-platform) - 修复版本
 function killPort(port) {
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     log(`Invalid port: ${port}`, 'red');
@@ -197,7 +197,8 @@ function killPort(port) {
       const lines = (findstrResult.stdout || '').trim().split('\n');
       for (const line of lines) {
         if (!line.includes('LISTENING')) continue;
-        const match = line.trim().match(/\s+(\d+)\s*$/);
+        // 修复：更准确的 PID 提取 - 匹配 LISTENING 后的数字
+        const match = line.match(/LISTENING\s+(\d+)/);
         if (match) {
           const pid = match[1];
           try {
@@ -233,7 +234,15 @@ function killPort(port) {
 function devMode() {
   logSection('Starting Development Mode');
   
-  const waitOn = require('wait-on');
+  // 修复：检查 wait-on 模块是否存在
+  let waitOn;
+  try {
+    waitOn = require('wait-on');
+  } catch (e) {
+    log('wait-on module not found. Installing...', 'yellow');
+    exec('npm install wait-on --save-dev');
+    waitOn = require('wait-on');
+  }
 
   // Release ports before starting
   log('Checking port usage...');
@@ -242,7 +251,8 @@ function devMode() {
   
   // Wait a moment for ports to be fully released
   log('Waiting for ports to be released...', 'dim');
-  exec('sleep 1 || timeout 1 >nul', { stdio: 'ignore', ignoreError: true });
+  // 修复：使用 Node.js 的同步等待
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2000);
   
   // Start frontend
   log('Starting frontend...');
@@ -261,6 +271,13 @@ function devMode() {
     env: process.env
   });
   
+  // Handle backend errors
+  backend.on('error', (err) => {
+    log(`Backend failed to start: ${err.message}`, 'red');
+    frontend.kill();
+    process.exit(1);
+  });
+  
   // Wait for both services to be ready
   log('Waiting for services to be ready...');
   waitOn({
@@ -277,18 +294,34 @@ function devMode() {
     
     log('Services ready, starting Electron...');
     
-    // Get electron executable path
-    const electronModulePath = require.resolve('electron');
-    const electronPath = process.platform === 'win32'
-      ? require('path').join(require('path').dirname(electronModulePath), 'dist', 'electron.exe')
-      : require('path').join(require('path').dirname(electronModulePath), 'dist', 'electron');
+    // 修复：更可靠的 Electron 路径查找
+    let electronPath;
+    try {
+      const electronModulePath = require.resolve('electron');
+      // 尝试多种可能的路径
+      const possiblePaths = [
+        path.join(path.dirname(electronModulePath), '..', 'dist', 'electron.exe'),
+        path.join(path.dirname(electronModulePath), '..', 'dist', 'electron'),
+        path.join(path.dirname(electronModulePath), '..', '..', '.bin', 'electron.cmd'),
+        path.join(path.dirname(electronModulePath), 'cli.js'),
+      ];
+      
+      electronPath = possiblePaths.find(p => fs.existsSync(p));
+      
+      if (!electronPath) {
+        // 回退到使用 npx electron
+        electronPath = 'electron';
+      }
+    } catch (e) {
+      electronPath = 'electron';
+    }
 
     const electronEnv = { ...process.env };
     delete electronEnv.ELECTRON_RUN_AS_NODE;
 
     const electron = spawn(electronPath, ['.'], {
       stdio: 'inherit',
-      shell: false,
+      shell: true,
       cwd: process.cwd(),
       env: electronEnv
     });
@@ -318,8 +351,21 @@ function buildElectron(target) {
   log(`Running: ${command}`, 'dim');
   exec(command);
   
+  // 手动复制 frontend/dist 目录到正确的位置
+  const distPath = path.join('dist-test', 'win-unpacked', 'resources', 'app', 'frontend', 'dist');
+  const srcPath = path.join('frontend', 'dist');
+  
+  if (fs.existsSync(srcPath)) {
+    log(`Copying frontend/dist to ${distPath}...`, 'dim');
+    if (fs.existsSync(distPath)) {
+      fs.rmSync(distPath, { recursive: true, force: true });
+    }
+    fs.cpSync(srcPath, distPath, { recursive: true });
+    log('Frontend dist copied successfully', 'green');
+  }
+  
   success(`Electron app built successfully!`);
-  log(`Output location: ${path.join('dist-electron')}`, 'dim');
+  log(`Output location: ${path.join('dist-test')}`, 'dim');
 }
 
 // Sync version before building

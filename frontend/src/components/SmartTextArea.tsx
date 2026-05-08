@@ -9,6 +9,7 @@ export interface SmartTextAreaProps extends Omit<TextAreaProps, 'onChange'> {
   value: string;
   onChange: (value: string) => void;
   enableCompletion?: boolean;
+  autoSize?: boolean | { minRows?: number; maxRows?: number };
 }
 
 export interface SmartTextAreaRef {
@@ -24,7 +25,7 @@ export interface SmartTextAreaRef {
  * 2. Tab 触发模式：按 Tab 触发显示补全，Enter 接受
  */
 export const SmartTextArea = forwardRef<SmartTextAreaRef, SmartTextAreaProps>(
-  ({ value, onChange, enableCompletion = true, style, className, ...rest }, ref) => {
+  ({ value, onChange, enableCompletion = true, autoSize, style, className, ...rest }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<RefTextAreaType>(null);
 
@@ -172,6 +173,7 @@ export const SmartTextArea = forwardRef<SmartTextAreaRef, SmartTextAreaProps>(
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
+          autoSize={autoSize}
           style={{
             ...style,
             position: 'relative',

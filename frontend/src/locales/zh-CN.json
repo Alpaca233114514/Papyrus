@@ -574,6 +574,10 @@
   "notesPage": {
     "deleteSuccess": "删除成功",
     "deleteFailed": "删除失败",
-    "allNotes": "全部笔记"
+    "allNotes": "全部笔记",
+    "today": "今天",
+    "yesterday": "昨天",
+    "daysAgo": "{{count}} 天前",
+    "weeksAgo": "{{count}} 周前"
   }
 }
