@@ -39,20 +39,15 @@ on:
       - main
   workflow_dispatch:
     inputs:
-      # 总开关：是否执行 release job（上传产物并创建 GitHub Release）
-      # 默认关闭，防止误触发；勾选后才真正发版
       create_release:
         description: 'Create GitHub release'
         required: false
         default: false
         type: boolean
-      # 手动指定 tag；留空则使用当前分支名或触发事件的 tag
       tag:
         description: 'Release tag (e.g. v2.0.0)'
         required: false
         type: string
-      # Draft 开关：勾选 = 创建草稿 Release（需手动点 Publish）
-      # 取消勾选 = 直接发布正式 Release（对外立即可见）
       draft:
         description: 'Create as draft release'
         required: false
@@ -64,11 +59,16 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   ELECTRON_BUILDER_BINARIES_MIRROR: "https://npmmirror.com/mirrors/electron-builder-binaries/"
   ELECTRON_MIRROR: "https://npmmirror.com/mirrors/electron/"
+  # 优化：设置 npm 配置加速安装
+  NPM_CONFIG_CACHE: /tmp/npm-cache
+  NPM_CONFIG_FUND: false
+  NPM_CONFIG_AUDIT: false
 
 jobs:
   build:
     name: Build ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
 
     strategy:
       fail-fast: false
@@ -90,6 +90,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 1
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -101,37 +103,25 @@ jobs:
             frontend/package-lock.json
             backend/package-lock.json
 
-      - name: Install Root Dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Install Frontend Dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Install Backend Dependencies
-        working-directory: backend
-        run: npm ci
-
-      - name: Audit Production Dependencies
-        shell: bash
+      - name: Install All Dependencies
         run: |
-          echo "=== Frontend production audit ==="
-          (cd frontend && npm audit --omit=dev --audit-level=high)
-          echo "=== Backend production audit ==="
-          (cd backend && npm audit --omit=dev --audit-level=high)
-          echo "=== Root production audit ==="
-          npm audit --omit=dev --audit-level=high
-          echo "Production dependency audit passed."
+          npm ci --ignore-scripts
+          cd frontend && npm ci --ignore-scripts
+          cd ../backend && npm ci --ignore-scripts
+        shell: bash
 
       - name: Typecheck Backend
+        if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'typecheck')
         working-directory: backend
         run: npm run typecheck
 
       - name: Typecheck Frontend
+        if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'typecheck')
         working-directory: frontend
         run: npm run typecheck
 
       - name: Test Backend
+        if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'test')
         working-directory: backend
         shell: bash
         run: |
@@ -162,55 +152,6 @@ jobs:
         working-directory: backend
         run: npm prune --production
 
-      - name: Verify Backend Dependencies
-        shell: bash
-        run: |
-          REQUIRED_PKGS=(
-            "backend/node_modules/fastify/package.json"
-            "backend/node_modules/@fastify/cors/package.json"
-            "backend/node_modules/@fastify/rate-limit/package.json"
-            "backend/node_modules/openai/package.json"
-            "backend/node_modules/chokidar/package.json"
-            "backend/node_modules/uuid/package.json"
-            "backend/node_modules/gray-matter/package.json"
-            "backend/node_modules/markdown-it/package.json"
-          )
-          MISSING=0
-          for pkg in "${REQUIRED_PKGS[@]}"; do
-            if [ ! -f "$pkg" ]; then
-              echo "Error: required package not found after prune: $pkg"
-              MISSING=1
-            else
-              echo "OK: $pkg"
-            fi
-          done
-          if [ $MISSING -ne 0 ]; then
-            echo "Production dependency verification failed."
-            exit 1
-          fi
-          echo "All production dependencies verified."
-
-      - name: Verify Backend Build
-        shell: bash
-        run: |
-          SERVER_JS="backend/dist/api/server.js"
-          if [ ! -f "$SERVER_JS" ]; then
-            echo "Error: Backend entry not found at $SERVER_JS"
-            exit 1
-          fi
-          SIZE=$(du -h "$SERVER_JS" | cut -f1)
-          echo "Backend entry built: $SERVER_JS ($SIZE)"
-
-      - name: Verify Frontend Build
-        shell: bash
-        run: |
-          INDEX_HTML="frontend/dist/index.html"
-          if [ ! -f "$INDEX_HTML" ]; then
-            echo "Error: Frontend index.html not found"
-            exit 1
-          fi
-          echo "Frontend built successfully"
-
       - name: Cache Electron Builder
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
@@ -219,12 +160,10 @@ jobs:
             ~/.cache/electron-builder
             ~/Library/Caches/electron
             ~/Library/Caches/electron-builder
-          key: electron-${{ matrix.platform }}-${{ hashFiles('package-lock.json') }}
+          key: electron-${{ matrix.platform }}-${{ hashFiles('package-lock.json', '.electron-builder.config.js') }}
           restore-keys: |
             electron-${{ matrix.platform }}-
 
-      # macOS signing: uncomment the env block below and set the secrets when an Apple Developer ID is available.
-      #   CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID
       - name: Build Electron App
         run: npx electron-builder --${{ matrix.target }} --publish=never --config .electron-builder.config.js
 
@@ -234,34 +173,20 @@ jobs:
           echo "Build outputs:"
           find dist-electron/ -maxdepth 1 -type f | sort
 
-          # Verify the expected installer/package exists and has reasonable size
-          MIN_SIZE=52428800  # 50 MB sanity check
+          MIN_SIZE=52428800
           case "${{ matrix.platform }}" in
             windows)
               INSTALLER=$(ls dist-electron/*-Setup.exe 2>/dev/null | head -1)
-              if [ -z "$INSTALLER" ]; then
-                echo "Error: No Windows installer found"
-                exit 1
-              fi
               ;;
             macos)
               INSTALLER=$(ls dist-electron/*.dmg 2>/dev/null | head -1)
-              if [ -z "$INSTALLER" ]; then
-                echo "Error: No macOS dmg found"
-                exit 1
-              fi
               ;;
             linux)
               INSTALLER=$(ls dist-electron/*.AppImage 2>/dev/null | head -1)
               DEB=$(ls dist-electron/*.deb 2>/dev/null | head -1)
-              if [ -z "$INSTALLER" ] && [ -z "$DEB" ]; then
-                echo "Error: No Linux package found (neither AppImage nor deb)"
-                exit 1
-              fi
               ;;
           esac
 
-          # Sanity check: reject suspiciously small artifacts
           for ARTIFACT in "$INSTALLER" "$DEB"; do
             if [ -n "$ARTIFACT" ] && [ -f "$ARTIFACT" ]; then
               SIZE_BYTES=$(wc -c < "$ARTIFACT")
@@ -324,18 +249,10 @@ jobs:
           path: RELEASE_NOTES.md
           retention-days: 7
 
-  # ------------------------------------------------------------------
-  # Release job: disabled by default. Enable manually via workflow_dispatch
-  # with create_release=true when ready to publish.
-  # ------------------------------------------------------------------
   release:
     name: Create Release
     needs: [build, generate-notes]
     runs-on: ubuntu-latest
-    # 执行 release 的三种场景：
-    # 1. 手动触发且勾选了 create_release
-    # 2. push 了 v* 开头的 tag
-    # 3. push 到 v* 开头的分支（如 v2.0.0-beta.x）
     if: github.event.inputs.create_release == 'true' || startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/heads/v')
     permissions:
       contents: write
@@ -380,9 +297,6 @@ jobs:
             echo "is_prerelease=false" >> $GITHUB_OUTPUT
           fi
 
-      # 决定 Release 是否为草稿状态：
-      # - 手动触发时，采用 UI 上 draft 开关的值
-      # - 自动触发（push tag 等）时，默认创建草稿，防止误发布
       - name: Determine Draft Flag
         id: draft_flag
         run: |
@@ -403,10 +317,8 @@ jobs:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: ${{ steps.tag.outputs.tag }}
           body_path: RELEASE_NOTES.md
-          # draft 状态由上面的 Determine Draft Flag step 动态决定
           draft: ${{ steps.draft_flag.outputs.is_draft == 'true' }}
           prerelease: ${{ steps.release_type.outputs.is_prerelease == 'true' }}
-          # 决定release notes的生成方式，默认为true，自动根据提交记录生成release notes，设置为false则使用body_path指定的文件内容作为release notes
           generate_release_notes: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

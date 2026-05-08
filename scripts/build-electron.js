@@ -352,7 +352,7 @@ function buildElectron(target) {
   exec(command);
   
   // 手动复制 frontend/dist 目录到正确的位置
-  const distPath = path.join('dist-test', 'win-unpacked', 'resources', 'app', 'frontend', 'dist');
+  const distPath = path.join('dist-electron', 'win-unpacked', 'resources', 'app', 'frontend', 'dist');
   const srcPath = path.join('frontend', 'dist');
   
   if (fs.existsSync(srcPath)) {
@@ -365,7 +365,7 @@ function buildElectron(target) {
   }
   
   success(`Electron app built successfully!`);
-  log(`Output location: ${path.join('dist-test')}`, 'dim');
+  log(`Output location: ${path.join('dist-electron')}`, 'dim');
 }
 
 // Sync version before building

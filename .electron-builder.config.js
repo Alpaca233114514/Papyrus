@@ -30,15 +30,6 @@ module.exports = {
       from: 'frontend/dist',
       to: 'frontend/dist',
     },
-    '!frontend/node_modules/**/*',
-    '!**/*.map',
-  ],
-
-  extraResources: [
-    {
-      from: 'assets',
-      to: 'assets',
-    },
     {
       from: 'backend/dist',
       to: 'backend/dist',
@@ -50,6 +41,15 @@ module.exports = {
     {
       from: 'backend/node_modules',
       to: 'backend/node_modules',
+    },
+    '!frontend/node_modules/**/*',
+    '!**/*.map',
+  ],
+
+  extraResources: [
+    {
+      from: 'assets',
+      to: 'assets',
     },
   ],
 
