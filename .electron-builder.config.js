@@ -20,7 +20,7 @@ module.exports = {
   copyright: 'Copyright © 2026 Papyrus Team',
   
   directories: {
-    output: 'dist-test',
+    output: 'dist-electron',
     buildResources: 'build',
   },
   
@@ -51,13 +51,9 @@ module.exports = {
       from: 'backend/node_modules',
       to: 'backend/node_modules',
     },
-    {
-      from: 'frontend/dist',
-      to: 'app/frontend/dist',
-    },
   ],
 
-  asar: false,
+  asar: true,
   
   // Windows configuration - 仅 NSIS 安装器
   win: {
