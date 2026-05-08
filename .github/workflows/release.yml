@@ -150,7 +150,9 @@ jobs:
 
       - name: Prune Backend Dependencies
         working-directory: backend
-        run: npm prune --production
+        run: |
+          npm rebuild
+          npm prune --production
 
       - name: Cache Electron Builder
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
