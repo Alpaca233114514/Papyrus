@@ -14,7 +14,7 @@ const resources = {
 
 const savedLanguage = localStorage.getItem('papyrus_language') ?? 'zh-CN';
 
-i18n
+export const init = i18n
   .use(initReactI18next)
   .init({
     resources,

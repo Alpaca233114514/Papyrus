@@ -30,4 +30,18 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        // 把大的第三方库拆分成单独的 chunk，便于缓存
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          'arco-vendor': ['@arco-design/web-react'],
+        }
+      }
+    },
+    // 生产构建时不生成 source map，加快构建
+    sourcemap: false,
+  },
 })

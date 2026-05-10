@@ -35,15 +35,14 @@ module.exports = {
       to: 'backend/dist',
     },
     {
-      from: 'backend/package.json',
-      to: 'backend/package.json',
-    },
-    {
       from: 'backend/node_modules',
       to: 'backend/node_modules',
     },
+    'backend/package.json',
     '!frontend/node_modules/**/*',
     '!**/*.map',
+    '!**/*.ts',
+    '!**/*.tsx',
   ],
 
   extraResources: [
@@ -54,21 +53,24 @@ module.exports = {
   ],
 
   asar: true,
-
   asarUnpack: [
-    'backend/dist/**/*',
+    'backend/dist/**',
     'backend/package.json',
-    'backend/node_modules/**/*',
+    'backend/node_modules/**',
   ],
-  
+  compression: 'store',
+  removePackageScripts: true,
+  nodeGypRebuild: false,
+  buildDependenciesFromSource: false,
+  npmRebuild: false,
+
   // Windows configuration - 仅 NSIS 安装器
   win: {
     target: [
       { target: 'nsis', arch: ['x64'] },
     ],
     icon: 'assets/icon.ico',
-    publisherName: 'Papyrus Team',
-    verifyUpdateCodeSignature: true,
+    verifyUpdateCodeSignature: !isCI,
     executableName: 'Papyrus Desktop',
     // Only sign locally (CI builds are unsigned)
     ...(hasCertificate && !isCI ? {
@@ -93,7 +95,6 @@ module.exports = {
   mac: {
     target: [
       { target: 'dmg', arch: ['arm64'] },
-      { target: 'zip', arch: ['arm64'] },
     ],
     icon: 'assets/icon.icns',
     category: 'public.app-category.productivity',
@@ -122,7 +123,6 @@ module.exports = {
     target: [
       { target: 'AppImage', arch: ['x64'] },
       { target: 'deb', arch: ['x64'] },
-      { target: 'tar.gz', arch: ['x64'] },
     ],
     artifactName: '${productName}-Linux-${arch}.${ext}',
     icon: 'assets/icon.png',
@@ -132,10 +132,12 @@ module.exports = {
     synopsis: 'Modern note-taking and learning application',
     description: 'Papyrus Desktop is a modern note-taking and learning application with AI integration and spaced repetition.',
     desktop: {
-      Name: 'Papyrus Desktop',
-      Comment: 'Note-taking and learning application',
-      Categories: 'Office;Education;',
-      StartupWMClass: 'Papyrus Desktop',
+      entry: {
+        Name: 'Papyrus Desktop',
+        Comment: 'Note-taking and learning application',
+        Categories: 'Office;Education;',
+        StartupWMClass: 'Papyrus Desktop',
+      },
     },
   },
   

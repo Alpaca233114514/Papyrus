@@ -22,7 +22,9 @@ import './tailwind.css';  // Tailwind CSS
 import App from './App';
 import { AccessibilityProvider } from './contexts/AccessibilityContext';
 import { ScreenReaderAnnouncerProvider } from './components/ScreenReaderAnnouncer';
-import './i18n';
+
+// 初始化 i18n
+import('./i18n');
 
 const el = document.getElementById('root');
 if (!el) throw new Error('Missing #root');
@@ -77,8 +79,8 @@ const LOCALE_MAP: Record<string, typeof zhCN> = {
 // 动态更新启动屏幕文本
 const updateSplashScreenText = async () => {
   try {
-    const { default: i18n } = await import('./i18n');
-    await i18n.init;
+    const { default: i18n, init } = await import('./i18n');
+    await init;
     const hintEl = document.querySelector('.splash-screen .hint');
     if (hintEl) {
       hintEl.textContent = i18n.t('settings.splashScreen');

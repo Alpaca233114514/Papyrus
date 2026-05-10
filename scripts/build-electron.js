@@ -345,9 +345,9 @@ function devMode() {
 // Build Electron app
 function buildElectron(target) {
   logSection(`Building Electron App (${target || 'current platform'})`);
-  
+
   const command = getBuildCommand(target);
-  
+
   log(`Running: ${command}`, 'dim');
   exec(command);
   
