@@ -139,6 +139,11 @@ jobs:
         uses: actions/setup-node@v6.4.0
         with:
           node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+            backend/package-lock.json
 
       - name: Cache node_modules (Root + Frontend + Backend)
         id: cache-node-modules
@@ -329,6 +334,11 @@ jobs:
         uses: actions/setup-node@v6.4.0
         with:
           node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+            backend/package-lock.json
       - name: Generate and Update Release Notes
         run: |
           node scripts/generate-release-notes.js origin/main HEAD
@@ -357,6 +367,11 @@ jobs:
         uses: actions/setup-node@v6.4.0
         with:
           node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+            backend/package-lock.json
 
       - name: Cache node_modules (Root + Frontend + Backend)
         id: cache-node-modules

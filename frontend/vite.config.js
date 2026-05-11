@@ -35,9 +35,16 @@ export default defineConfig({
     rollupOptions: {
       output: {
         // 把大的第三方库拆分成单独的 chunk，便于缓存
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom'],
-          'arco-vendor': ['@arco-design/web-react'],
+        manualChunks: (id) => {
+          if (id.includes('node_modules')) {
+            if (id.includes('react')) {
+              return 'react-vendor';
+            }
+            if (id.includes('@arco-design')) {
+              return 'arco-vendor';
+            }
+            return 'vendor';
+          }
         }
       }
     },
