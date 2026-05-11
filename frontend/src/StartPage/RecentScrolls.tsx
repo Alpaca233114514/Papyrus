@@ -1,8 +1,8 @@
-import { Typography, Spin, Message } from '@arco-design/web-react';
+import { Typography, Message } from '@arco-design/web-react';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, type Card } from '../api';
-import { PRIMARY_COLOR, SECONDARY_COLOR } from '../theme-constants';
+import { useCommonCardStyle, CommonCard, CardGroup, PRIMARY_COLOR } from '../components';
 
 interface Collection {
   id: string;
@@ -14,26 +14,27 @@ interface Collection {
 }
 
 const CollectionCard = ({ collection, onClick, t }: { collection: Collection; onClick?: () => void; t: (key: string, options?: Record<string, unknown>) => string }) => {
-  const [hovered, setHovered] = useState(false);
+  const { hovered, setHovered, cardStyle, width, height } = useCommonCardStyle({
+    borderWidth: 2,
+  });
 
   return (
-    <div
+    <CommonCard
+      hovered={hovered}
+      setHovered={setHovered}
+      cardStyle={cardStyle}
+      width={width}
+      height={height}
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      role="button"
+      tabIndex={0}
+      aria-label={`${collection.title} - ${collection.dueCount > 0 ? t('startPage.dueCount', { count: collection.dueCount }) : t('startPage.completed')}`}
       style={{
         flex: '0 0 auto',
-        width: '220px',
-        height: '100%',
-        borderRadius: '16px',
-        border: `2px solid ${hovered ? SECONDARY_COLOR : 'var(--color-text-3)'}`,
-        background: 'transparent',
         padding: '24px',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        cursor: 'pointer',
-        transition: 'border-color 0.2s',
         boxSizing: 'border-box',
       }}
     >
@@ -83,7 +84,7 @@ const CollectionCard = ({ collection, onClick, t }: { collection: Collection; on
           {t('startPage.lastUsed')}
         </Typography.Text>
       </div>
-    </div>
+    </CommonCard>
   );
 };
 
@@ -170,50 +171,16 @@ const RecentScrolls = ({ height, onStudyTag }: RecentScrollsProps) => {
     return () => window.removeEventListener('papyrus_cards_changed', handleCardsChanged);
   }, []);
 
-  if (loading) {
-    return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'row',
-        gap: '16px',
-        height: `${height}px`,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-        <Spin size={24} />
-      </div>
-    );
-  }
-
-  if (collections.length === 0) {
-    return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'row',
-        gap: '16px',
-        height: `${height}px`,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-        <Typography.Text type="secondary">{t('startPage.noCards')}</Typography.Text>
-      </div>
-    );
-  }
-
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'row',
-      gap: '16px',
-      height: `${height}px`,
-      overflowX: 'auto',
-      overflowY: 'hidden',
-      paddingBottom: '4px',
-    }}>
+    <CardGroup
+      height={height}
+      loading={loading}
+      emptyText={t('startPage.noCards')}
+    >
       {collections.map(c => (
         <CollectionCard key={c.id} collection={c} onClick={() => onStudyTag?.(c.id)} t={t} />
       ))}
-    </div>
+    </CardGroup>
   );
 };
 

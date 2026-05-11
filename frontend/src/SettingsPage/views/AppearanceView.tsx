@@ -246,7 +246,7 @@ const AppearanceView = ({ onBack }: AppearanceViewProps) => {
         </div>
       )}
 
-      <SettingItem title={t('appearanceView.sceneryNotesPage')} desc={t('appearanceView.sceneryNotesPageDesc')} divider={false}>
+      <SettingItem title={t('appearanceView.sceneryNotesPage')} desc={t('appearanceView.sceneryNotesPageDesc')}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Switch
             size="small"
@@ -259,6 +259,90 @@ const AppearanceView = ({ onBack }: AppearanceViewProps) => {
               size="mini"
               icon={<IconPlus />}
               onClick={() => handleOpenAddScenery('notes')}
+              style={{ borderRadius: '999px' }}
+            >
+              {t('appearanceView.configure')}
+            </Button>
+          )}
+        </div>
+      </SettingItem>
+
+      <SettingItem title={t('appearanceView.sceneryScrollPage')} desc={t('appearanceView.sceneryScrollPageDesc')}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Switch
+            size="small"
+            checked={scrollScenery.config.enabled}
+            onChange={(checked) => scrollScenery.updateConfig({ enabled: checked })}
+          />
+          {scrollScenery.config.enabled && (
+            <Button
+              type="primary"
+              size="mini"
+              icon={<IconPlus />}
+              onClick={() => handleOpenAddScenery('scroll')}
+              style={{ borderRadius: '999px' }}
+            >
+              {t('appearanceView.configure')}
+            </Button>
+          )}
+        </div>
+      </SettingItem>
+
+      <SettingItem title={t('appearanceView.sceneryFilesPage')} desc={t('appearanceView.sceneryFilesPageDesc')}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Switch
+            size="small"
+            checked={filesScenery.config.enabled}
+            onChange={(checked) => filesScenery.updateConfig({ enabled: checked })}
+          />
+          {filesScenery.config.enabled && (
+            <Button
+              type="primary"
+              size="mini"
+              icon={<IconPlus />}
+              onClick={() => handleOpenAddScenery('files')}
+              style={{ borderRadius: '999px' }}
+            >
+              {t('appearanceView.configure')}
+            </Button>
+          )}
+        </div>
+      </SettingItem>
+
+      <SettingItem title={t('appearanceView.sceneryExtensionsPage')} desc={t('appearanceView.sceneryExtensionsPageDesc')}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Switch
+            size="small"
+            checked={extensionsScenery.config.enabled}
+            onChange={(checked) => extensionsScenery.updateConfig({ enabled: checked })}
+          />
+          {extensionsScenery.config.enabled && (
+            <Button
+              type="primary"
+              size="mini"
+              icon={<IconPlus />}
+              onClick={() => handleOpenAddScenery('extensions')}
+              style={{ borderRadius: '999px' }}
+            >
+              {t('appearanceView.configure')}
+            </Button>
+          )}
+        </div>
+      </SettingItem>
+
+      <SettingItem title={t('appearanceView.sceneryChartsPage')} desc={t('appearanceView.sceneryChartsPageDesc')} divider={false}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Switch
+            size="small"
+            checked={chartsScenery.config.enabled}
+            onChange={(checked) => chartsScenery.updateConfig({ enabled: checked })}
+          />
+          {chartsScenery.config.enabled && (
+            <Button
+              type="primary"
+              size="mini"
+              icon={<IconPlus />}
+              onClick={() => handleOpenAddScenery('charts')}
               style={{ borderRadius: '999px' }}
             >
               {t('appearanceView.configure')}

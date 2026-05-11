@@ -24,6 +24,7 @@ import type { ScrollPageProps } from './types';
 const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
   const { t } = useTranslation();
   const [isStudying, setIsStudying] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [dueCount, setDueCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
@@ -119,14 +120,34 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
     const handleGlobalNewCard = () => {
       setCreateCardModalVisible(true);
     };
+    const handleStartStudy = (e: Event) => {
+      const customEvent = e as CustomEvent<{ tag?: string }>;
+      const tag = customEvent.detail?.tag;
+      setFilterTag(tag);
+      setIsDemo(false);
+      setIsStudying(true);
+    };
     window.addEventListener('papyrus_new_card', handleGlobalNewCard);
-    return () => window.removeEventListener('papyrus_new_card', handleGlobalNewCard);
+    window.addEventListener('papyrus_start_study', handleStartStudy);
+    return () => {
+      window.removeEventListener('papyrus_new_card', handleGlobalNewCard);
+      window.removeEventListener('papyrus_start_study', handleStartStudy);
+    };
   }, []);
 
   const startStudy = (tag?: string) => {
+    setIsExiting(false);
     setFilterTag(tag);
     setIsDemo(false);
     setIsStudying(true);
+  };
+
+  const handleExitStudy = () => {
+    setIsExiting(true);
+    setTimeout(() => {
+      setIsStudying(false);
+      setIsExiting(false);
+    }, 300);
   };
 
   useEffect(() => {
@@ -217,8 +238,33 @@ const ScrollPage = ({ initialTag, onInitialTagUsed }: ScrollPageProps) => {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
+        animation: isExiting
+          ? 'flashcardStudyExit 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards'
+          : 'flashcardStudyEnter 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards',
       }}>
-        <FlashcardStudy onExit={() => setIsStudying(false)} demo={isDemo} filterTag={filterTag} />
+        <FlashcardStudy onExit={handleExitStudy} demo={isDemo} filterTag={filterTag} />
+        <style>{`
+          @keyframes flashcardStudyEnter {
+            from {
+              opacity: 0;
+              transform: translateY(20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          @keyframes flashcardStudyExit {
+            from {
+              opacity: 1;
+              transform: translateY(0);
+            }
+            to {
+              opacity: 0;
+              transform: translateY(20px);
+            }
+          }
+        `}</style>
       </div>
     );
   }

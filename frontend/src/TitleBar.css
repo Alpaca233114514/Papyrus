@@ -21,6 +21,16 @@
   app-region: drag;
 }
 
+/* macOS: add left padding to avoid traffic lights */
+.titlebar.titlebar-macos {
+  padding-left: 70px;
+}
+
+.titlebar.titlebar-macos .titlebar-logo,
+.titlebar.titlebar-macos .titlebar-menus {
+  margin-left: 0;
+}
+
 /* Elements that should not be draggable */
 .no-drag {
   -webkit-app-region: no-drag;

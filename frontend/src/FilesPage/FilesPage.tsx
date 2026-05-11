@@ -1,7 +1,7 @@
 import { Typography, Button, Tag, Radio, Empty, Tooltip, Message, Modal, Input, Breadcrumb } from '@arco-design/web-react';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { IconFolderAdd, IconUpload, IconFolder, IconImage, IconFileVideo, IconMusic, IconFile, IconDownload, IconDelete, IconLeft } from '@arco-design/web-react/icon';
-import { api, getFileUrl } from '../api';
+import { api, getFileUrl, getThumbnailUrl } from '../api';
 import type { FileItemData } from '../api';
 import { PageLayout } from '../components';
 import { PRIMARY_COLOR } from '../theme-constants';
@@ -42,13 +42,26 @@ function formatDate(timestamp: number): string {
 
 // 网格文件卡片
 const GridFileCard = ({ file, onClick }: { file: FileItemData; onClick?: (f: FileItemData) => void }) => {
+  const isImage = file.type === 'image' && !file.is_folder;
+
   return (
     <Tooltip content={file.name} position='top'>
       <div
         className="files-grid-card"
         onClick={() => onClick?.(file)}
       >
-        <FileTypeIcon type={file.type} size={48} />
+        {isImage ? (
+          <div className="files-grid-card-thumbnail-wrapper">
+            <img
+              src={getThumbnailUrl(file.id)}
+              alt={file.name}
+              className="files-grid-card-thumbnail"
+              loading="lazy"
+            />
+          </div>
+        ) : (
+          <FileTypeIcon type={file.type} size={48} />
+        )}
         <div className="files-grid-card-name-wrapper">
           <Typography.Text className="files-grid-card-name" title={file.name}>
             {file.name}

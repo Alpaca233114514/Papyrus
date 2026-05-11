@@ -1,14 +1,15 @@
 /**
  * Papyrus 主应用组件
- * 
+ *
  * 无障碍特性：
  * - Skip Link 跳转到主内容
  * - ARIA 地标角色
  * - 键盘导航支持
  * - 语义化 HTML 结构
  */
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react';
 import { BackTop, Message } from '@arco-design/web-react';
+import { IconLeft } from '@arco-design/web-react/icon';
 import { useTranslation } from 'react-i18next';
 import TitleBar from './TitleBar';
 import Sidebar from './Sidebar';
@@ -70,11 +71,13 @@ const App = () => {
   const [prevPage, setPrevPage] = useState<string | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [nextPage, setNextPage] = useState<string | null>(null);
+  const pendingActionRef = useRef<'newNote' | 'newCard' | 'startStudy' | null>(null);
+  const studyTagRef = useRef<string | undefined>(undefined);
 
   // 处理页面切换动画 - 串行执行，先退出再进入（新页面预加载但不显示）
   const handlePageChange = useCallback((newPage: string) => {
     if (isTransitioning) return;
-    
+
     const newIndex = PAGE_ORDER.indexOf(newPage);
     if (newIndex === -1) {
       console.warn(t('app.pageNotFound', { page: newPage }));
@@ -83,21 +86,21 @@ const App = () => {
     }
     const prevIndex = prevPageIndexRef.current;
     const prevPageValue = activePage;
-    
+
     let direction: 'up' | 'down' | null = null;
     if (newIndex > prevIndex) {
       direction = 'up';
     } else if (newIndex < prevIndex) {
       direction = 'down';
     }
-    
+
     if (!direction) {
       setActivePage(newPage);
       return;
     }
-    
+
     prevPageIndexRef.current = newIndex;
-    
+
     setAnimationDirection(direction);
     setPrevPage(prevPageValue);
     setNextPage(newPage);
@@ -127,6 +130,36 @@ const App = () => {
     window.addEventListener('papyrus_open_settings', handleOpenSettings);
     return () => window.removeEventListener('papyrus_open_settings', handleOpenSettings);
   }, [handlePageChange]);
+
+  // 处理新建笔记/卡片操作
+  const handleNewAction = useCallback((action: 'newNote' | 'newCard') => {
+    const targetPage = action === 'newNote' ? 'notes' : 'scroll';
+
+    if (activePage === targetPage) {
+      // 直接在对应界面时，确保正确的事件名
+      if (action === 'newNote') {
+        window.dispatchEvent(new CustomEvent('papyrus_new_note'));
+      } else if (action === 'newCard') {
+        window.dispatchEvent(new CustomEvent('papyrus_new_card'));
+      }
+    } else {
+      pendingActionRef.current = action;
+      handlePageChange(targetPage);
+    }
+  }, [activePage, handlePageChange]);
+
+  // 处理开始学习操作
+  const handleStartStudy = useCallback((tag?: string) => {
+    studyTagRef.current = tag;
+    if (activePage === 'scroll') {
+      // 已经在 scroll 页面，直接触发学习
+      window.dispatchEvent(new CustomEvent('papyrus_start_study', { detail: { tag } }));
+    } else {
+      // 不在 scroll 页面，先切换页面
+      pendingActionRef.current = 'startStudy';
+      handlePageChange('scroll');
+    }
+  }, [activePage, handlePageChange]);
 
   const chatDragActiveRef = useRef(false);
   const onChatDragStart = useCallback((e: React.MouseEvent) => {
@@ -172,8 +205,8 @@ const App = () => {
 
   // 渲染当前页面
   const renderPage = () => {
-    const pages: Record<string, React.ReactNode> = {
-      start: <StartPage onDoneChange={setTodayDone} onNavigate={handlePageChange} />,
+    const pages: Record<string, ReactNode> = {
+      start: <StartPage onDoneChange={setTodayDone} onNavigate={handlePageChange} onStartStudy={handleStartStudy} onNewCard={() => handleNewAction('newCard')} />,
       scroll: <ScrollPage initialTag={initialScrollTag} onInitialTagUsed={() => setInitialScrollTag(undefined)} />,
       notes: <NotesPage />,
       charts: <ChartsPage />,
@@ -194,8 +227,26 @@ const App = () => {
       if (e.animationName.includes('pageExitUp') || e.animationName.includes('pageExitDown')) {
         setPrevPage(null);
         if (nextPage) {
-          setActivePage(nextPage);
+          const pageToSet = nextPage;
+          setActivePage(pageToSet);
           setNextPage(null);
+
+          // 检查是否有待处理的操作
+          if (pendingActionRef.current) {
+            const action = pendingActionRef.current;
+            const tag = studyTagRef.current;
+            setTimeout(() => {
+              if (action === 'newNote') {
+                window.dispatchEvent(new CustomEvent('papyrus_new_note'));
+              } else if (action === 'newCard') {
+                window.dispatchEvent(new CustomEvent('papyrus_new_card'));
+              } else if (action === 'startStudy') {
+                window.dispatchEvent(new CustomEvent('papyrus_start_study', { detail: { tag } }));
+              }
+              pendingActionRef.current = null;
+              studyTagRef.current = undefined;
+            }, 350); // 确保组件完全挂载
+          }
         }
         setTimeout(() => {
           setIsTransitioning(false);
@@ -216,12 +267,6 @@ const App = () => {
           className={`tw-absolute tw-inset-0 tw-flex tw-flex-col ${isTransitioning && prevPage ? exitAnimationClass : (animationDirection ? enterAnimationClass : '')}`}
           onAnimationEnd={isTransitioning && prevPage ? handleExitAnimationEnd : (animationDirection ? handleEnterAnimationEnd : undefined)}
         >
-          {activePage === 'start' && todayDone && (
-            <div
-              className={`tw-absolute tw-inset-x-0 tw-top-0 tw-h-[160px] tw-pointer-events-none tw-z-0 tw-bg-gradient-to-b tw-from-[rgba(232,255,234,0.45)] tw-to-transparent${isStartExiting ? ` ${exitAnimationClass}` : ''}`}
-              aria-hidden="true"
-            />
-          )}
           {pages[activePage]}
         </div>
         {isTransitioning && nextPage && (
@@ -244,14 +289,14 @@ const App = () => {
   return (
     <div className="tw-relative tw-flex tw-flex-col tw-mx-auto tw-w-full tw-h-screen tw-overflow-hidden tw-bg-arco-bg-1">
       {/* Skip Link - 无障碍导航（AA 级） */}
-      <a 
-        href="#main-content" 
+      <a
+        href="#main-content"
         className="skip-link"
         aria-label={t('app.skipToMainContent')}
       >
         {t('app.skipToMainContent')}
       </a>
-      
+
       {/* 返回顶部按钮 */}
       {activePage === 'start' && (
         <BackTop
@@ -264,23 +309,25 @@ const App = () => {
       )}
 
       {/* 标题栏 */}
-      <TitleBar 
-        onPageChange={handlePageChange} 
-        onSearchResult={handleSearchResult} 
+      <TitleBar
+        onPageChange={handlePageChange}
+        onSearchResult={handleSearchResult}
+        onNewNote={() => handleNewAction('newNote')}
+        onNewCard={() => handleNewAction('newCard')}
       />
-      
+
       {/* 主体布局 */}
       <div className="tw-flex tw-flex-1 tw-overflow-hidden">
         {/* 侧边栏导航 */}
-        <Sidebar 
-          collapsed={sidebarCollapsed} 
-          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} 
-          chatOpen={chatOpen} 
-          onChatToggle={() => setChatOpen(!chatOpen)} 
-          activePage={activePage} 
-          onPageChange={handlePageChange} 
+        <Sidebar
+          collapsed={sidebarCollapsed}
+          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          chatOpen={chatOpen}
+          onChatToggle={() => setChatOpen(!chatOpen)}
+          activePage={activePage}
+          onPageChange={handlePageChange}
         />
-        
+
         {/* 主内容区域 */}
         <main
           id="main-content"
@@ -293,18 +340,18 @@ const App = () => {
           {/* 页面内容 */}
           {renderPage()}
         </main>
-        
+
         {/* 节标题导航（AAA 级） */}
-        <SectionNavigation 
+        <SectionNavigation
           containerSelector="#main-content"
           minLevel={2}
           maxLevel={3}
         />
-        
+
         {/* 聊天面板 */}
         <div
-          className="tw-flex tw-flex-shrink-0 tw-overflow-hidden"
-          style={{ width: chatOpen ? chatWidth + 4 : 0, opacity: chatOpen ? 1 : 0.01, transition: isDragging ? 'none' : 'width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease' }}
+          className="tw-relative tw-flex tw-flex-shrink-0 tw-overflow-hidden"
+          style={{ width: chatOpen ? chatWidth + 4 : 0, transition: isDragging ? 'none' : 'width 0.3s cubic-bezier(0.4,0,0.2,1)' }}
           role="complementary"
           aria-label="AI 助手聊天面板"
         >
@@ -322,8 +369,30 @@ const App = () => {
             onClose={() => setChatOpen(false)}
           />
         </div>
+        <button
+          className="tw-flex-shrink-0 tw-w-5 tw-h-16 tw-flex tw-items-center tw-justify-center tw-bg-arco-bg-1 tw-cursor-pointer tw-text-arco-text-3 hover:tw-bg-arco-fill-2 hover:tw-text-arco-text-1 tw-outline-none tw-shadow-none"
+          style={{
+            borderRadius: '8px 0 0 8px',
+            position: 'fixed',
+            right: chatOpen ? chatWidth : 0,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            zIndex: 10,
+            transition: isDragging ? 'none' : 'right 0.3s cubic-bezier(0.4,0,0.2,1)',
+            margin: 0,
+            padding: 0,
+            border: 'none',
+            boxShadow: 'none',
+            WebkitAppearance: 'none',
+            MozAppearance: 'none',
+          }}
+          onClick={() => setChatOpen(!chatOpen)}
+          aria-label={chatOpen ? '收起聊天面板' : '展开聊天面板'}
+        >
+          <IconLeft style={{ transform: chatOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+        </button>
       </div>
-      
+
       {/* 状态栏 */}
       <StatusBar />
     </div>

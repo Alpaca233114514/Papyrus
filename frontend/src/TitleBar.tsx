@@ -19,10 +19,11 @@ const Shortcut = ({ keys }: { keys: string }) => (
 interface TitleBarProps {
   onPageChange?: (page: string) => void;
   onNewNote?: () => void;
+  onNewCard?: () => void;
   onSearchResult?: (result: SearchResult) => void;
 }
 
-const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) => {
+const TitleBar = ({ onPageChange, onNewNote, onNewCard, onSearchResult }: TitleBarProps) => {
   const { t } = useTranslation();
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [importContent, setImportContent] = useState('');
@@ -30,6 +31,7 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
   const [userProfile, setUserProfile] = useState<UserProfile>(loadUserProfile());
   const [tempUserId, setTempUserId] = useState('');
   const [tempAvatarUrl, setTempAvatarUrl] = useState<string | null>(null);
+  const [isMacos, setIsMacos] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { getShortcutDisplay } = useShortcuts();
 
@@ -43,6 +45,18 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
       window.removeEventListener('papyrus_user_profile_changed', handleProfileChanged);
       window.removeEventListener('storage', handleProfileChanged);
     };
+  }, []);
+
+  useEffect(() => {
+    const checkPlatform = async () => {
+      try {
+        const platform = await window.electronAPI?.getPlatform?.();
+        setIsMacos(platform === 'darwin');
+      } catch (e) {
+        setIsMacos(false);
+      }
+    };
+    checkPlatform();
   }, []);
 
   // 打开用户设置弹窗
@@ -126,24 +140,12 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
 
   // 新建菜单项
   const handleNewNote = () => {
-    if (onPageChange) {
-      onPageChange('notes');
-    }
-    // 延迟派发事件，确保 NotesPage 组件已挂载并注册监听器
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('papyrus_new_note'));
-    }, 100);
+    onNewNote?.();
     Message.success(t('titleBar.createNewNote'));
   };
 
   const handleNewCard = () => {
-    if (onPageChange) {
-      onPageChange('scroll');
-    }
-    // 延迟派发事件，确保 ScrollPage 组件已挂载并注册监听器
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('papyrus_new_card'));
-    }, 100);
+    onNewCard?.();
     Message.success(t('titleBar.createNewCard'));
   };
 
@@ -404,19 +406,22 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
 
   return (
     <>
-      <div className="titlebar">
+      <div className={`titlebar${isMacos ? ' titlebar-macos' : ''}`}>
         <div className="titlebar-logo">
           <img src="./icon.png" alt="Papyrus Desktop" className="titlebar-logo-icon" />
         </div>
 
-        <Space className="titlebar-menus no-drag" size={0}>
-          <Dropdown trigger="click" droplist={fileMenu}>
-            <Button type="text" size="small" className="titlebar-menu-item">{t('titleBar.file')}</Button>
-          </Dropdown>
-          <Dropdown trigger="click" droplist={editMenu}>
-            <Button type="text" size="small" className="titlebar-menu-item">{t('titleBar.edit')}</Button>
-          </Dropdown>
-        </Space>
+        {/* File/Edit menus - hidden on macOS (use system menu bar instead) */}
+        {!isMacos && (
+          <Space className="titlebar-menus no-drag" size={0}>
+            <Dropdown trigger="click" droplist={fileMenu}>
+              <Button type="text" size="small" className="titlebar-menu-item">{t('titleBar.file')}</Button>
+            </Dropdown>
+            <Dropdown trigger="click" droplist={editMenu}>
+              <Button type="text" size="small" className="titlebar-menu-item">{t('titleBar.edit')}</Button>
+            </Dropdown>
+          </Space>
+        )}
 
         {/* center search */}
         <div className="titlebar-center no-drag">
@@ -430,28 +435,38 @@ const TitleBar = ({ onPageChange, onNewNote, onSearchResult }: TitleBarProps) =>
           />
         </div>
 
-        {/* window controls */}
-        <div className="titlebar-controls no-drag">
-          <div className="titlebar-avatar no-drag" onClick={handleOpenProfileModal}>
-            {renderAvatar(28, userProfile.avatarUrl, userProfile.userId)}
+        {/* window controls - hidden on macOS to preserve native traffic lights */}
+        {!isMacos && (
+          <div className="titlebar-controls no-drag">
+            <div className="titlebar-avatar no-drag" onClick={handleOpenProfileModal}>
+              {renderAvatar(28, userProfile.avatarUrl, userProfile.userId)}
+            </div>
+            <button className="titlebar-btn no-drag" aria-label="最小化" onClick={() => window.electronAPI?.minimizeWindow?.()}>
+              <IconMinus />
+            </button>
+            <button className="titlebar-btn no-drag" aria-label="最大化" onClick={() => window.electronAPI?.maximizeWindow?.()}>
+              <IconExpand />
+            </button>
+            <button className="titlebar-btn titlebar-btn-close no-drag" aria-label="关闭" onClick={() => {
+              const minimize = localStorage.getItem('papyrus_minimize_to_tray') === 'true';
+              if (minimize) {
+                window.electronAPI?.closeWindow?.();
+              } else {
+                window.electronAPI?.quitApp?.();
+              }
+            }}>
+              <IconClose />
+            </button>
           </div>
-          <button className="titlebar-btn no-drag" aria-label="最小化" onClick={() => window.electronAPI?.minimizeWindow?.()}>
-            <IconMinus />
-          </button>
-          <button className="titlebar-btn no-drag" aria-label="最大化" onClick={() => window.electronAPI?.maximizeWindow?.()}>
-            <IconExpand />
-          </button>
-          <button className="titlebar-btn titlebar-btn-close no-drag" aria-label="关闭" onClick={() => {
-            const minimize = localStorage.getItem('papyrus_minimize_to_tray') === 'true';
-            if (minimize) {
-              window.electronAPI?.closeWindow?.();
-            } else {
-              window.electronAPI?.quitApp?.();
-            }
-          }}>
-            <IconClose />
-          </button>
-        </div>
+        )}
+        {/* macOS: show only avatar on the right */}
+        {isMacos && (
+          <div className="titlebar-controls no-drag">
+            <div className="titlebar-avatar no-drag" onClick={handleOpenProfileModal}>
+              {renderAvatar(28, userProfile.avatarUrl, userProfile.userId)}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 导入对话框 */}

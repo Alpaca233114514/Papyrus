@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Modal, Form, Input, Select, Checkbox, Typography } from '@arco-design/web-react';
+import { useState, useEffect } from 'react';
+import { Modal, Form, Input, Select, Checkbox, Typography, Message } from '@arco-design/web-react';
 import { ProviderLogo } from '../../../../icons/ProviderLogo';
 import { PORT_OPTIONS } from '../../../../utils/modelSelector';
 import { CAPABILITIES_MAP } from '../constants';
@@ -82,11 +82,13 @@ const ModelModal = ({ visible, onClose, onModelSaved, providers, editingModel, s
               onModelSaved();
               closeModal();
             } else {
+              Message.error(data.error || t('chatView.saveFailed'));
               window.dispatchEvent(new CustomEvent('papyrus_ai_config_changed'));
             }
           })
           .catch(err => {
             console.error('Failed to update model:', err);
+            Message.error(t('chatView.saveFailed'));
             window.dispatchEvent(new CustomEvent('papyrus_ai_config_changed'));
           })
           .finally(() => {
@@ -100,17 +102,15 @@ const ModelModal = ({ visible, onClose, onModelSaved, providers, editingModel, s
               onModelSaved();
               closeModal();
             } else {
+              Message.error(data.error || t('chatView.saveFailed'));
               window.dispatchEvent(new CustomEvent('papyrus_ai_config_changed'));
             }
           })
           .catch(err => {
             console.error('Failed to add model:', err);
             const msg = err instanceof Error ? err.message : String(err);
-            if (msg.includes('已存在')) {
-              window.dispatchEvent(new CustomEvent('papyrus_ai_config_changed'));
-            } else {
-              window.dispatchEvent(new CustomEvent('papyrus_ai_config_changed'));
-            }
+            Message.error(msg || t('chatView.saveFailed'));
+            window.dispatchEvent(new CustomEvent('papyrus_ai_config_changed'));
           })
           .finally(() => {
             setSaveModelLoading(false);
@@ -135,6 +135,14 @@ const ModelModal = ({ visible, onClose, onModelSaved, providers, editingModel, s
       modelForm.setFieldValue('apiKeyId', provider.apiKeys[0].id);
     }
   };
+
+  useEffect(() => {
+    if (visible && editingModel) {
+      modelForm.setFieldsValue({
+        apiKeyId: editingModel.apiKeyId,
+      });
+    }
+  }, [visible, editingModel, modelForm]);
 
   const enabledProviders = providers.filter(p => p.enabled);
 

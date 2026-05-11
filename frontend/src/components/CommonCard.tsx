@@ -14,9 +14,21 @@ export interface CommonCardConfig {
   hoverBorderColor?: string;
   defaultBackground?: string;
   hoverBackground?: string;
+  width?: number | string;
+  height?: number | string;
 }
 
 const DEFAULT_CONFIG: Required<CommonCardConfig> = {
+  borderWidth: 1,
+  defaultBorderColor: 'var(--color-text-3)',
+  hoverBorderColor: 'var(--color-primary)',
+  defaultBackground: 'var(--color-bg-1)',
+  hoverBackground: 'var(--color-primary-light)',
+  width: 220,
+  height: 140,
+};
+
+const AUTO_SIZE_CONFIG: Omit<Required<CommonCardConfig>, 'width' | 'height'> = {
   borderWidth: 1,
   defaultBorderColor: 'var(--color-text-3)',
   hoverBorderColor: 'var(--color-primary)',
@@ -40,6 +52,8 @@ export const useCommonCardStyle = (config: CommonCardConfig = {}) => {
     hovered,
     setHovered,
     cardStyle,
+    width: mergedConfig.width,
+    height: mergedConfig.height,
   };
 };
 
@@ -48,6 +62,8 @@ interface CommonCardProps {
   setHovered: (hovered: boolean) => void;
   cardStyle: CommonCardStyles;
   children: React.ReactNode;
+  width?: number | string;
+  height?: number | string;
   style?: React.CSSProperties;
   className?: string;
   onClick?: () => void;
@@ -63,6 +79,8 @@ export const CommonCard = ({
   setHovered,
   cardStyle,
   children,
+  width,
+  height,
   style,
   className,
   onClick,
@@ -85,6 +103,8 @@ export const CommonCard = ({
       className={className}
       style={{
         ...cardStyle,
+        ...(width !== undefined && { width }),
+        ...(height !== undefined && { height }),
         ...style,
       }}
     >

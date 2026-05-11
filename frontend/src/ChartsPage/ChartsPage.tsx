@@ -154,6 +154,7 @@ const StatCard = ({ title, value, suffix, icon }: { title: string; value: string
         display: 'flex',
         alignItems: 'center',
         gap: '16px',
+        minHeight: '100px',
       }}
     >
       <div style={{
@@ -214,6 +215,7 @@ const SimpleProgressCard = ({ title, progress, count, dataReady }: { title: stri
       cardStyle={cardStyle}
       style={{
         padding: '20px',
+        minHeight: '140px',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>

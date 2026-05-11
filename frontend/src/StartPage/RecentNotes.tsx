@@ -1,9 +1,8 @@
-import { Typography, Spin } from '@arco-design/web-react';
+import { Typography } from '@arco-design/web-react';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, type Note } from '../api';
-
-const SECONDARY_COLOR = '#9FD4FD';
+import { useCommonCardStyle, CommonCard, CardGroup, PRIMARY_COLOR } from '../components';
 
 interface NoteCardProps {
   note: {
@@ -12,49 +11,62 @@ interface NoteCardProps {
     preview: string;
     lastUsed: string;
   };
+  onClick?: () => void;
 }
 
-const NoteCard = ({ note }: NoteCardProps) => {
-  const [hovered, setHovered] = useState(false);
+const NoteCard = ({ note, onClick }: NoteCardProps) => {
+  const { hovered, setHovered, cardStyle, width, height } = useCommonCardStyle({
+    borderWidth: 2,
+  });
 
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+    <CommonCard
+      hovered={hovered}
+      setHovered={setHovered}
+      cardStyle={cardStyle}
+      width={width}
+      height={height}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      aria-label={`${note.title} - ${note.lastUsed}`}
       style={{
         flex: '0 0 auto',
-        width: '220px',
-        height: '100%',
-        borderRadius: '16px',
-        border: `2px solid ${hovered ? SECONDARY_COLOR : 'var(--color-text-3)'}`,
-        background: 'transparent',
-        padding: '24px',
+        padding: '20px',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        cursor: 'pointer',
-        transition: 'border-color 0.2s',
         boxSizing: 'border-box',
+        minHeight: '140px',
       }}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <Typography.Text bold style={{ fontSize: '18px', lineHeight: 1.3 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, overflow: 'hidden' }}>
+        <Typography.Text bold style={{ fontSize: '16px', lineHeight: 1.3 }}>
           {note.title}
         </Typography.Text>
-        <Typography.Text type='secondary' style={{ fontSize: '13px', lineHeight: 1.5 }}>
+        <Typography.Text type='secondary' style={{ 
+          fontSize: '12px', 
+          lineHeight: 1.5,
+          display: '-webkit-box',
+          WebkitLineClamp: 3,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}>
           {note.preview}
         </Typography.Text>
       </div>
 
-      <Typography.Text type='secondary' style={{ fontSize: '13px' }}>
+      <Typography.Text type='secondary' style={{ fontSize: '12px', marginTop: '8px' }}>
         {note.lastUsed}
       </Typography.Text>
-    </div>
+    </CommonCard>
   );
 };
 
 interface RecentNotesProps {
   height: number;
+  onNavigate?: (noteId: string) => void;
 }
 
 // 辅助函数：时间戳转换为相对时间字符串
@@ -71,7 +83,7 @@ function formatTimestamp(timestamp: number, t: (key: string, options?: Record<st
   return t('startPage.monthsAgo', { count: Math.floor(diffDays / 30) });
 }
 
-const RecentNotes = ({ height }: RecentNotesProps) => {
+const RecentNotes = ({ height, onNavigate }: RecentNotesProps) => {
   const { t } = useTranslation();
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,46 +120,12 @@ const RecentNotes = ({ height }: RecentNotesProps) => {
     };
   }, []);
 
-  if (loading) {
-    return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'row',
-        gap: '16px',
-        height: `${height}px`,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-        <Spin size={24} />
-      </div>
-    );
-  }
-
-  if (notes.length === 0) {
-    return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'row',
-        gap: '16px',
-        height: `${height}px`,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-        <Typography.Text type="secondary">{t('startPage.noNotes')}</Typography.Text>
-      </div>
-    );
-  }
-
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'row',
-      gap: '16px',
-      height: `${height}px`,
-      overflowX: 'auto',
-      overflowY: 'hidden',
-      paddingBottom: '4px',
-    }}>
+    <CardGroup
+      height={height}
+      loading={loading}
+      emptyText={t('startPage.noNotes')}
+    >
       {notes.map(n => (
         <NoteCard
           key={n.id}
@@ -157,9 +135,10 @@ const RecentNotes = ({ height }: RecentNotesProps) => {
             preview: n.preview,
             lastUsed: formatTimestamp(n.updated_at, t),
           }}
+          onClick={() => onNavigate?.(n.id)}
         />
       ))}
-    </div>
+    </CardGroup>
   );
 };
 

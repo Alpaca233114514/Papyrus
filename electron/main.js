@@ -293,10 +293,11 @@ function createWindow() {
       webSecurity: true,
       devTools: isDevMode,
     },
-    // Frameless window - hide native title bar on all platforms
+    // Frameless window - hide native title bar
+    // macOS: use hiddenInset to preserve traffic lights (red/yellow/green buttons)
+    // Windows/Linux: use hidden to hide entire title bar
     frame: false,
-    titleBarStyle: 'hidden',
-    // Disable system caption buttons overlay (use custom TitleBar instead)
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
     titleBarOverlay: false,
   });
 
@@ -324,22 +325,75 @@ function createWindow() {
     mainWindow.loadFile(indexPath);
   }
 
-  // Set minimal application menu to preserve standard keyboard shortcuts (Ctrl+C/V/X/A/Z)
-  // Without this, setMenu(null) on Windows/Linux disables all standard edit accelerators
-  Menu.setApplicationMenu(Menu.buildFromTemplate([
-    {
-      label: 'Edit',
-      submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'selectAll' },
-      ],
-    },
-  ]));
+  // Set application menu based on platform
+  // macOS: full application menu with File, Edit, View, Window, Help (system menu bar)
+  // Windows/Linux: minimal Edit menu for keyboard shortcuts only
+  // Note: File/Edit are in custom titlebar for Windows/Linux, but we need Edit menu for shortcuts
+  const isMac = process.platform === 'darwin';
+  
+  if (isMac) {
+    // macOS: use native menu bar with Papyrus app menu
+    const template = [
+      {
+        label: 'Papyrus',
+        submenu: [
+          { role: 'about' },
+          { type: 'separator' },
+          { role: 'services' },
+          { type: 'separator' },
+          { role: 'hide' },
+          { role: 'hideOthers' },
+          { role: 'unhide' },
+          { type: 'separator' },
+          { role: 'quit' }
+        ]
+      },
+      {
+        label: 'File',
+        submenu: [
+          { role: 'close' } // Cmd+W
+        ]
+      },
+      {
+        label: 'Edit',
+        submenu: [
+          { role: 'undo' },
+          { role: 'redo' },
+          { type: 'separator' },
+          { role: 'cut' },
+          { role: 'copy' },
+          { role: 'paste' },
+          { role: 'selectAll' }
+        ]
+      },
+      {
+        label: 'Window',
+        submenu: [
+          { role: 'minimize' },
+          { role: 'zoom' },
+          { type: 'separator' },
+          { role: 'front' }
+        ]
+      }
+    ];
+    Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+  } else {
+    // Windows/Linux: minimal Edit menu for keyboard shortcuts
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+      {
+        label: 'Edit',
+        submenu: [
+          { role: 'undo' },
+          { role: 'redo' },
+          { type: 'separator' },
+          { role: 'cut' },
+          { role: 'copy' },
+          { role: 'paste' },
+          { role: 'selectAll' },
+        ],
+      },
+    ]));
+  }
   
   // Window event handlers
   mainWindow.once('ready-to-show', () => {

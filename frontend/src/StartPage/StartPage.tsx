@@ -8,6 +8,7 @@ import { getSolarTerm, fetchSolarTerm } from './solarTerms';
 import { type SceneryContent, fetchSceneryContent } from './sceneryContent';
 import FlashcardStudy from '../ScrollPage/FlashcardStudy';
 import { api } from '../api';
+import { useCommonCardStyle, CommonCard, CardGroup } from '../components';
 import './StartPage.css';
 
 
@@ -30,6 +31,8 @@ type StartPageData = {
 type StartPageProps = {
   onDoneChange?: (done: boolean) => void;
   onNavigate?: (page: string) => void;
+  onStartStudy?: (tag?: string) => void;
+  onNewCard?: () => void;
 };
 
 type PendingCardProps = {
@@ -39,6 +42,7 @@ type PendingCardProps = {
   solarTerm: string | null;
   loading: boolean;
   onStartStudy?: () => void;
+  onNewCard?: () => void;
   scenery: SceneryContent | null;
 };
 
@@ -149,79 +153,233 @@ const ShelfSection = ({ label, children }: { label: string; children: ReactNode 
   </section>
 );
 
-const ShortcutCard = ({ icon, label, onClick }: { icon: ReactNode; label: string; onClick: () => void }) => {
+const StartCTAButton = ({ 
+  label, 
+  onClick, 
+  highlighted: externalHighlighted,
+  onHoverChange 
+}: { 
+  label: string; 
+  onClick?: () => void;
+  highlighted?: boolean;
+  onHoverChange?: (hovered: boolean) => void;
+}) => {
   const [hovered, setHovered] = useState(false);
-  const hoverState = hovered ? 'true' : 'false';
+  const [pressed, setPressed] = useState(false);
+  const [rippleKey, setRippleKey] = useState(0);
+  
+  const highlighted = externalHighlighted ?? (hovered || pressed);
+
+  const handleMouseEnter = () => {
+    setHovered(true);
+    setRippleKey((value) => value + 1);
+    onHoverChange?.(true);
+  };
+
+  const handleMouseLeave = () => {
+    setHovered(false);
+    setPressed(false);
+    onHoverChange?.(false);
+  };
+
+  return (
+    <Button
+      shape='round'
+      size='large'
+      type={highlighted ? 'primary' : 'secondary'}
+      className="start-cta-button"
+      data-highlighted={highlighted ? 'true' : 'false'}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onMouseDown={() => setPressed(true)}
+      onMouseUp={() => setPressed(false)}
+      onClick={onClick}
+    >
+      {hovered ? (
+        <span key={rippleKey} className="start-btn-ripple" />
+      ) : null}
+      <span className="start-cta-button-label">{label}</span>
+    </Button>
+  );
+};
+
+type StartCardProps = {
+  scenery: SceneryContent | null;
+  headline: string;
+  subline?: string;
+  greeting?: string;
+  buttonLabel: string;
+  onButtonClick?: () => void;
+}
+
+const StartCard = ({ scenery, headline, subline, greeting, buttonLabel, onButtonClick }: StartCardProps) => {
+  const [hovered, setHovered] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  const showScenery = scenery !== null;
+  const defaultImage = './scenery/image.png';
+  const image = imageError ? defaultImage : scenery?.image;
+  const poem = scenery?.poem ?? '且将新火试新茶，诗酒趁年华。';
+  const source = scenery?.source ?? '[宋] 苏轼《望江南·超然台作》';
+
   return (
     <div
+      className={`start-card-frame ${showScenery ? 'start-card-frame--scenery' : 'start-card-frame--pending'}`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      data-hovered={hovered ? 'true' : 'false'}
+    >
+      {!showScenery && <LatticeBackground />}
+
+      {showScenery && (
+        <img
+          src={image}
+          alt={`窗景图片：${poem} —— ${source}`}
+          className="start-scenery-image"
+          data-hovered={hovered ? 'true' : 'false'}
+          onError={() => setImageError(true)}
+        />
+      )}
+
+      <div className="start-card-top">
+        <Typography.Paragraph
+          type='secondary'
+          spacing='close'
+          className="start-card-headline"
+        >
+          {headline}
+        </Typography.Paragraph>
+        {subline && (
+          <Typography.Text className="scenery-sub-text start-card-subline">
+            {subline}
+          </Typography.Text>
+        )}
+      </div>
+
+      <div className="start-card-bottom">
+        {greeting && (
+          <Typography.Text className="scenery-sub-text start-card-greeting">
+            {greeting}
+          </Typography.Text>
+        )}
+        <div />
+
+        <StartCTAButton
+          label={buttonLabel}
+          onClick={onButtonClick}
+          highlighted={hovered}
+        />
+      </div>
+
+      {showScenery && (
+        <div className="start-poem-container" data-hovered={hovered ? 'true' : 'false'}>
+          <div className="start-poem-inner">
+            <div className="start-poem-text">
+              {poem}
+            </div>
+            {source && (
+              <div className="start-poem-source">
+                {'——'}{source}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ShortcutCard = ({ icon, label, onClick }: { icon: ReactNode; label: string; onClick: () => void }) => {
+  const { hovered, setHovered, cardStyle, width, height } = useCommonCardStyle({
+    borderWidth: 2,
+  });
+  return (
+    <CommonCard
+      hovered={hovered}
+      setHovered={setHovered}
+      cardStyle={cardStyle}
+      width={width}
+      height={height}
       role="button"
       tabIndex={0}
       aria-label={label}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       onClick={onClick}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); }
       }}
-      className="start-shortcut"
-      data-hovered={hoverState}
+      style={{
+        flex: '0 0 auto',
+        padding: '16px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxSizing: 'border-box',
+        gap: '12px',
+      }}
     >
-      <div className="start-shortcut-icon-wrap" data-hovered={hoverState}>
+      <div style={{
+        width: '48px',
+        height: '48px',
+        borderRadius: '50%',
+        background: hovered ? 'var(--color-primary-light)' : 'var(--color-fill-2)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '24px',
+        transition: 'background 0.2s',
+      }}>
         {icon}
       </div>
       <Typography.Text
         type={hovered ? 'primary' : 'secondary'}
-        className="start-shortcut-label"
+        style={{ fontSize: '16px', fontWeight: 500 }}
       >
         {label}
       </Typography.Text>
-    </div>
+    </CommonCard>
   );
 };
 
 const ShelfSections = ({ onStudyTag, onNavigate }: { onStudyTag?: (tag: string) => void; onNavigate?: (page: string) => void }) => {
   const { t } = useTranslation();
-  const { ref, height } = useCardHeight();
+  const cardHeight = 140;
+
+  const shortcuts = onNavigate ? [
+    { icon: '📝', label: t('sidebar.notes'), onClick: () => onNavigate('notes') },
+    { icon: '📁', label: t('sidebar.files'), onClick: () => onNavigate('files') },
+    { icon: '📊', label: t('sidebar.charts'), onClick: () => onNavigate('charts') },
+    { icon: '⚙️', label: t('sidebar.settings'), onClick: () => onNavigate('settings') },
+  ] : [];
 
   return (
     <>
-      <div ref={ref} className="start-shelf-measure" />
-
       {onNavigate && (
         <ShelfSection label={t('startPage.shortcuts')}>
-          <div className="start-shelf-row">
-            <ShortcutCard
-              icon={<span className="start-shortcut-icon">📝</span>}
-              label={t('sidebar.notes')}
-              onClick={() => onNavigate('notes')}
-            />
-            <ShortcutCard
-              icon={<span className="start-shortcut-icon">📁</span>}
-              label={t('sidebar.files')}
-              onClick={() => onNavigate('files')}
-            />
-            <ShortcutCard
-              icon={<span className="start-shortcut-icon">📊</span>}
-              label={t('sidebar.charts')}
-              onClick={() => onNavigate('charts')}
-            />
-            <ShortcutCard
-              icon={<span className="start-shortcut-icon">⚙️</span>}
-              label={t('sidebar.settings')}
-              onClick={() => onNavigate('settings')}
-            />
-          </div>
+          <CardGroup height={cardHeight}>
+            {shortcuts.map((shortcut, index) => (
+              <ShortcutCard
+                key={index}
+                icon={<span>{shortcut.icon}</span>}
+                label={shortcut.label}
+                onClick={shortcut.onClick}
+              />
+            ))}
+          </CardGroup>
         </ShelfSection>
       )}
 
       <ShelfSection label={t('startPage.review')}>
-        <ReviewQueue height={height} />
+        <ReviewQueue height={cardHeight} onStartStudy={() => {
+        }} />
       </ShelfSection>
       <ShelfSection label={t('startPage.recentScrolls')}>
-        <RecentScrolls height={height} onStudyTag={onStudyTag} />
+        <RecentScrolls height={cardHeight} onStudyTag={onStudyTag} />
       </ShelfSection>
       <ShelfSection label={t('startPage.recentNotes')}>
-        <RecentNotes height={height} />
+        <RecentNotes height={cardHeight} onNavigate={(noteId) => {
+          onNavigate?.('notes');
+        }} />
       </ShelfSection>
     </>
   );
@@ -255,189 +413,37 @@ const LatticeBackground = () => {
 
 const PendingCard = ({ stats, greeting, dateLabel, solarTerm, loading, onStartStudy, scenery }: PendingCardProps) => {
   const { t } = useTranslation();
-  const [hovered, setHovered] = useState(false);
-  const [pressed, setPressed] = useState(false);
-  const [rippleKey, setRippleKey] = useState(0);
-  const [imageError, setImageError] = useState(false);
-
-  const highlighted = hovered || pressed;
-  const showScenery = scenery !== null;
-  const defaultImage = './scenery/image.png';
-  const image = imageError ? defaultImage : scenery?.image;
-  const poem = scenery?.poem ?? '且将新火试新茶，诗酒趁年华。';
-  const source = scenery?.source ?? '[宋] 苏轼《望江南·超然台作》';
-
-  const handleClick = () => {
-    onStartStudy?.();
-  };
 
   return (
-    <div
-      className={`start-card-frame ${showScenery ? 'start-card-frame--scenery' : 'start-card-frame--pending'}`}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => { setHovered(false); setPressed(false); }}
-    >
-      {!showScenery && <LatticeBackground />}
-
-      {showScenery && (
-        <img
-          src={image}
-          alt={`窗景图片：${poem} —— ${source}`}
-          className="start-scenery-image"
-          data-hovered={hovered ? 'true' : 'false'}
-          onError={() => setImageError(true)}
-        />
-      )}
-
-      <div className="start-card-top">
-        <Typography.Paragraph
-          type='secondary'
-          spacing='close'
-          className="start-card-headline"
-        >
-          {loading ? (
-            t('startPage.fetchCardsFailed')
-          ) : (
-            <>
-              {t('startPage.cardsDue', { count: stats.cardsDue })}
-            </>
-          )}
-        </Typography.Paragraph>
-        <Typography.Text className="scenery-sub-text start-card-subline">
-          {loading ? '' : t('startPage.streakProgress', { streakDays: stats.streakDays, todayProgress: stats.todayProgress })}
-        </Typography.Text>
-      </div>
-
-      <div className="start-card-bottom">
-        <Typography.Text className="scenery-sub-text start-card-greeting">
-          {greeting} | {dateLabel}{solarTerm ? ` | ${solarTerm}` : ''}
-        </Typography.Text>
-
-        <Button
-          shape='round'
-          size='large'
-          type={highlighted ? 'primary' : 'secondary'}
-          className="start-cta-button"
-          data-highlighted={highlighted ? 'true' : 'false'}
-          onMouseEnter={() => {
-            setHovered(true);
-            setRippleKey((value) => value + 1);
-          }}
-          onMouseLeave={() => {
-            setHovered(false);
-            setPressed(false);
-          }}
-          onMouseDown={() => setPressed(true)}
-          onMouseUp={() => setPressed(false)}
-          onClick={handleClick}
-        >
-          {hovered ? (
-            <span key={rippleKey} className="start-btn-ripple" />
-          ) : null}
-          <span className="start-cta-button-label">{t('startPage.start')}</span>
-        </Button>
-      </div>
-
-      {showScenery && (
-        <div className="start-poem-container" data-hovered={hovered ? 'true' : 'false'}>
-          <div className="start-poem-inner">
-            <div className="start-poem-text">
-              {poem}
-            </div>
-            {source && (
-              <div className="start-poem-source">
-                {'——'}{source}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+    <StartCard
+      scenery={scenery}
+      headline={loading ? t('startPage.fetchCardsFailed') : t('startPage.cardsDue', { count: stats.cardsDue })}
+      subline={loading ? undefined : t('startPage.streakProgress', { streakDays: stats.streakDays, todayProgress: stats.todayProgress })}
+      greeting={`${greeting} | ${dateLabel}${solarTerm ? ` | ${solarTerm}` : ''}`}
+      buttonLabel={t('startPage.start')}
+      onButtonClick={onStartStudy}
+    />
   );
 };
 
-const DoneCard = ({ scenery }: { scenery: SceneryContent | null }) => {
+const DoneCard = ({ scenery, onNewCard }: { scenery: SceneryContent | null; onNewCard?: () => void }) => {
   const { t } = useTranslation();
-  const [hovered, setHovered] = useState(false);
-  const [imageError, setImageError] = useState(false);
-  const hoverState = hovered ? 'true' : 'false';
-
-  const defaultImage = './scenery/image.png';
-
-  // 窗景关闭时（scenery 为 null），显示纯背景卡片样式
-  if (!scenery) {
-    return (
-      <div className="start-card-frame start-card-frame--done">
-        <div className="start-card-top">
-          <Typography.Paragraph
-            type='secondary'
-            spacing='close'
-            className="start-card-headline"
-          >
-            {t('startPage.congratulations')}
-          </Typography.Paragraph>
-        </div>
-
-        <div className="start-card-bottom">
-          <Typography.Text className="scenery-sub-text start-card-greeting">
-            {t('startPage.keepGoing')}
-          </Typography.Text>
-        </div>
-      </div>
-    );
-  }
-
-  // 窗景开启时，显示图片 + 诗句 + 渐变遮罩
-  const image = imageError ? defaultImage : scenery.image;
-  const poem = scenery.poem ?? '且将新火试新茶，诗酒趁年华。';
-  const source = scenery.source ?? '[宋] 苏轼《望江南·超然台作》';
 
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className="start-card-frame start-card-frame--scenery"
-    >
-      <img
-        src={image}
-        alt={`窗景图片：${poem} —— ${source}`}
-        className="start-scenery-image"
-        data-hovered={hoverState}
-        onError={() => setImageError(true)}
-      />
-
-      <div className="start-done-greeting" data-hovered={hoverState}>
-        <Typography.Paragraph
-          type='secondary'
-          spacing='close'
-          className="start-card-headline"
-        >
-          {t('startPage.congratulations')}
-        </Typography.Paragraph>
-      </div>
-
-      <div className="start-poem-container" data-hovered={hoverState}>
-        <div className="start-poem-inner">
-          <div className="start-poem-text">
-            {poem}
-          </div>
-          {source && (
-            <div className="start-poem-source">
-              {'——'}{source}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+    <StartCard
+      scenery={scenery}
+      headline={t('startPage.congratulations')}
+      subline={t('startPage.keepGoing')}
+      buttonLabel={t('titleBar.newCard')}
+      onButtonClick={onNewCard}
+    />
   );
 };
 
-const StartPage = ({ onDoneChange, onNavigate }: StartPageProps) => {
+const StartPage = ({ onDoneChange, onNavigate, onStartStudy, onNewCard }: StartPageProps) => {
   const { t } = useTranslation();
   const data = useStartPageData(t);
   const done = !data.loading && data.stats.cardsDue === 0;
-  const [isStudying, setIsStudying] = useState(false);
-  const [studyTag, setStudyTag] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     onDoneChange?.(done);
@@ -452,33 +458,21 @@ const StartPage = ({ onDoneChange, onNavigate }: StartPageProps) => {
     return () => window.removeEventListener('papyrus_study_completed', handleStudyCompleted);
   }, [data.refresh]);
 
-  // 退出学习模式后刷新数据（避免初始挂载时重复刷新）
-  const prevIsStudyingRef = useRef(false);
-  useEffect(() => {
-    if (prevIsStudyingRef.current && !isStudying) {
-      data.refresh();
-    }
-    prevIsStudyingRef.current = isStudying;
-  }, [isStudying, data.refresh]);
-
-  // 学习模式
-  if (isStudying) {
-    return (
-      <div className="start-study-shell">
-        <FlashcardStudy onExit={() => setIsStudying(false)} demo={false} filterTag={studyTag} />
-      </div>
-    );
-  }
-
   return (
     <div id="start-page-scroll" className="start-page-root">
+      {done && (
+        <div
+          className="tw-absolute tw-inset-x-0 tw-top-0 tw-h-[160px] tw-pointer-events-none tw-z-0 tw-bg-gradient-to-b tw-from-[rgba(232,255,234,0.45)] tw-to-transparent"
+          aria-hidden="true"
+        />
+      )}
       <div className="start-hero">
         <Typography.Title heading={1} className="start-hero-title">
           {t('startPage.title')}
         </Typography.Title>
 
         {done ? (
-          <DoneCard scenery={data.scenery} />
+          <DoneCard scenery={data.scenery} onNewCard={onNewCard} />
         ) : (
           <PendingCard
             stats={data.stats}
@@ -487,10 +481,7 @@ const StartPage = ({ onDoneChange, onNavigate }: StartPageProps) => {
             solarTerm={data.solarTerm}
             loading={data.loading}
             scenery={data.scenery}
-            onStartStudy={() => {
-              setStudyTag(undefined);
-              setIsStudying(true);
-            }}
+            onStartStudy={() => onStartStudy?.()}
           />
         )}
       </div>
@@ -502,10 +493,7 @@ const StartPage = ({ onDoneChange, onNavigate }: StartPageProps) => {
 
         <ShelfSections
           onNavigate={onNavigate}
-          onStudyTag={(tag) => {
-            setStudyTag(tag);
-            setIsStudying(true);
-          }}
+          onStudyTag={(tag) => onStartStudy?.(tag)}
         />
 
         <div className="start-bottom-spacer" />

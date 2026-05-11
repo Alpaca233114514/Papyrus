@@ -6,7 +6,7 @@ import type { CollectionCardProps } from '../types';
 
 const CollectionCard = ({ collection, onClick, onManage }: CollectionCardProps) => {
   const { t } = useTranslation();
-  const { hovered, setHovered, cardStyle } = useCommonCardStyle({
+  const { hovered, setHovered, cardStyle, width, height } = useCommonCardStyle({
     borderWidth: 2,
   });
 
@@ -15,6 +15,8 @@ const CollectionCard = ({ collection, onClick, onManage }: CollectionCardProps) 
       hovered={hovered}
       setHovered={setHovered}
       cardStyle={cardStyle}
+      width={width}
+      height={height}
       role="button"
       tabIndex={0}
       aria-label={`${collection.title}，包含 ${collection.scrollCount} 个卷轴，共 ${collection.totalCards} 张卡片`}
@@ -27,8 +29,6 @@ const CollectionCard = ({ collection, onClick, onManage }: CollectionCardProps) 
       }}
       style={{
         flex: '0 0 auto',
-        width: '220px',
-        height: '140px',
         padding: '20px',
         display: 'flex',
         flexDirection: 'column',

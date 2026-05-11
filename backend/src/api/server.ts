@@ -164,7 +164,7 @@ export async function initApp(): Promise<void> {
   app.register(cardVersionRoutes, { prefix: '/api/cards/:cardId' });
   app.register(filesRoutes, { prefix: '/api/files' });
   app.register(relationsRoutes, { prefix: '/api' });
-  app.register(extensionsRoutes, { prefix: '/api' });
+  app.register(extensionsRoutes, { prefix: '/api/extensions' });
 }
 
 let mcpServer: MCPServer | null = null;

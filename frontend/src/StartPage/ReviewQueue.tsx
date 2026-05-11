@@ -1,7 +1,8 @@
-import { Typography, Spin, Empty } from '@arco-design/web-react';
+import { Typography } from '@arco-design/web-react';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, type Card } from '../api';
+import { useCommonCardStyle, CommonCard, CardGroup, PRIMARY_COLOR } from '../components';
 
 interface ReviewItem {
   id: string;
@@ -10,31 +11,31 @@ interface ReviewItem {
   estimatedMinutes: number;
 }
 
-const SECONDARY_COLOR = '#9FD4FD';
-
-const ReviewCard = ({ item }: { item: ReviewItem }) => {
-  const [hovered, setHovered] = useState(false);
+const ReviewCard = ({ item, onClick }: { item: ReviewItem; onClick?: () => void }) => {
   const { t } = useTranslation();
+  const { hovered, setHovered, cardStyle, width, height } = useCommonCardStyle({
+    borderWidth: 2,
+  });
 
   const title = item.id === 'new' ? t('startPage.newCards') : t('startPage.reviewCards');
 
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+    <CommonCard
+      hovered={hovered}
+      setHovered={setHovered}
+      cardStyle={cardStyle}
+      width={width}
+      height={height}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      aria-label={`${title} - ${t('startPage.dueCount', { count: item.scrollCount })} - ${t('startPage.minutes', { count: item.estimatedMinutes })}`}
       style={{
         flex: '0 0 auto',
-        width: '220px',
-        height: '100%',
-        borderRadius: '16px',
-        border: `2px solid ${hovered ? SECONDARY_COLOR : 'var(--color-text-3)'}`,
-        background: 'transparent',
         padding: '24px',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        cursor: 'pointer',
-        transition: 'border-color 0.2s',
         boxSizing: 'border-box',
       }}
     >
@@ -42,7 +43,7 @@ const ReviewCard = ({ item }: { item: ReviewItem }) => {
         <div style={{
           display: 'inline-flex',
           alignSelf: 'flex-start',
-          background: '#206CCF',
+          background: PRIMARY_COLOR,
           color: '#fff',
           borderRadius: '999px',
           padding: '2px 10px',
@@ -60,12 +61,13 @@ const ReviewCard = ({ item }: { item: ReviewItem }) => {
       <Typography.Text type='secondary' style={{ fontSize: '13px' }}>
         {t('startPage.minutes', { count: item.estimatedMinutes })}
       </Typography.Text>
-    </div>
+    </CommonCard>
   );
 };
 
 interface ReviewQueueProps {
   height: number;
+  onStartStudy?: (type: 'new' | 'review') => void;
 }
 
 // 计算待复习队列
@@ -104,7 +106,7 @@ function calculateReviewQueue(cards: Card[]): ReviewItem[] {
   return queue;
 }
 
-const ReviewQueue = ({ height }: ReviewQueueProps) => {
+const ReviewQueue = ({ height, onStartStudy }: ReviewQueueProps) => {
   const { t } = useTranslation();
   const [items, setItems] = useState<ReviewItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,50 +136,21 @@ const ReviewQueue = ({ height }: ReviewQueueProps) => {
     return () => window.removeEventListener('papyrus_cards_changed', handleCardsChanged);
   }, []);
 
-  if (loading) {
-    return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'row',
-        gap: '16px',
-        height: `${height}px`,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-        <Spin size={24} />
-      </div>
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px',
-        height: `${height}px`,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-        <Empty description={t('startPage.noDueCards')} />
-      </div>
-    );
-  }
-
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'row',
-      gap: '16px',
-      height: `${height}px`,
-      overflowX: 'auto',
-      overflowY: 'hidden',
-      paddingBottom: '4px',
-    }}>
+    <CardGroup
+      height={height}
+      loading={loading}
+      emptyText={t('startPage.noDueCards')}
+      showEmptyIcon={true}
+    >
       {items.map(r => (
-        <ReviewCard key={r.id} item={r} />
+        <ReviewCard
+          key={r.id}
+          item={r}
+          onClick={() => onStartStudy?.(r.id as 'new' | 'review')}
+        />
       ))}
-    </div>
+    </CardGroup>
   );
 };
 

@@ -7,7 +7,7 @@ import { PRIMARY_COLOR, SUCCESS_COLOR } from '../constants';
 
 const ScrollCard = ({ scroll, onStudy }: ScrollCardProps) => {
   const { t } = useTranslation();
-  const { hovered, setHovered, cardStyle } = useCommonCardStyle({
+  const { hovered, setHovered, cardStyle, width, height } = useCommonCardStyle({
     borderWidth: 2,
   });
 
@@ -16,6 +16,8 @@ const ScrollCard = ({ scroll, onStudy }: ScrollCardProps) => {
       hovered={hovered}
       setHovered={setHovered}
       cardStyle={cardStyle}
+      width={width}
+      height={height}
       role="button"
       tabIndex={onStudy ? 0 : -1}
       aria-label={`${scroll.title}，${scroll.collection}，${scroll.dueCount > 0 ? t('scrollPage.dueCards', { count: scroll.dueCount }) : t('scrollPage.completedCards')}，共 ${scroll.cardCount} 张卡片`}
@@ -29,8 +31,6 @@ const ScrollCard = ({ scroll, onStudy }: ScrollCardProps) => {
       }}
       style={{
         flex: '0 0 auto',
-        width: '280px',
-        height: '140px',
         padding: '20px',
         display: 'flex',
         flexDirection: 'column',

@@ -25,6 +25,7 @@ export { default as ToolCallCard } from './ToolCallCard';
 // 公共卡片组件
 export { CommonCard, useCommonCardStyle, SECONDARY_COLOR, PRIMARY_COLOR } from './CommonCard';
 export type { CommonCardStyles, CommonCardConfig } from './CommonCard';
+export { CardGroup } from './CardGroup';
 
 // 页面布局组件
 export { PageLayout } from './PageLayout';

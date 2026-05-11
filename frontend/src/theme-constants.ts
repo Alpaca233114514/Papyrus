@@ -11,6 +11,6 @@ export const DANGER_COLOR_LIGHT = 'var(--color-danger-light)';
 export const WARNING_COLOR = 'var(--color-warning)';
 export const WARNING_COLOR_LIGHT = 'var(--color-warning-light)';
 
-export const SECONDARY_COLOR = 'var(--color-secondary, #9FD4FD)';
+export const SECONDARY_COLOR = '#9FD4FD';
 export const LINK_COLOR = 'var(--color-link)';
 export const LINK_COLOR_HOVER = 'var(--color-link-hover)';

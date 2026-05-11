@@ -7,6 +7,10 @@ export function getFileUrl(fileId: string, action: 'preview' | 'download'): stri
   return `${BASE}/files/${fileId}/${action}`;
 }
 
+export function getThumbnailUrl(fileId: string): string {
+  return `${BASE}/files/${fileId}/thumbnail`;
+}
+
 export let cachedToken: string | null | undefined;
 
 export function clearAuthTokenCache(): void {
@@ -568,7 +572,26 @@ export const api = {
       body: JSON.stringify(data),
     }),
   getExtensionsList: () =>
-    request<{ success: boolean; extensions: Array<{ id: string; name: string; description: string; version: string; author: string; rating: number; downloads: number; isEnabled: boolean; updateAvailable?: boolean; tags: string[] }>; count: number }>('/extensions'),
+    request<{ success: boolean; extensions: Array<{ id: string; name: string; description: string; version: string; author: string; rating: number; downloads: number; isEnabled: boolean; isBuiltin?: boolean; updateAvailable?: boolean; latestVersion?: string; tags: string[] }>; count: number; stats?: { total: number; enabled: number; builtin: number } }>('/extensions'),
+  installExtension: (data: { id: string; name: string; description?: string; version?: string; author?: string; rating?: number; downloads?: number; tags?: string[] }) =>
+    request<{ success: boolean; extension: unknown; message: string }>('/extensions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  uninstallExtension: (id: string) =>
+    request<{ success: boolean; message: string; error?: string }>(`/extensions/${id}`, { method: 'DELETE' }),
+  setExtensionEnabled: (id: string, enabled: boolean) =>
+    request<{ success: boolean; message: string; error?: string }>(`/extensions/${id}/enabled`, {
+      method: 'POST',
+      body: JSON.stringify({ enabled }),
+    }),
+  checkExtensionUpdates: () =>
+    request<{ success: boolean; hasUpdates: boolean; updateCount: number; updates: Array<{ id: string; hasUpdate: boolean; currentVersion: string; latestVersion: string }>; extensions: unknown[] }>('/extensions/check-updates', { method: 'POST' }),
+  updateExtensionConfig: (id: string, config: Record<string, unknown>) =>
+    request<{ success: boolean; message: string }>(`/extensions/${id}/config`, {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    }),
 
   // Update
   getVersion: () => request<VersionRes>('/update/version'),

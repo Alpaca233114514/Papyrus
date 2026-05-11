@@ -7,7 +7,7 @@
  * - 无障碍支持（WCAG 2.1 AA/AAA）
  * - 深色模式检测
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ConfigProvider } from '@arco-design/web-react';
 import zhCN from '@arco-design/web-react/es/locale/zh-CN';
@@ -24,7 +24,7 @@ import { AccessibilityProvider } from './contexts/AccessibilityContext';
 import { ScreenReaderAnnouncerProvider } from './components/ScreenReaderAnnouncer';
 
 // 初始化 i18n
-import('./i18n');
+import i18n, { init as i18nInit } from './i18n';
 
 const el = document.getElementById('root');
 if (!el) throw new Error('Missing #root');
@@ -95,10 +95,17 @@ const Root = () => {
     try { return localStorage.getItem('papyrus_language') ?? 'zh-CN'; }
     catch { return 'zh-CN'; }
   });
+  const [i18nReady, setI18nReady] = useState(false);
 
   const locale = LOCALE_MAP[localeKey] ?? zhCN;
 
   useEffect(() => {
+    const initI18n = async () => {
+      await i18nInit;
+      setI18nReady(true);
+    };
+    initI18n();
+
     const handler = (e: StorageEvent) => {
       if (e.key === 'papyrus_language') {
         setLocaleKey(e.newValue ?? 'zh-CN');
@@ -109,6 +116,10 @@ const Root = () => {
     updateSplashScreenText();
     return () => window.removeEventListener('storage', handler);
   }, []);
+
+  if (!i18nReady) {
+    return null; // 或者可以显示一个简单的加载动画
+  }
 
   return (
     <React.StrictMode>

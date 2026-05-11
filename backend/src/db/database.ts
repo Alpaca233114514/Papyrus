@@ -71,6 +71,34 @@ function initSchema(database: DatabaseSync): void {
   );
   const isNewDb = tableCheck.get() === undefined;
 
+  try {
+    const columns = database.prepare("SELECT name FROM pragma_table_info('extensions')").all() as Array<{ name: string }>;
+    const existingColumns = new Set(columns.map(c => c.name));
+    
+    const missingColumns = [
+      { name: 'description', type: "TEXT DEFAULT ''" },
+      { name: 'version', type: "TEXT DEFAULT '1.0.0'" },
+      { name: 'author', type: "TEXT DEFAULT 'Unknown'" },
+      { name: 'rating', type: 'REAL DEFAULT 0.0' },
+      { name: 'downloads', type: 'INTEGER DEFAULT 0' },
+      { name: 'is_enabled', type: 'INTEGER DEFAULT 0' },
+      { name: 'is_builtin', type: 'INTEGER DEFAULT 0' },
+      { name: 'update_available', type: 'INTEGER DEFAULT 0' },
+      { name: 'latest_version', type: 'TEXT' },
+      { name: 'tags', type: "TEXT DEFAULT '[]'" },
+      { name: 'config', type: "TEXT DEFAULT '{}'" },
+      { name: 'installed_at', type: 'REAL DEFAULT 0.0' },
+      { name: 'updated_at', type: 'REAL DEFAULT 0.0' },
+    ];
+    
+    for (const col of missingColumns) {
+      if (!existingColumns.has(col.name)) {
+        database.exec(`ALTER TABLE extensions ADD COLUMN ${col.name} ${col.type};`);
+      }
+    }
+  } catch {
+  }
+
   database.exec(`
     CREATE TABLE IF NOT EXISTS cards (
       id TEXT PRIMARY KEY,
@@ -229,6 +257,26 @@ function initSchema(database: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_chat_msgs_parent ON chat_messages(parent_message_id);
     CREATE INDEX IF NOT EXISTS idx_chat_sessions_active ON chat_sessions(is_active);
     CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated ON chat_sessions(updated_at DESC);
+
+    CREATE TABLE IF NOT EXISTS extensions (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      version TEXT NOT NULL DEFAULT '1.0.0',
+      author TEXT NOT NULL DEFAULT 'Unknown',
+      rating REAL DEFAULT 0.0,
+      downloads INTEGER DEFAULT 0,
+      is_enabled INTEGER DEFAULT 0,
+      is_builtin INTEGER DEFAULT 0,
+      update_available INTEGER DEFAULT 0,
+      latest_version TEXT,
+      tags TEXT DEFAULT '[]',
+      config TEXT DEFAULT '{}',
+      installed_at REAL DEFAULT 0.0,
+      updated_at REAL DEFAULT 0.0
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_extensions_enabled ON extensions(is_enabled);
   `);
 
   const providerCount = (database.prepare('SELECT COUNT(*) as c FROM providers').get() as { c: number }).c;
@@ -337,6 +385,26 @@ function seedDefaults(database: DatabaseSync): void {
         `INSERT INTO provider_models (id, provider_id, name, model_id, port, enabled)
          VALUES (?, ?, ?, ?, ?, ?)`
       ).run(`${pid}-${modelId}`, pid, modelName, modelId, 'openai-compat', 1);
+    }
+  }
+
+  const extensionCount = (database.prepare('SELECT COUNT(*) as c FROM extensions WHERE is_builtin = 1').get() as { c: number }).c;
+  if (extensionCount === 0) {
+    const builtinExtensions = [
+      { id: 'core.markdown', name: 'Markdown 增强', description: '提供 Markdown 编辑、预览与导出能力', version: '1.0.0', author: 'Papyrus Team', rating: 4.9, downloads: 12000, tags: ['编辑器', '内置'] },
+      { id: 'core.obsidian-import', name: 'Obsidian 导入', description: '将 Obsidian Vault 中的笔记一键导入 Papyrus Desktop', version: '1.0.0', author: 'Papyrus Team', rating: 4.8, downloads: 8800, tags: ['导入', '内置'] },
+      { id: 'community.theme-pack', name: '主题包', description: '一组社区贡献的视觉主题，支持深色与高对比度', version: '0.4.2', author: 'Community', rating: 4.5, downloads: 3200, tags: ['主题', '社区'] },
+      { id: 'lab.ai-cards', name: 'AI 自动制卡', description: '基于笔记内容自动生成学习卡片', version: '0.2.1', author: 'Papyrus Lab', rating: 4.2, downloads: 2100, tags: ['AI', '实验'] },
+    ];
+
+    for (const ext of builtinExtensions) {
+      database.prepare(
+        `INSERT INTO extensions (id, name, description, version, author, rating, downloads, is_enabled, is_builtin, update_available, latest_version, tags, config, installed_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        ext.id, ext.name, ext.description, ext.version, ext.author, ext.rating, ext.downloads,
+        1, 1, 0, ext.version, JSON.stringify(ext.tags), '{}', now / 1000, now / 1000
+      );
     }
   }
 }
@@ -1819,6 +1887,169 @@ export function getChatMessageCount(sessionId: string, opts?: { includeDeleted?:
   const stmt = database.prepare(sql);
   const row = stmt.get(sessionId) as { c: number };
   return row.c;
+}
+
+// ==================== Extensions ====================
+
+export interface ExtensionRecord {
+  id: string;
+  name: string;
+  description: string;
+  version: string;
+  author: string;
+  rating: number;
+  downloads: number;
+  is_enabled: boolean;
+  is_builtin: boolean;
+  update_available: boolean;
+  latest_version: string | null;
+  tags: string[];
+  config: Record<string, unknown>;
+  installed_at: number;
+  updated_at: number;
+}
+
+export interface CreateExtensionInput {
+  id: string;
+  name: string;
+  description?: string;
+  version?: string;
+  author?: string;
+  rating?: number;
+  downloads?: number;
+  tags?: string[];
+  is_builtin?: boolean;
+}
+
+function extensionFromRow(row: Record<string, unknown>): ExtensionRecord {
+  return {
+    id: String(row.id ?? ''),
+    name: String(row.name ?? ''),
+    description: String(row.description ?? ''),
+    version: String(row.version ?? '1.0.0'),
+    author: String(row.author ?? 'Unknown'),
+    rating: Number(row.rating ?? 0),
+    downloads: Number(row.downloads ?? 0),
+    is_enabled: Boolean(row.is_enabled),
+    is_builtin: Boolean(row.is_builtin),
+    update_available: Boolean(row.update_available),
+    latest_version: row.latest_version != null ? String(row.latest_version) : null,
+    tags: typeof row.tags === 'string' ? tagsFromJson(row.tags) : [],
+    config: typeof row.config === 'string' ? JSON.parse(row.config || '{}') : {},
+    installed_at: Number(row.installed_at ?? 0),
+    updated_at: Number(row.updated_at ?? 0),
+  };
+}
+
+export function loadAllExtensions(logger?: PapyrusLogger): ExtensionRecord[] {
+  const database = getDb();
+  const stmt = database.prepare('SELECT * FROM extensions ORDER BY installed_at DESC');
+  const rows = stmt.all() as Record<string, unknown>[];
+  const extensions = rows.map(extensionFromRow);
+  logger?.info(`从数据库加载 ${extensions.length} 个扩展`);
+  return extensions;
+}
+
+export function getExtensionById(id: string): ExtensionRecord | null {
+  const database = getDb();
+  const stmt = database.prepare('SELECT * FROM extensions WHERE id = ?');
+  const row = stmt.get(id) as Record<string, unknown> | undefined;
+  if (!row) return null;
+  return extensionFromRow(row);
+}
+
+export function installExtension(input: CreateExtensionInput, logger?: PapyrusLogger): ExtensionRecord {
+  const database = getDb();
+  const now = Date.now() / 1000;
+  const ext: ExtensionRecord = {
+    id: input.id,
+    name: input.name,
+    description: input.description ?? '',
+    version: input.version ?? '1.0.0',
+    author: input.author ?? 'Unknown',
+    rating: input.rating ?? 0,
+    downloads: input.downloads ?? 0,
+    is_enabled: true,
+    is_builtin: input.is_builtin ?? false,
+    update_available: false,
+    latest_version: input.version ?? '1.0.0',
+    tags: input.tags ?? [],
+    config: {},
+    installed_at: now,
+    updated_at: now,
+  };
+
+  database.prepare(
+    `INSERT OR REPLACE INTO extensions (id, name, description, version, author, rating, downloads, is_enabled, is_builtin, update_available, latest_version, tags, config, installed_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    ext.id, ext.name, ext.description, ext.version, ext.author, ext.rating, ext.downloads,
+    ext.is_enabled ? 1 : 0, ext.is_builtin ? 1 : 0, ext.update_available ? 1 : 0, ext.latest_version,
+    JSON.stringify(ext.tags), JSON.stringify(ext.config), ext.installed_at, ext.updated_at
+  );
+
+  logger?.info(`安装扩展: ${ext.name} (${ext.id})`);
+  return ext;
+}
+
+export function uninstallExtension(id: string, logger?: PapyrusLogger): boolean {
+  const database = getDb();
+  const ext = getExtensionById(id);
+  if (!ext) return false;
+  if (ext.is_builtin) {
+    logger?.warning(`无法卸载内置扩展: ${id}`);
+    return false;
+  }
+  const stmt = database.prepare('DELETE FROM extensions WHERE id = ?');
+  const result = stmt.run(id);
+  logger?.info(`卸载扩展: ${id}`);
+  return result.changes > 0;
+}
+
+export function setExtensionEnabled(id: string, enabled: boolean, logger?: PapyrusLogger): boolean {
+  const database = getDb();
+  const now = Date.now() / 1000;
+  const stmt = database.prepare('UPDATE extensions SET is_enabled = ?, updated_at = ? WHERE id = ?');
+  const result = stmt.run(enabled ? 1 : 0, now, id);
+  logger?.info(`扩展 ${id} 已${enabled ? '启用' : '禁用'}`);
+  return result.changes > 0;
+}
+
+export function checkExtensionUpdates(logger?: PapyrusLogger): { id: string; hasUpdate: boolean; currentVersion: string; latestVersion: string }[] {
+  const extensions = loadAllExtensions(logger);
+  const results: { id: string; hasUpdate: boolean; currentVersion: string; latestVersion: string }[] = [];
+
+  for (const ext of extensions) {
+    if (ext.latest_version && ext.latest_version !== ext.version) {
+      results.push({
+        id: ext.id,
+        hasUpdate: true,
+        currentVersion: ext.version,
+        latestVersion: ext.latest_version,
+      });
+      const database = getDb();
+      database.prepare('UPDATE extensions SET update_available = 1 WHERE id = ?').run(ext.id);
+    }
+  }
+
+  return results;
+}
+
+export function updateExtensionConfig(id: string, config: Record<string, unknown>, logger?: PapyrusLogger): boolean {
+  const database = getDb();
+  const now = Date.now() / 1000;
+  const stmt = database.prepare('UPDATE extensions SET config = ?, updated_at = ? WHERE id = ?');
+  const result = stmt.run(JSON.stringify(config), now, id);
+  logger?.info(`更新扩展配置: ${id}`);
+  return result.changes > 0;
+}
+
+export function getExtensionStats(): { total: number; enabled: number; builtin: number } {
+  const database = getDb();
+  const total = (database.prepare('SELECT COUNT(*) as c FROM extensions').get() as { c: number }).c;
+  const enabled = (database.prepare('SELECT COUNT(*) as c FROM extensions WHERE is_enabled = 1').get() as { c: number }).c;
+  const builtin = (database.prepare('SELECT COUNT(*) as c FROM extensions WHERE is_builtin = 1').get() as { c: number }).c;
+  return { total, enabled, builtin };
 }
 
 export { closeDb, getDb, resetDb };

@@ -26,7 +26,7 @@ export interface SceneryItem {
 const DEFAULT_SCENERY: SceneryItem = {
   id: 'default',
   name: '默认窗景',
-  image: './scenery/image.png',
+  image: '/scenery/image.png',
 };
 
 // 本地存储键
@@ -36,12 +36,12 @@ const START_PAGE_SCENERY_KEY = 'papyrus_start_page_scenery';
 
 // 默认设置（各页面独立窗景配置）
 const defaultPageSceneries: Record<PageType, PageSceneryConfig> = {
-  common: { enabled: false, image: './scenery/image.png', name: '默认窗景', opacity: 0.35, poem: '且将新火试新茶，诗酒趁年华。', source: '[宋] 苏轼《望江南·超然台作》' },
-  notes: { enabled: false, image: './scenery/image.png', name: '默认窗景', opacity: 0.35, poem: '且将新火试新茶，诗酒趁年华。', source: '[宋] 苏轼《望江南·超然台作》' },
-  scroll: { enabled: false, image: './scenery/image.png', name: '默认窗景', opacity: 0.35, poem: '且将新火试新茶，诗酒趁年华。', source: '[宋] 苏轼《望江南·超然台作》' },
-  files: { enabled: false, image: './scenery/image.png', name: '默认窗景', opacity: 0.35, poem: '且将新火试新茶，诗酒趁年华。', source: '[宋] 苏轼《望江南·超然台作》' },
-  extensions: { enabled: false, image: './scenery/image.png', name: '默认窗景', opacity: 0.35, poem: '且将新火试新茶，诗酒趁年华。', source: '[宋] 苏轼《望江南·超然台作》' },
-  charts: { enabled: false, image: './scenery/image.png', name: '默认窗景', opacity: 0.35, poem: '且将新火试新茶，诗酒趁年华。', source: '[宋] 苏轼《望江南·超然台作》' },
+  common: { enabled: true, image: '/scenery/image.png', name: '默认窗景', opacity: 0.35, poem: '且将新火试新茶，诗酒趁年华。', source: '[宋] 苏轼《望江南·超然台作》' },
+  notes: { enabled: true, image: '/scenery/image.png', name: '默认窗景', opacity: 0.35, poem: '且将新火试新茶，诗酒趁年华。', source: '[宋] 苏轼《望江南·超然台作》' },
+  scroll: { enabled: true, image: '/scenery/image.png', name: '默认窗景', opacity: 0.35, poem: '且将新火试新茶，诗酒趁年华。', source: '[宋] 苏轼《望江南·超然台作》' },
+  files: { enabled: true, image: '/scenery/image.png', name: '默认窗景', opacity: 0.35, poem: '且将新火试新茶，诗酒趁年华。', source: '[宋] 苏轼《望江南·超然台作》' },
+  extensions: { enabled: true, image: '/scenery/image.png', name: '默认窗景', opacity: 0.35, poem: '且将新火试新茶，诗酒趁年华。', source: '[宋] 苏轼《望江南·超然台作》' },
+  charts: { enabled: true, image: '/scenery/image.png', name: '默认窗景', opacity: 0.35, poem: '且将新火试新茶，诗酒趁年华。', source: '[宋] 苏轼《望江南·超然台作》' },
 };
 
 // 开始页面窗景设置（用于 DoneCard）
@@ -56,7 +56,7 @@ export interface StartPageSceneryConfig {
 
 const defaultStartPageScenery: StartPageSceneryConfig = {
   enabled: true,
-  image: './scenery/image.png',
+  image: '/scenery/image.png',
   name: '默认窗景',
   opacity: 0.35,
   poem: '春未老，风细柳斜斜。试上超然台上望，半壕春水一城花，烟雨暗千家。寒食后，酒醒却咨嗟。休对故人思故国，且将新火试新茶，诗酒趁年华。',
@@ -69,9 +69,18 @@ const loadSettings = () => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
-      return {
-        pageSceneries: { ...defaultPageSceneries, ...(parsed.pageSceneries || {}) },
-      };
+      const loadedPageSceneries = parsed.pageSceneries || {};
+      // 确保所有页面都启用窗景
+      const pageSceneries = { ...defaultPageSceneries };
+      for (const page of Object.keys(defaultPageSceneries) as PageType[]) {
+        if (loadedPageSceneries[page]) {
+          pageSceneries[page] = {
+            ...loadedPageSceneries[page],
+            enabled: true // 强制启用窗景
+          };
+        }
+      }
+      return { pageSceneries };
     }
   } catch {
     // ignore

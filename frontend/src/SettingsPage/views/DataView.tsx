@@ -98,6 +98,7 @@ const DataView = ({ onBack }: DataViewProps) => {
         Message.success(t('dataView.resetSuccess'));
         window.dispatchEvent(new CustomEvent('papyrus_cards_changed'));
         window.dispatchEvent(new CustomEvent('papyrus_notes_changed'));
+        window.dispatchEvent(new CustomEvent('papyrus_user_profile_changed'));
       } else {
         Message.error(t('dataView.resetFailed', { error: '' }));
       }
