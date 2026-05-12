@@ -63,6 +63,33 @@ function findUnpackedDir() {
   return candidates[0];
 }
 
+function findExtraResourcesDir() {
+  const candidates = [];
+  function walk(dir, depth) {
+    if (depth > 4) return;
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === 'resources') {
+          const backendDir = path.join(fullPath, 'backend');
+          if (fs.existsSync(backendDir)) {
+            candidates.push(fullPath);
+          }
+        }
+        walk(fullPath, depth + 1);
+      }
+    }
+  }
+  walk(DIST_ELECTRON, 0);
+  return candidates[0];
+}
+
 function findInDir(dir, relPath) {
   const fullPath = path.join(dir, relPath);
   return fs.existsSync(fullPath);
@@ -78,10 +105,12 @@ function main() {
 
   const asarPath = findAppAsar();
   const unpackedDir = findUnpackedDir();
+  const extraResourcesDir = findExtraResourcesDir();
 
   console.log(`dist-electron: ${DIST_ELECTRON}`);
   console.log(`app.asar: ${asarPath || 'NOT FOUND'}`);
   console.log(`app.asar.unpacked: ${unpackedDir || 'NOT FOUND'}`);
+  console.log(`extraResources: ${extraResourcesDir || 'NOT FOUND'}`);
   console.log('');
 
   const missing = [];
@@ -101,6 +130,13 @@ function main() {
     if (!found && unpackedDir) {
       if (findInDir(unpackedDir, relPath)) {
         console.log(`  OK (unpacked): ${relPath}`);
+        found = true;
+      }
+    }
+
+    if (!found && extraResourcesDir) {
+      if (findInDir(extraResourcesDir, relPath)) {
+        console.log(`  OK (extraResources): ${relPath}`);
         found = true;
       }
     }

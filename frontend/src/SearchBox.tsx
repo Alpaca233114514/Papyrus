@@ -223,7 +223,7 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
         id="search-results-listbox"
         role="listbox"
         aria-label="搜索结果"
-        className={`tw-absolute tw-left-0 tw-right-0 tw-z-50 tw-overflow-hidden tw-bg-arco-bg-popup tw-rounded-arco-lg tw-border tw-border-arco-border-2 ${
+        className={`tw-absolute tw-left-0 tw-right-0 tw-z-50 tw-overflow-hidden tw-bg-arco-bg-popup tw-rounded-arco-lg tw-border tw-border-arco-border-2 no-drag ${
           isOpen ? 'search-dropdown-enter' : 'search-dropdown-leave'
         }`}
         style={{

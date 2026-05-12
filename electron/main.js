@@ -52,9 +52,7 @@ const getPaths = () => {
   return {
     resourcesPath,
     assetsPath: path.join(resourcesPath, 'assets'),
-    frontendDistPath: isDevMode
-      ? path.join(__dirname, '..', 'frontend', 'dist')
-      : path.join(resourcesPath, 'app', 'frontend', 'dist'),
+    frontendDistPath: path.join(__dirname, '..', 'frontend', 'dist'),
     iconPath: path.join(resourcesPath, 'assets', getIconName()),
   };
 };
@@ -308,7 +306,7 @@ function createWindow() {
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
-          "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:8000 http://localhost:8000 https:; img-src 'self' data: https: blob:; font-src 'self' data:; frame-src 'self';",
+          "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:* http://localhost:* https:; img-src 'self' file: data: http://127.0.0.1:* http://localhost:* https: blob:; media-src 'self' http://127.0.0.1:* http://localhost:* blob:; font-src 'self' data:; frame-src 'self';",
         ],
       },
     });

@@ -30,16 +30,9 @@ module.exports = {
       from: 'frontend/dist',
       to: 'frontend/dist',
     },
-    {
-      from: 'backend/dist',
-      to: 'backend/dist',
-    },
-    {
-      from: 'backend/node_modules',
-      to: 'backend/node_modules',
-    },
-    'backend/package.json',
+    '!node_modules/**/*',
     '!frontend/node_modules/**/*',
+    '!backend/**/*',
     '!**/*.map',
     '!**/*.ts',
     '!**/*.tsx',
@@ -50,15 +43,23 @@ module.exports = {
       from: 'assets',
       to: 'assets',
     },
+    {
+      from: 'backend/dist',
+      to: 'backend/dist',
+    },
+    {
+      from: 'backend/node_modules',
+      to: 'backend/node_modules',
+    },
+    {
+      from: 'backend/package.json',
+      to: 'backend/package.json',
+    },
   ],
 
   asar: true,
-  asarUnpack: [
-    'backend/dist/**',
-    'backend/package.json',
-    'backend/node_modules/**',
-  ],
-  compression: 'store',
+  asarUnpack: [],
+  compression: 'maximum',
   removePackageScripts: true,
   nodeGypRebuild: false,
   buildDependenciesFromSource: false,

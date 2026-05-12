@@ -90,7 +90,7 @@
   display: flex;
   align-items: center;
   min-width: 200px;
-  padding: 0 16px;
+  padding: 0 48px;
 }
 
 .titlebar-search,
@@ -103,6 +103,8 @@
 .titlebar-search-input {
   width: 100% !important;
   min-width: 180px !important;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 .titlebar-search .arco-input-inner-wrapper,

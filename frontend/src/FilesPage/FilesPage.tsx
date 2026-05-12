@@ -60,7 +60,9 @@ const GridFileCard = ({ file, onClick }: { file: FileItemData; onClick?: (f: Fil
             />
           </div>
         ) : (
-          <FileTypeIcon type={file.type} size={48} />
+          <div className="files-grid-card-icon-wrapper">
+            <FileTypeIcon type={file.type} size={48} />
+          </div>
         )}
         <div className="files-grid-card-name-wrapper">
           <Typography.Text className="files-grid-card-name" title={file.name}>

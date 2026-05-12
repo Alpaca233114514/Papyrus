@@ -424,7 +424,7 @@ const TitleBar = ({ onPageChange, onNewNote, onNewCard, onSearchResult }: TitleB
         )}
 
         {/* center search */}
-        <div className="titlebar-center no-drag">
+        <div className="titlebar-center">
           <SearchBox 
             onResultClick={handleSearchResult}
             onNavigateToNote={(noteId) => {
