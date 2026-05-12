@@ -17,13 +17,14 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const inputRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 执行搜索
+  const isOpen = isFocused;
+
   const performSearch = useCallback(async (searchQuery: string) => {
     if (!searchQuery.trim()) {
       setResults([]);
@@ -44,7 +45,6 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
     }
   }, []);
 
-  // 防抖搜索
   const debouncedSearch = useCallback((searchQuery: string) => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -54,25 +54,21 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
     }, 200);
   }, [performSearch]);
 
-  // 输入处理
   const handleInputChange = (value: string) => {
     setQuery(value);
     setSelectedIndex(-1);
     if (value.trim()) {
-      setIsOpen(true);
       debouncedSearch(value);
     } else {
       setResults([]);
-      setIsOpen(false);
     }
   };
 
-  // 点击结果
   const handleResultClick = (result: SearchResult) => {
-    setIsOpen(false);
+    setIsFocused(false);
     setQuery('');
     setResults([]);
-    
+
     if (onResultClick) {
       onResultClick(result);
     } else if (result.type === 'note' && onNavigateToNote) {
@@ -82,13 +78,11 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
     }
   };
 
-  // 键盘导航
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!isOpen) {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         inputRef.current?.focus();
-        setIsOpen(true);
       }
       return;
     }
@@ -96,7 +90,7 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setSelectedIndex(prev => 
+        setSelectedIndex(prev =>
           prev < results.length - 1 ? prev + 1 : prev
         );
         break;
@@ -112,17 +106,16 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
         break;
       case 'Escape':
         e.preventDefault();
-        setIsOpen(false);
+        setIsFocused(false);
         inputRef.current?.blur();
         break;
     }
   };
 
-  // 点击外部关闭
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
+        setIsFocused(false);
       }
     };
 
@@ -132,13 +125,11 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
     };
   }, []);
 
-  // 全局键盘监听
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         inputRef.current?.focus();
-        setIsOpen(true);
       }
     };
 
@@ -148,7 +139,6 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
     };
   }, []);
 
-  // 清理
   useEffect(() => {
     return () => {
       if (searchTimeoutRef.current) {
@@ -157,12 +147,11 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
     };
   }, []);
 
-  // 高亮匹配文本
   const highlightMatch = (text: string, queryStr: string) => {
     if (!queryStr.trim()) return text;
     const regex = new RegExp(`(${queryStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
     const parts = text.split(regex);
-    return parts.map((part, i) => 
+    return parts.map((part, i) =>
       regex.test(part) ? (
         <span key={i} className="tw-bg-primary-light tw-font-medium">
           {part}
@@ -173,7 +162,6 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
     );
   };
 
-  // 获取图标
   const getTypeIcon = (type: string) => {
     if (type === 'note') {
       return <IconFile className="tw-text-base tw-text-arco-text-2" />;
@@ -181,7 +169,6 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
     return <IconBook className="tw-text-base tw-text-arco-text-2" />;
   };
 
-  // 获取匹配字段显示
   const getMatchedFieldLabel = (field: string) => {
     const labels: Record<string, string> = {
       title: '标题',
@@ -203,12 +190,15 @@ const SearchBox = ({ onResultClick, onNavigateToNote, onNavigateToCard }: Search
         value={query}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
-        onFocus={() => {
-          if (query.trim()) {
-            setIsOpen(true);
-          }
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => {
+          setTimeout(() => {
+            if (containerRef.current && !containerRef.current.contains(document.activeElement)) {
+              setIsFocused(false);
+            }
+          }, 150);
         }}
-        
+
         className="titlebar-search-input"
         allowClear
         aria-label={`搜索笔记和卡片，按 ${getShortcutDisplay('search')} 快速聚焦`}

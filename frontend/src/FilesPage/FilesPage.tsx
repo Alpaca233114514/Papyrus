@@ -144,6 +144,7 @@ const FilesPage = () => {
   // 文件夹导航状态
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
   const [folderStack, setFolderStack] = useState<Array<{ id: string | null; name: string }>>([{ id: null, name: '文件库' }]);
+  const [folderNavDirection, setFolderNavDirection] = useState<'forward' | 'backward'>('forward');
 
   // 筛选状态
   const [activeFilter, setActiveFilter] = useState<FilterTag>('全部');
@@ -282,7 +283,7 @@ const FilesPage = () => {
 
   const handleDownloadFile = (file: FileItemData) => {
     if (file.is_folder) {
-      // 点击文件夹：进入该文件夹
+      setFolderNavDirection('forward');
       setCurrentFolder(file.id);
       setFolderStack(prev => [...prev, { id: file.id, name: file.name }]);
       setActiveFilter('全部');
@@ -303,6 +304,7 @@ const FilesPage = () => {
 
   const handleFileClick = useCallback((file: FileItemData) => {
     if (file.is_folder) {
+      setFolderNavDirection('forward');
       setCurrentFolder(file.id);
       setFolderStack(prev => [...prev, { id: file.id, name: file.name }]);
       setActiveFilter('全部');
@@ -315,6 +317,7 @@ const FilesPage = () => {
 
   const handleBreadcrumbClick = (index: number) => {
     const target = folderStack[index];
+    setFolderNavDirection('backward');
     setCurrentFolder(target.id);
     setFolderStack(prev => prev.slice(0, index + 1));
     setActiveFilter('全部');
@@ -383,21 +386,19 @@ const FilesPage = () => {
       extraStatsContent={extraStatsContent}
     >
       {/* 面包屑导航 */}
-      {folderStack.length > 1 && (
-        <div className="files-breadcrumb-wrapper">
-          <Breadcrumb>
-            {folderStack.map((item, index) => (
-              <Breadcrumb.Item
-                key={item.id ?? 'root'}
-                style={{ cursor: index < folderStack.length - 1 ? 'pointer' : 'default' }}
-                onClick={() => index < folderStack.length - 1 && handleBreadcrumbClick(index)}
-              >
-                {item.name}
-              </Breadcrumb.Item>
-            ))}
-          </Breadcrumb>
-        </div>
-      )}
+      <div className="files-breadcrumb-wrapper">
+        <Breadcrumb>
+          {folderStack.map((item, index) => (
+            <Breadcrumb.Item
+              key={item.id ?? 'root'}
+              style={{ cursor: index < folderStack.length - 1 ? 'pointer' : 'default' }}
+              onClick={() => index < folderStack.length - 1 && handleBreadcrumbClick(index)}
+            >
+              {item.name}
+            </Breadcrumb.Item>
+          ))}
+        </Breadcrumb>
+      </div>
 
       {/* 筛选标签 */}
       {!loading && (
@@ -418,21 +419,27 @@ const FilesPage = () => {
       {loading ? (
         <Empty description='加载中...' className="files-empty-padded" />
       ) : currentFiles.length === 0 ? (
-        <Empty description={activeFilter !== '全部' ? '暂无符合条件的文件' : currentFolder ? '该文件夹为空' : '暂无文件'} className="files-empty-padded" />
+        <div key={currentFolder ?? 'root'} className={`files-content-enter files-content-enter-${folderNavDirection}`}>
+          <Empty description={activeFilter !== '全部' ? '暂无符合条件的文件' : currentFolder ? '该文件夹为空' : '暂无文件'} className="files-empty-padded" />
+        </div>
       ) : viewMode === 'grid' ? (
-        <div className="files-grid">
-          {currentFiles.map(file => <GridFileCard key={file.id} file={file} onClick={handleFileClick} />)}
+        <div key={currentFolder ?? 'root'} className={`files-content-enter files-content-enter-${folderNavDirection}`}>
+          <div className="files-grid">
+            {currentFiles.map(file => <GridFileCard key={file.id} file={file} onClick={handleFileClick} />)}
+          </div>
         </div>
       ) : (
-        <div className="files-list-table">
-          <div className="files-list-header">
-            <div className="files-list-header-icon" />
-            <div className="files-list-header-name">名称</div>
-            <div className="files-list-header-size">大小</div>
-            <div className="files-list-header-date">修改时间</div>
-            <div className="files-list-header-actions" />
+        <div key={currentFolder ?? 'root'} className={`files-content-enter files-content-enter-${folderNavDirection}`}>
+          <div className="files-list-table">
+            <div className="files-list-header">
+              <div className="files-list-header-icon" />
+              <div className="files-list-header-name">名称</div>
+              <div className="files-list-header-size">大小</div>
+              <div className="files-list-header-date">修改时间</div>
+              <div className="files-list-header-actions" />
+            </div>
+            {currentFiles.map(file => <ListFileRow key={file.id} file={file} onClick={handleFileClick} onDownload={handleDownloadFile} onDelete={handleDeleteFile} />)}
           </div>
-          {currentFiles.map(file => <ListFileRow key={file.id} file={file} onClick={handleFileClick} onDownload={handleDownloadFile} onDelete={handleDeleteFile} />)}
         </div>
       )}
 

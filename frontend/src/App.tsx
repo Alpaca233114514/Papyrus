@@ -227,26 +227,8 @@ const App = () => {
       if (e.animationName.includes('pageExitUp') || e.animationName.includes('pageExitDown')) {
         setPrevPage(null);
         if (nextPage) {
-          const pageToSet = nextPage;
-          setActivePage(pageToSet);
+          setActivePage(nextPage);
           setNextPage(null);
-
-          // 检查是否有待处理的操作
-          if (pendingActionRef.current) {
-            const action = pendingActionRef.current;
-            const tag = studyTagRef.current;
-            setTimeout(() => {
-              if (action === 'newNote') {
-                window.dispatchEvent(new CustomEvent('papyrus_new_note'));
-              } else if (action === 'newCard') {
-                window.dispatchEvent(new CustomEvent('papyrus_new_card'));
-              } else if (action === 'startStudy') {
-                window.dispatchEvent(new CustomEvent('papyrus_start_study', { detail: { tag } }));
-              }
-              pendingActionRef.current = null;
-              studyTagRef.current = undefined;
-            }, 350); // 确保组件完全挂载
-          }
         }
         setTimeout(() => {
           setIsTransitioning(false);
@@ -254,8 +236,25 @@ const App = () => {
       }
     };
 
-    const handleEnterAnimationEnd = () => {
+    const handleEnterAnimationEnd = (e: React.AnimationEvent) => {
+      if (!e.animationName.includes('pageSlideUp') && !e.animationName.includes('pageSlideDown')) {
+        return;
+      }
       setAnimationDirection(null);
+
+      if (pendingActionRef.current) {
+        const action = pendingActionRef.current;
+        const tag = studyTagRef.current;
+        if (action === 'newNote') {
+          window.dispatchEvent(new CustomEvent('papyrus_new_note'));
+        } else if (action === 'newCard') {
+          window.dispatchEvent(new CustomEvent('papyrus_new_card'));
+        } else if (action === 'startStudy') {
+          window.dispatchEvent(new CustomEvent('papyrus_start_study', { detail: { tag } }));
+        }
+        pendingActionRef.current = null;
+        studyTagRef.current = undefined;
+      }
     };
 
     const isStartExiting = isTransitioning && prevPage === 'start';

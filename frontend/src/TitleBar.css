@@ -91,6 +91,7 @@
   align-items: center;
   min-width: 200px;
   padding: 0 48px;
+  align-self: stretch;
 }
 
 .titlebar-search,

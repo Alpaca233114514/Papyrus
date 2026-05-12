@@ -2,6 +2,43 @@
    FilesPage 样式 - 迁移自内联样式
    ============================================ */
 
+/* 文件夹导航动画 */
+@keyframes files-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes files-slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.files-content-enter {
+  animation-duration: 0.25s;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.files-content-enter-forward {
+  animation-name: files-slide-in-right;
+}
+
+.files-content-enter-backward {
+  animation-name: files-slide-in-left;
+}
+
 /* 网格文件卡片 */
 .files-grid-card {
   border-radius: 16px;

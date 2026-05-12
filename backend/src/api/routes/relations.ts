@@ -89,6 +89,10 @@ export default async function relationsRoutes(fastify: FastifyInstance): Promise
       reply.status(404).send({ success: false, error: '笔记不存在' });
       return;
     }
+    if (noteId === body.target_id) {
+      reply.status(400).send({ success: false, error: '不能将笔记关联到自身' });
+      return;
+    }
     try {
       const relationId = createRelation(
         noteId,
@@ -97,8 +101,14 @@ export default async function relationsRoutes(fastify: FastifyInstance): Promise
         body.description ?? '',
       );
       reply.send({ success: true, relation_id: relationId });
-    } catch {
-      reply.status(409).send({ success: false, error: '关联已存在' });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('UNIQUE constraint failed')) {
+        reply.status(409).send({ success: false, error: '该关联已存在' });
+      } else {
+        request.log.error({ err }, '创建关联失败');
+        reply.status(500).send({ success: false, error: '创建关联失败' });
+      }
     }
   });
 

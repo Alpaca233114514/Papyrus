@@ -20,7 +20,7 @@ import {
   IconArrowLeft,
 } from '@arco-design/web-react/icon';
 import type { RelatedNote, SearchableNote, RelationType } from './types';
-import { BASE } from '../../../api';
+import { BASE, getAuthToken } from '../../../api';
 
 const TabPane = Tabs.TabPane;
 const Option = Select.Option;
@@ -141,9 +141,13 @@ export const RelationsPanel: React.FC<RelationsPanelProps> = ({
     }
 
     try {
+      const token = await getAuthToken();
       const response = await fetch(`${BASE}/notes/${noteId}/relations`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'X-Papyrus-Token': token } : {}),
+        },
         body: JSON.stringify({
           target_id: selectedNote.id,
           relation_type: newRelationType,
@@ -161,7 +165,7 @@ export const RelationsPanel: React.FC<RelationsPanelProps> = ({
         setNewRelationDesc('');
         loadRelations();
       } else {
-        Message.error('关联已存在或创建失败');
+        Message.error(data.error || '关联已存在或创建失败');
       }
     } catch {
       Message.error('关联创建失败');
@@ -173,9 +177,13 @@ export const RelationsPanel: React.FC<RelationsPanelProps> = ({
     if (!editingRelation) return;
 
     try {
+      const token = await getAuthToken();
       const response = await fetch(`${BASE}/relations/${editingRelation.relation_id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'X-Papyrus-Token': token } : {}),
+        },
         body: JSON.stringify({
           relation_type: editRelationType,
           description: editRelationDesc,
@@ -189,7 +197,7 @@ export const RelationsPanel: React.FC<RelationsPanelProps> = ({
         setEditingRelation(null);
         loadRelations();
       } else {
-        Message.error('关联更新失败');
+        Message.error(data.error || '关联更新失败');
       }
     } catch {
       Message.error('关联更新失败');
@@ -203,8 +211,12 @@ export const RelationsPanel: React.FC<RelationsPanelProps> = ({
       content: '确定要删除这个关联吗？',
       onOk: async () => {
         try {
+          const token = await getAuthToken();
           const response = await fetch(`${BASE}/relations/${relationId}`, {
             method: 'DELETE',
+            headers: {
+              ...(token ? { 'X-Papyrus-Token': token } : {}),
+            },
           });
           
           const data = await response.json();
@@ -212,7 +224,7 @@ export const RelationsPanel: React.FC<RelationsPanelProps> = ({
             Message.success('关联已删除');
             loadRelations();
           } else {
-            Message.error('删除失败');
+            Message.error(data.error || '删除失败');
           }
         } catch {
           Message.error('删除失败');

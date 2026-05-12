@@ -99,6 +99,33 @@ function initSchema(database: DatabaseSync): void {
   } catch {
   }
 
+  try {
+    const relationsDef = database.prepare(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='relations'"
+    ).get() as { sql: string } | undefined;
+    if (relationsDef && relationsDef.sql.includes('UNIQUE(source_id, target_id)') && !relationsDef.sql.includes('relation_type')) {
+      database.exec(`
+        CREATE TABLE IF NOT EXISTS relations_new (
+          id TEXT PRIMARY KEY,
+          source_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+          target_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+          relation_type TEXT NOT NULL DEFAULT 'reference',
+          description TEXT DEFAULT '',
+          created_at REAL DEFAULT 0.0,
+          updated_at REAL DEFAULT 0.0,
+          UNIQUE(source_id, target_id, relation_type)
+        );
+        INSERT OR IGNORE INTO relations_new SELECT * FROM relations;
+        DROP TABLE relations;
+        ALTER TABLE relations_new RENAME TO relations;
+        CREATE INDEX IF NOT EXISTS idx_relations_source ON relations(source_id);
+        CREATE INDEX IF NOT EXISTS idx_relations_target ON relations(target_id);
+      `);
+    }
+  } catch (err) {
+    console.error('迁移 relations 表约束失败:', err instanceof Error ? err.message : String(err));
+  }
+
   database.exec(`
     CREATE TABLE IF NOT EXISTS cards (
       id TEXT PRIMARY KEY,
@@ -220,7 +247,7 @@ function initSchema(database: DatabaseSync): void {
       description TEXT DEFAULT '',
       created_at REAL DEFAULT 0.0,
       updated_at REAL DEFAULT 0.0,
-      UNIQUE(source_id, target_id)
+      UNIQUE(source_id, target_id, relation_type)
     );
 
     CREATE INDEX IF NOT EXISTS idx_relations_source ON relations(source_id);
