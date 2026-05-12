@@ -19,7 +19,7 @@ const REQUIRED_FILES = [
 function findAppAsar() {
   const candidates = [];
   function walk(dir, depth) {
-    if (depth > 4) return;
+    if (depth > 6) return;
     let entries;
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -42,7 +42,7 @@ function findAppAsar() {
 function findUnpackedDir() {
   const candidates = [];
   function walk(dir, depth) {
-    if (depth > 4) return;
+    if (depth > 6) return;
     let entries;
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -66,7 +66,7 @@ function findUnpackedDir() {
 function findExtraResourcesDir() {
   const candidates = [];
   function walk(dir, depth) {
-    if (depth > 4) return;
+    if (depth > 5) return;
     let entries;
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -76,7 +76,7 @@ function findExtraResourcesDir() {
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (entry.name === 'resources') {
+        if (entry.name.toLowerCase() === 'resources') {
           const backendDir = path.join(fullPath, 'backend');
           if (fs.existsSync(backendDir)) {
             candidates.push(fullPath);
