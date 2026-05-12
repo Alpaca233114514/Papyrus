@@ -145,18 +145,6 @@ jobs:
             frontend/package-lock.json
             backend/package-lock.json
 
-      - name: Cache node_modules (Root + Frontend + Backend)
-        id: cache-node-modules
-        uses: actions/cache@v5.0.5
-        with:
-          path: |
-            node_modules
-            frontend/node_modules
-            backend/node_modules
-          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json', 'frontend/package-lock.json', 'backend/package-lock.json') }}
-          restore-keys: |
-            nm-${{ runner.os }}-
-
       - name: Cache Electron & Builder Binaries
         uses: actions/cache@v5.0.5
         with:
@@ -168,7 +156,6 @@ jobs:
             eb-${{ runner.os }}-
 
       - name: Install Dependencies
-        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         shell: bash
         run: |
           npm ci --ignore-scripts --no-audit --no-fund --prefer-offline &
@@ -297,6 +284,7 @@ jobs:
           path: ${{ steps.find-artifacts.outputs.exe_path }}
           if-no-files-found: warn
           retention-days: 7
+          archive: false
 
       - name: Upload macOS DMG (Artifact)
         if: matrix.platform == 'macos' && steps.find-artifacts.outputs.dmg_path
@@ -306,6 +294,7 @@ jobs:
           path: ${{ steps.find-artifacts.outputs.dmg_path }}
           if-no-files-found: warn
           retention-days: 7
+          archive: false
 
       - name: Upload Release Asset
         if: needs.prepare-release.outputs.should_release == 'true'
@@ -373,20 +362,7 @@ jobs:
             frontend/package-lock.json
             backend/package-lock.json
 
-      - name: Cache node_modules (Root + Frontend + Backend)
-        id: cache-node-modules
-        uses: actions/cache@v5.0.5
-        with:
-          path: |
-            node_modules
-            frontend/node_modules
-            backend/node_modules
-          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json', 'frontend/package-lock.json', 'backend/package-lock.json') }}
-          restore-keys: |
-            nm-${{ runner.os }}-
-
       - name: Install Dependencies
-        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         shell: bash
         run: |
           npm ci --ignore-scripts --no-audit --no-fund --prefer-offline &

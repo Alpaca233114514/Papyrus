@@ -258,8 +258,7 @@ function devMode() {
   log('Starting frontend...');
   const frontend = spawn('npm', ['run', 'dev:frontend'], {
     cwd: path.join(process.cwd(), 'frontend'),
-    stdio: 'inherit',
-    shell: true
+    stdio: 'inherit'
   });
   
   // Start Node.js backend
@@ -267,7 +266,6 @@ function devMode() {
   const backend = spawn('npm', ['run', 'dev'], {
     cwd: path.join(process.cwd(), 'backend'),
     stdio: 'inherit',
-    shell: true,
     env: process.env
   });
   
@@ -321,7 +319,6 @@ function devMode() {
 
     const electron = spawn(electronPath, ['.'], {
       stdio: 'inherit',
-      shell: true,
       cwd: process.cwd(),
       env: electronEnv
     });

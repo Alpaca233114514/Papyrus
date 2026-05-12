@@ -76,11 +76,9 @@ const LOCALE_MAP: Record<string, typeof zhCN> = {
   'en-US': enUS,
 };
 
-// 动态更新启动屏幕文本
 const updateSplashScreenText = async () => {
   try {
-    const { default: i18n, init } = await import('./i18n');
-    await init;
+    await i18nInit;
     const hintEl = document.querySelector('.splash-screen .hint');
     if (hintEl) {
       hintEl.textContent = i18n.t('settings.splashScreen');
