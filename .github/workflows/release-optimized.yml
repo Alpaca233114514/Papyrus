@@ -155,13 +155,30 @@ jobs:
           restore-keys: |
             eb-${{ runner.os }}-
 
+      - name: Cache Node Modules
+        id: cache-node-modules
+        uses: actions/cache@v5.0.5
+        with:
+          path: |
+            node_modules
+            frontend/node_modules
+            backend/node_modules
+          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json', 'frontend/package-lock.json', 'backend/package-lock.json') }}
+          restore-keys: |
+            nm-${{ runner.os }}-
+
       - name: Install Dependencies
         shell: bash
         run: |
-          npm ci --ignore-scripts --no-audit --no-fund --prefer-offline &
-          (cd frontend && npm ci --ignore-scripts --no-audit --no-fund --prefer-offline) &
-          (cd backend && npm ci --ignore-scripts --no-audit --no-fund --prefer-offline) &
-          wait
+          if [ "${{ steps.cache-node-modules.outputs.cache-hit }}" = "true" ]; then
+            echo "Cache hit - skipping install"
+          else
+            echo "Cache miss - installing dependencies (incremental if partial restore)..."
+            npm install --frozen-lockfile --ignore-scripts --no-audit --no-fund --prefer-offline &
+            (cd frontend && npm install --frozen-lockfile --ignore-scripts --no-audit --no-fund --prefer-offline) &
+            (cd backend && npm install --frozen-lockfile --ignore-scripts --no-audit --no-fund --prefer-offline) &
+            wait
+          fi
 
       - name: Cache Frontend Build
         id: cache-frontend-build
@@ -362,13 +379,30 @@ jobs:
             frontend/package-lock.json
             backend/package-lock.json
 
+      - name: Cache Node Modules
+        id: cache-node-modules
+        uses: actions/cache@v5.0.5
+        with:
+          path: |
+            node_modules
+            frontend/node_modules
+            backend/node_modules
+          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json', 'frontend/package-lock.json', 'backend/package-lock.json') }}
+          restore-keys: |
+            nm-${{ runner.os }}-
+
       - name: Install Dependencies
         shell: bash
         run: |
-          npm ci --ignore-scripts --no-audit --no-fund --prefer-offline &
-          (cd frontend && npm ci --ignore-scripts --no-audit --no-fund --prefer-offline) &
-          (cd backend && npm ci --ignore-scripts --no-audit --no-fund --prefer-offline) &
-          wait
+          if [ "${{ steps.cache-node-modules.outputs.cache-hit }}" = "true" ]; then
+            echo "Cache hit - skipping install"
+          else
+            echo "Cache miss - installing dependencies (incremental if partial restore)..."
+            npm install --frozen-lockfile --ignore-scripts --no-audit --no-fund --prefer-offline &
+            (cd frontend && npm install --frozen-lockfile --ignore-scripts --no-audit --no-fund --prefer-offline) &
+            (cd backend && npm install --frozen-lockfile --ignore-scripts --no-audit --no-fund --prefer-offline) &
+            wait
+          fi
 
       - name: Run Typechecks (Parallel)
         shell: bash
