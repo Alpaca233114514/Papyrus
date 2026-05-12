@@ -1606,20 +1606,21 @@ export function runInTransaction<T>(fn: () => T): T {
 }
 
 export function clearAllData(): void {
+  runInTransaction(() => {
+    const database = getDb();
+    database.exec('DELETE FROM cards;');
+    database.exec('DELETE FROM card_versions;');
+    database.exec('DELETE FROM notes;');
+    database.exec('DELETE FROM note_versions;');
+    database.exec('DELETE FROM relations;');
+    database.exec('DELETE FROM files;');
+    database.exec('DELETE FROM chat_messages;');
+    database.exec('DELETE FROM chat_sessions;');
+    database.exec('DELETE FROM provider_models;');
+    database.exec('DELETE FROM api_keys;');
+    database.exec('DELETE FROM providers;');
+  });
   const database = getDb();
-  database.exec('DELETE FROM cards;');
-  database.exec('DELETE FROM card_versions;');
-  database.exec('DELETE FROM notes;');
-  database.exec('DELETE FROM note_versions;');
-  database.exec('DELETE FROM relations;');
-  database.exec('DELETE FROM files;');
-  database.exec('DELETE FROM chat_messages;');
-  database.exec('DELETE FROM chat_sessions;');
-  database.exec('DELETE FROM provider_models;');
-  database.exec('DELETE FROM api_keys;');
-  database.exec('DELETE FROM providers;');
-  
-  // 重新初始化默认的供应商和模型配置
   seedDefaults(database);
 }
 
