@@ -353,7 +353,6 @@ jobs:
         with:
           tag_name: ${{ needs.prepare-release.outputs.tag_name }}
           body_path: RELEASE_NOTES.md
-          generate_release_notes: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
