@@ -4,7 +4,7 @@ import path from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
 import { paths } from '../../utils/paths.js';
 import {
-  loadAllCards, saveAllCards, insertCard, runInTransaction,
+  loadAllCards, saveAllCards, insertCard, checkpointDb, runInTransaction,
   loadAllNotes, saveAllNotes, insertNote,
   clearAllData, createDbSnapshot,
 } from '../../db/database.js';

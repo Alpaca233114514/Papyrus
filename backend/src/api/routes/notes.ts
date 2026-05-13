@@ -42,7 +42,7 @@ export default async function notesRoutes(fastify: FastifyInstance): Promise<voi
     try {
       const { noteId } = request.params as { noteId: string };
       const body = request.body as { title?: string; folder?: string; content?: string; tags?: string[] };
-      const note = updateNote(noteId, body);
+      const note = await updateNote(noteId, body);
       if (!note) {
         reply.status(404).send({ success: false, error: 'Note not found' });
         return;

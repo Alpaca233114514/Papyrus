@@ -101,7 +101,7 @@ export default async function mcpRoutes(fastify: FastifyInstance): Promise<void>
       const { noteId } = request.params as { noteId: string };
       const payload = request.body as Partial<Pick<Note, 'title' | 'folder' | 'content' | 'tags'>>;
 
-      const updated = updateNote(noteId, payload);
+      const updated = await updateNote(noteId, payload);
       if (!updated) {
         reply.status(404).send({ success: false, note: null, error: 'note not found' });
         return;
