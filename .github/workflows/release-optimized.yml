@@ -117,6 +117,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     needs: [prepare-release]
+    permissions:
+      contents: write
 
     strategy:
       fail-fast: false
