@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Button, Spin, Message, Slider } from '@arco-design/web-react';
 import { IconZoomIn, IconZoomOut, IconRefresh } from '@arco-design/web-react/icon';
 import type { GraphNode, GraphLink, RelationType } from './types';
+import { BASE, getAuthToken } from '../../../api';
 
 interface RelationGraphProps {
   noteId: string;
@@ -54,10 +55,14 @@ export const RelationGraph: React.FC<RelationGraphProps> = ({
   const loadGraphData = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/notes/${noteId}/graph?depth=${currentDepth}`);
+      const token = await getAuthToken();
+      const response = await fetch(`${BASE}/notes/${noteId}/graph?depth=${currentDepth}`, {
+        headers: {
+          ...(token ? { 'X-Papyrus-Token': token } : {}),
+        },
+      });
       const result = await response.json();
       if (result.success) {
-        // 初始化节点位置（圆形布局）
         const nodes = result.nodes.map((n: GraphNode, i: number) => {
           const angle = (i / Math.max(result.nodes.length, 1)) * Math.PI * 2;
           const radius = n.is_center ? 0 : 150;
@@ -73,6 +78,8 @@ export const RelationGraph: React.FC<RelationGraphProps> = ({
         setData({ nodes: result.nodes, links: result.links });
         simulationRef.current = { nodes, links: result.links, animationId: null };
         startSimulation();
+      } else {
+        Message.error(result.error || '加载图谱失败');
       }
     } catch {
       Message.error('加载图谱失败');

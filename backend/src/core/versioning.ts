@@ -59,7 +59,7 @@ export function rollbackNote(noteId: string, versionId: string, logger?: Papyrus
     hash: targetVersion.hash,
     headings: targetVersion.headings,
     outgoing_links: targetVersion.outgoing_links,
-    incoming_count: targetVersion.incoming_count,
+    incoming_count: currentNote.incoming_count,
   };
   dbUpdateNote(rolledBackNote, logger);
   logger?.info(`回滚笔记: ${noteId} -> ${versionId}`);

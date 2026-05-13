@@ -1,21 +1,6 @@
 import type { FastifyInstance } from 'fastify';
-import { DatabaseSync } from 'node:sqlite';
-import { paths } from '../../utils/paths.js';
-import { recordCardCreated, recordCardReviewed, recordNoteCreated } from '../../core/progress.js';
-
-function getProgressDb(): DatabaseSync {
-  const db = new DatabaseSync(paths.dbFile);
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS daily_progress (
-      date TEXT PRIMARY KEY,
-      cards_created INTEGER DEFAULT 0,
-      cards_reviewed INTEGER DEFAULT 0,
-      notes_created INTEGER DEFAULT 0,
-      study_minutes INTEGER DEFAULT 0
-    )
-  `);
-  return db;
-}
+import { getDb } from '../../db/database.js';
+import { recordCardReviewed } from '../../core/progress.js';
 
 function getToday(): string {
   return new Date().toISOString().slice(0, 10);
@@ -24,12 +9,11 @@ function getToday(): string {
 export default async function progressRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get('/streak', async (request, reply) => {
     try {
-      const db = getProgressDb();
+      const db = getDb();
       const today = getToday();
 
       const stmt = db.prepare('SELECT * FROM daily_progress ORDER BY date DESC');
       const rows = stmt.all() as Array<{ date: string; cards_reviewed: number }>;
-      db.close();
 
       const todayRow = rows.find(r => r.date === today);
       const todayCompleted = (todayRow?.cards_reviewed ?? 0) > 0;
@@ -85,7 +69,7 @@ export default async function progressRoutes(fastify: FastifyInstance): Promise<
       const { days = '30' } = request.query as { days?: string };
       const parsedDays = parseInt(days, 10);
       const numDays = Number.isFinite(parsedDays) && parsedDays > 0 ? parsedDays : 30;
-      const db = getProgressDb();
+      const db = getDb();
       const stmt = db.prepare('SELECT * FROM daily_progress ORDER BY date DESC LIMIT ?');
       const rows = stmt.all(numDays) as Array<{
         date: string;
@@ -94,7 +78,6 @@ export default async function progressRoutes(fastify: FastifyInstance): Promise<
         notes_created: number;
         study_minutes: number;
       }>;
-      db.close();
 
       reply.send({
         success: true,
@@ -119,10 +102,9 @@ export default async function progressRoutes(fastify: FastifyInstance): Promise<
       const { days = '365' } = request.query as { days?: string };
       const parsedDays = parseInt(days, 10);
       const numDays = Number.isFinite(parsedDays) && parsedDays > 0 ? parsedDays : 365;
-      const db = getProgressDb();
+      const db = getDb();
       const stmt = db.prepare('SELECT * FROM daily_progress ORDER BY date DESC LIMIT ?');
       const rows = stmt.all(numDays) as Array<{ date: string; cards_reviewed: number }>;
-      db.close();
 
       const data = rows.map(r => {
         const count = r.cards_reviewed;

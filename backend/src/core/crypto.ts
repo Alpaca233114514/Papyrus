@@ -134,7 +134,8 @@ export function decryptApiKey(encryptedKey: string): string {
 
     const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
     return decrypted.toString('utf8');
-  } catch {
+  } catch (err) {
+    console.error('[CRYPTO] API key decryption failed:', err instanceof Error ? err.message : String(err));
     return '';
   }
 }

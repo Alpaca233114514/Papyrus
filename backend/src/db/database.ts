@@ -304,12 +304,15 @@ function initSchema(database: DatabaseSync): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_extensions_enabled ON extensions(is_enabled);
-  `);
 
-  const providerCount = (database.prepare('SELECT COUNT(*) as c FROM providers').get() as { c: number }).c;
-  if (providerCount === 0) {
-    seedDefaults(database);
-  }
+    CREATE TABLE IF NOT EXISTS daily_progress (
+      date TEXT PRIMARY KEY,
+      cards_created INTEGER DEFAULT 0,
+      cards_reviewed INTEGER DEFAULT 0,
+      notes_created INTEGER DEFAULT 0,
+      study_minutes INTEGER DEFAULT 0
+    );
+  `);
 
   seedDefaults(database);
 
@@ -727,11 +730,25 @@ export function deleteNoteById(noteId: string, logger?: PapyrusLogger): boolean 
 export function deleteNotesByIds(noteIds: string[], logger?: PapyrusLogger): number {
   if (noteIds.length === 0) return 0;
   const database = getDb();
-  const placeholders = noteIds.map(() => '?').join(',');
-  const stmt = database.prepare(`DELETE FROM notes WHERE id IN (${placeholders})`);
-  const result = stmt.run(...noteIds);
-  logger?.info(`批量删除 ${result.changes} 条笔记`);
-  return Number(result.changes);
+  database.exec('BEGIN TRANSACTION;');
+  try {
+    // Update incoming_count for notes referenced by the deleted notes
+    for (const noteId of noteIds) {
+      const updateStmt = database.prepare(
+        'UPDATE notes SET incoming_count = incoming_count - 1 WHERE id IN (SELECT target_id FROM relations WHERE source_id = ?)'
+      );
+      updateStmt.run(noteId);
+    }
+    const placeholders = noteIds.map(() => '?').join(',');
+    const stmt = database.prepare(`DELETE FROM notes WHERE id IN (${placeholders})`);
+    const result = stmt.run(...noteIds);
+    database.exec('COMMIT;');
+    logger?.info(`批量删除 ${result.changes} 条笔记`);
+    return Number(result.changes);
+  } catch (e) {
+    database.exec('ROLLBACK;');
+    throw e;
+  }
 }
 
 export function getNoteById(noteId: string): Note | null {
@@ -1401,6 +1418,8 @@ export interface RelationRecord {
   description: string;
   created_at: number;
   updated_at: number;
+  title?: string;
+  folder?: string;
 }
 
 export function loadRelationsForNote(noteId: string): { outgoing: RelationRecord[]; incoming: RelationRecord[] } {
@@ -1443,6 +1462,8 @@ export function loadRelationsForNote(noteId: string): { outgoing: RelationRecord
       description: r.description,
       created_at: r.created_at,
       updated_at: r.updated_at,
+      title: r.target_title,
+      folder: r.target_folder,
     })),
     incoming: incomingRows.map(r => ({
       id: r.id,
@@ -1452,6 +1473,8 @@ export function loadRelationsForNote(noteId: string): { outgoing: RelationRecord
       description: r.description,
       created_at: r.created_at,
       updated_at: r.updated_at,
+      title: r.source_title,
+      folder: r.source_folder,
     })),
   };
 }
@@ -1512,15 +1535,15 @@ export function searchNotesForRelation(query: string, excludeNoteId: string, lim
   return rows.map(noteFromRow);
 }
 
-export function getGraphData(noteId: string, depth: number): { nodes: Array<{ id: string; title: string; is_center: boolean }>; links: Array<{ source: string; target: string; type: string }> } {
+export function getGraphData(noteId: string, depth: number): { nodes: Array<{ id: string; title: string; folder: string; is_center: boolean }>; links: Array<{ source: string; target: string; type: string }> } {
   const database = getDb();
-  const nodeSet = new Map<string, { id: string; title: string; is_center: boolean }>();
+  const nodeSet = new Map<string, { id: string; title: string; folder: string; is_center: boolean }>();
   const linkSet = new Set<string>();
   const links: Array<{ source: string; target: string; type: string }> = [];
 
-  function addNode(id: string, title: string, isCenter: boolean) {
+  function addNode(id: string, title: string, folder: string, isCenter: boolean) {
     if (!nodeSet.has(id)) {
-      nodeSet.set(id, { id, title, is_center: isCenter });
+      nodeSet.set(id, { id, title, folder, is_center: isCenter });
     }
   }
 
@@ -1532,14 +1555,12 @@ export function getGraphData(noteId: string, depth: number): { nodes: Array<{ id
     }
   }
 
-  // 获取中心笔记
-  const centerStmt = database.prepare('SELECT id, title FROM notes WHERE id = ?');
-  const centerRow = centerStmt.get(noteId) as { id: string; title: string } | undefined;
+  const centerStmt = database.prepare('SELECT id, title, folder FROM notes WHERE id = ?');
+  const centerRow = centerStmt.get(noteId) as { id: string; title: string; folder: string } | undefined;
   if (centerRow) {
-    addNode(centerRow.id, centerRow.title, true);
+    addNode(centerRow.id, centerRow.title, centerRow.folder, true);
   }
 
-  // BFS 获取关联笔记
   let currentDepth = 0;
   let currentIds = [noteId];
 
@@ -1548,31 +1569,31 @@ export function getGraphData(noteId: string, depth: number): { nodes: Array<{ id
     const placeholders = currentIds.map(() => '?').join(',');
 
     const outgoingStmt = database.prepare(`
-      SELECT r.source_id, r.target_id, r.relation_type, n.title as target_title
+      SELECT r.source_id, r.target_id, r.relation_type, n.title as target_title, n.folder as target_folder
       FROM relations r
       JOIN notes n ON r.target_id = n.id
       WHERE r.source_id IN (${placeholders})
     `);
-    const outgoingRows = outgoingStmt.all(...currentIds) as Array<{ source_id: string; target_id: string; relation_type: string; target_title: string }>;
+    const outgoingRows = outgoingStmt.all(...currentIds) as Array<{ source_id: string; target_id: string; relation_type: string; target_title: string; target_folder: string }>;
     for (const row of outgoingRows) {
-      addNode(row.target_id, row.target_title, false);
+      addNode(row.target_id, row.target_title, row.target_folder, false);
       addLink(row.source_id, row.target_id, row.relation_type);
-      if (!nodeSet.has(row.target_id) || currentDepth + 1 < depth) {
+      if (currentDepth + 1 < depth) {
         nextIds.push(row.target_id);
       }
     }
 
     const incomingStmt = database.prepare(`
-      SELECT r.source_id, r.target_id, r.relation_type, n.title as source_title
+      SELECT r.source_id, r.target_id, r.relation_type, n.title as source_title, n.folder as source_folder
       FROM relations r
       JOIN notes n ON r.source_id = n.id
       WHERE r.target_id IN (${placeholders})
     `);
-    const incomingRows = incomingStmt.all(...currentIds) as Array<{ source_id: string; target_id: string; relation_type: string; source_title: string }>;
+    const incomingRows = incomingStmt.all(...currentIds) as Array<{ source_id: string; target_id: string; relation_type: string; source_title: string; source_folder: string }>;
     for (const row of incomingRows) {
-      addNode(row.source_id, row.source_title, false);
+      addNode(row.source_id, row.source_title, row.source_folder, false);
       addLink(row.source_id, row.target_id, row.relation_type);
-      if (!nodeSet.has(row.source_id) || currentDepth + 1 < depth) {
+      if (currentDepth + 1 < depth) {
         nextIds.push(row.source_id);
       }
     }

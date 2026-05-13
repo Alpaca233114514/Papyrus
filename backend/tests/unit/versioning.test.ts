@@ -79,10 +79,10 @@ describe('Versioning', () => {
   });
 
   describe('getNoteHistory', () => {
-    it('should return versions in descending order', () => {
+    it('should return versions in descending order', async () => {
       const note = createNote('Title', 'v1');
-      updateNote(note.id, { content: 'v2' });
-      updateNote(note.id, { content: 'v3' });
+      await updateNote(note.id, { content: 'v2' });
+      await updateNote(note.id, { content: 'v3' });
 
       const history = getNoteHistory(note.id);
       expect(history.length).toBe(2);
@@ -100,9 +100,9 @@ describe('Versioning', () => {
   });
 
   describe('rollbackNote', () => {
-    it('should roll back note to a previous version', () => {
+    it('should roll back note to a previous version', async () => {
       const note = createNote('Title', 'Original');
-      updateNote(note.id, { content: 'Modified' });
+      await updateNote(note.id, { content: 'Modified' });
 
       const history = getNoteHistory(note.id);
       // @ts-expect-error - checked length above
@@ -117,9 +117,9 @@ describe('Versioning', () => {
       expect(current).toMatchObject({ content: 'Original' });
     });
 
-    it('should create a new version when rolling back', () => {
+    it('should create a new version when rolling back', async () => {
       const note = createNote('Title', 'Original');
-      updateNote(note.id, { content: 'Modified' });
+      await updateNote(note.id, { content: 'Modified' });
 
       const historyBefore = getNoteHistory(note.id);
       expect(historyBefore.length).toBe(1);
@@ -141,10 +141,10 @@ describe('Versioning', () => {
       expect(result).toBeNull();
     });
 
-    it('should return null for version belonging to different note', () => {
+    it('should return null for version belonging to different note', async () => {
       const noteA = createNote('A', 'content A');
       const noteB = createNote('B', 'content B');
-      updateNote(noteA.id, { content: 'modified A' });
+      await updateNote(noteA.id, { content: 'modified A' });
 
       const historyA = getNoteHistory(noteA.id);
       // @ts-expect-error - checked length above
@@ -256,9 +256,9 @@ describe('Versioning', () => {
   });
 
   describe('updateNote integration', () => {
-    it('should auto-save version before updating', () => {
+    it('should auto-save version before updating', async () => {
       const note = createNote('Title', 'Original');
-      updateNote(note.id, { content: 'Updated' });
+      await updateNote(note.id, { content: 'Updated' });
 
       const history = getNoteHistory(note.id);
       expect(history.length).toBe(1);

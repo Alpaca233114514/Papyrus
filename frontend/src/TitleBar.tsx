@@ -3,11 +3,12 @@ import { IconMinus, IconExpand, IconClose, IconUser, IconUpload, IconRefresh } f
 import './TitleBar.css';
 import { api, type SearchResult } from './api';
 import type { UserProfile } from './types/common';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import SearchBox from './SearchBox';
 import { useShortcuts } from './hooks/useShortcuts';
 import { saveUserProfile, loadUserProfile } from './SettingsPage/views/ChatView/utils';
+import { getRecentItems, clearRecentItems, type RecentItem } from './utils/recentFiles';
 
 // 快捷键提示组件 - 使用 Tailwind
 const Shortcut = ({ keys }: { keys: string }) => (
@@ -17,7 +18,7 @@ const Shortcut = ({ keys }: { keys: string }) => (
 );
 
 interface TitleBarProps {
-  onPageChange?: (page: string) => void;
+  onPageChange?: (page: string, noteId?: string) => void;
   onNewNote?: () => void;
   onNewCard?: () => void;
   onSearchResult?: (result: SearchResult) => void;
@@ -32,8 +33,13 @@ const TitleBar = ({ onPageChange, onNewNote, onNewCard, onSearchResult }: TitleB
   const [tempUserId, setTempUserId] = useState('');
   const [tempAvatarUrl, setTempAvatarUrl] = useState<string | null>(null);
   const [isMacos, setIsMacos] = useState(false);
+  const [recentItems, setRecentItems] = useState<RecentItem[]>(() => getRecentItems());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { getShortcutDisplay } = useShortcuts();
+
+  const refreshRecentItems = useCallback(() => {
+    setRecentItems(getRecentItems());
+  }, []);
 
   useEffect(() => {
     const handleProfileChanged = () => {
@@ -46,6 +52,13 @@ const TitleBar = ({ onPageChange, onNewNote, onNewCard, onSearchResult }: TitleB
       window.removeEventListener('storage', handleProfileChanged);
     };
   }, []);
+
+  useEffect(() => {
+    window.addEventListener('papyrus_recent_files_changed', refreshRecentItems);
+    return () => {
+      window.removeEventListener('papyrus_recent_files_changed', refreshRecentItems);
+    };
+  }, [refreshRecentItems]);
 
   useEffect(() => {
     const checkPlatform = async () => {
@@ -172,6 +185,20 @@ const TitleBar = ({ onPageChange, onNewNote, onNewCard, onSearchResult }: TitleB
     }
   };
 
+  const handleOpenRecentItem = (item: RecentItem) => {
+    if (item.type === 'note') {
+      onPageChange?.('notes', item.id);
+    } else if (item.type === 'card') {
+      onPageChange?.('scroll');
+    } else if (item.type === 'file') {
+      onPageChange?.('files');
+    }
+  };
+
+  const handleClearRecentFiles = () => {
+    clearRecentItems();
+  };
+
   // 导入功能
   const handleImportTxt = () => {
     setImportModalVisible(true);
@@ -272,7 +299,26 @@ const TitleBar = ({ onPageChange, onNewNote, onNewCard, onSearchResult }: TitleB
           </span>
         </Menu.Item>
         <Menu.SubMenu key="recent" title={t('titleBar.recentFiles')} style={{ width: 260 }}>
-          <Menu.Item key="recent-empty" disabled style={{ width: 260 }}>{t('titleBar.noRecentFiles')}</Menu.Item>
+          {recentItems.length === 0 ? (
+            <Menu.Item key="recent-empty" disabled style={{ width: 260 }}>{t('titleBar.noRecentFiles')}</Menu.Item>
+          ) : (
+            <>
+              {recentItems.map(item => (
+                <Menu.Item key={`recent-${item.type}-${item.id}`} onClick={() => handleOpenRecentItem(item)} style={{ width: 260 }}>
+                  <span className="tw-flex tw-items-center tw-w-full tw-truncate" title={item.title}>
+                    <span className="tw-text-xs tw-text-arco-text-3 tw-mr-2 tw-flex-shrink-0">
+                      {item.type === 'note' ? t('titleBar.recentTypeNote') : item.type === 'card' ? t('titleBar.recentTypeCard') : t('titleBar.recentTypeFile')}
+                    </span>
+                    <span className="tw-truncate">{item.title}</span>
+                  </span>
+                </Menu.Item>
+              ))}
+              <Divider style={{ margin: '4px 0' }} />
+              <Menu.Item key="recent-clear" onClick={handleClearRecentFiles} style={{ width: 260 }}>
+                <span className="tw-text-xs tw-text-arco-text-3">{t('titleBar.clearRecentFiles')}</span>
+              </Menu.Item>
+            </>
+          )}
         </Menu.SubMenu>
       </Menu.SubMenu>
       
@@ -428,8 +474,7 @@ const TitleBar = ({ onPageChange, onNewNote, onNewCard, onSearchResult }: TitleB
           <SearchBox 
             onResultClick={handleSearchResult}
             onNavigateToNote={(noteId) => {
-              onPageChange?.('notes');
-              // 可以扩展为直接导航到特定笔记
+              onPageChange?.('notes', noteId);
             }}
             onNavigateToCard={() => onPageChange?.('scroll')}
           />

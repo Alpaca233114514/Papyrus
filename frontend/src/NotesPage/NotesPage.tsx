@@ -6,13 +6,19 @@ import { NoteDetailView } from './views/NoteDetailView';
 import { FileTree } from './components/FileTree';
 import { useNotes } from './useNotes';
 import { PRIMARY_COLOR } from '../theme-constants';
+import { addRecentItem } from '../utils/recentFiles';
 
 import type { Note } from './types';
 
 type ViewMode = 'list' | 'detail';
 type AnimationDirection = 'in' | 'out';
 
-const NotesPage = () => {
+type NotesPageProps = {
+  initialNoteId?: string;
+  onInitialNoteIdUsed?: () => void;
+};
+
+const NotesPage = ({ initialNoteId, onInitialNoteIdUsed }: NotesPageProps) => {
   const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
@@ -45,11 +51,23 @@ const NotesPage = () => {
   );
 
   const handleNoteClick = useCallback((note: Note) => {
+    addRecentItem({ id: note.id, type: 'note', title: note.title });
     setAnimationDirection('in');
     setSelectedNote(note);
     setIsCreateMode(false);
     setViewMode('detail');
   }, []);
+
+  useEffect(() => {
+    if (initialNoteId && !isLoading && notes.length > 0) {
+      const note = notes.find(n => n.id === initialNoteId);
+      if (note) {
+        handleNoteClick(note);
+        onInitialNoteIdUsed?.();
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialNoteId, isLoading, notes]);
 
   const handleCreateClick = useCallback(() => {
     setAnimationDirection('in');

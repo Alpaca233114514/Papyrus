@@ -28,11 +28,11 @@ describe('AI Tools Integration Tests', () => {
   });
 
   describe('Tool Registry', () => {
-    it('should include all 21 tools in registry', () => {
+    it('should include all 20 tools in registry', () => {
       const pt = new PapyrusTools();
       const defs = pt.getToolsForOpenAI();
       const names = defs.map(d => d.function.name);
-      expect(names.length).toBe(21);
+      expect(names.length).toBe(20);
       expect(names).toContain('create_card');
       expect(names).toContain('search_notes');
       expect(names).toContain('create_relation');

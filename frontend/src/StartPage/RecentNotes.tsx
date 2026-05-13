@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, type Note } from '../api';
 import { useCommonCardStyle, CommonCard, CardGroup, PRIMARY_COLOR } from '../components';
+import { addRecentItem } from '../utils/recentFiles';
 
 interface NoteCardProps {
   note: {
@@ -135,7 +136,10 @@ const RecentNotes = ({ height, onNavigate }: RecentNotesProps) => {
             preview: n.preview,
             lastUsed: formatTimestamp(n.updated_at, t),
           }}
-          onClick={() => onNavigate?.(n.id)}
+          onClick={() => {
+            addRecentItem({ id: n.id, type: 'note', title: n.title });
+            onNavigate?.(n.id);
+          }}
         />
       ))}
     </CardGroup>

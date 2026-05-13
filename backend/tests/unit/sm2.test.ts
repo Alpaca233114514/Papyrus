@@ -19,6 +19,15 @@ describe('SM-2 Algorithm', () => {
     expect(card.ef).toBeGreaterThanOrEqual(1.3);
   });
 
+  it('should treat grade 2 (vague) as pass, not reset', () => {
+    const card: CardState = { ef: 2.5, repetitions: 5, interval: 86400 };
+    const result = applySm2(card, 2, 1000);
+
+    expect(card.repetitions).toBe(6);
+    expect(result.intervalDays).toBeGreaterThan(1);
+    expect(card.ef).toBeGreaterThanOrEqual(1.3);
+  });
+
   it('should set 6 day interval on second successful review (grade 3)', () => {
     const card: CardState = { ef: 2.5, repetitions: 1 };
     const result = applySm2(card, 3, 1000);

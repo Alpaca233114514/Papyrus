@@ -14,7 +14,7 @@ export function applySm2(card: CardState, grade: number, now?: number): { interv
   const repRaw = card.repetitions;
   let repetitions = typeof repRaw === 'number' ? Math.floor(repRaw) : 0;
 
-  const qualityMap: Record<number, number> = { 0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 };
+  const qualityMap: Record<number, number> = { 1: 1, 2: 3, 3: 5 };
   const quality = qualityMap[grade] ?? 3;
 
   let intervalDays: number;

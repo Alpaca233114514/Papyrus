@@ -1,10 +1,11 @@
 import {
   createNote,
-  updateNote,
   deleteNote,
   searchNotes,
   getNoteById,
 } from '../../core/notes.js';
+import { getNoteById as dbGetNote, updateNote as dbUpdateNote } from '../../db/database.js';
+import { saveNoteVersion } from '../../core/versioning.js';
 import type { ToolDescriptor, ToolResult } from './types.js';
 import { requireString, optionalString, requireId, isErr } from './types.js';
 
@@ -86,8 +87,14 @@ export const NOTE_TOOLS: ToolDescriptor[] = [
       if (folder !== undefined) updates.folder = folder;
       if (Array.isArray(params.tags)) updates.tags = params.tags.map(t => String(t)).slice(0, 50);
 
-      const note = updateNote(noteId, updates, ctx.logger ?? undefined);
+      const note = dbGetNote(noteId);
       if (!note) return { success: false, error: '笔记不存在' };
+      saveNoteVersion(note, ctx.logger ?? undefined);
+      if (updates.title !== undefined) note.title = updates.title;
+      if (updates.content !== undefined) note.content = updates.content;
+      if (updates.folder !== undefined) note.folder = updates.folder;
+      if (updates.tags !== undefined) note.tags = updates.tags;
+      dbUpdateNote(note, ctx.logger ?? undefined);
       return {
         success: true,
         message: '笔记已更新',

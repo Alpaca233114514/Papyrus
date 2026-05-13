@@ -13,6 +13,7 @@ import {
 } from '../db/database.js';
 import { saveCardVersion } from './versioning.js';
 import { applySm2 } from './sm2.js';
+import { recordCardCreated } from './progress.js';
 import type { CardRecord } from './types.js';
 import type { PapyrusLogger } from '../utils/logger.js';
 
@@ -40,6 +41,7 @@ export function createCard(
   };
 
   dbInsertCard(card, logger);
+  recordCardCreated();
   logger?.info(`创建卡片: ${card.id}`);
   return card;
 }

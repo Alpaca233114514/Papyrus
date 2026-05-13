@@ -118,25 +118,27 @@ describe('CardTools', () => {
   });
 
   it('should update a card', () => {
-    tools.executeTool('create_card', { question: 'Old Q', answer: 'Old A' });
-    const result = tools.executeTool('update_card', { card_index: 0, question: 'New Q', answer: 'New A' });
+    const createResult = tools.executeTool('create_card', { question: 'Old Q', answer: 'Old A' });
+    const cardId = (createResult as Record<string, unknown>).card as Record<string, string>;
+    const result = tools.executeTool('update_card', { card_id: cardId.id, question: 'New Q', answer: 'New A' });
     expect(result.success).toBe(true);
     expect(result.new?.q).toBe('New Q');
   });
 
-  it('should reject invalid card index for update', () => {
-    const result = tools.executeTool('update_card', { card_index: 999, question: 'Q' });
+  it('should reject update with non-existent card_id', () => {
+    const result = tools.executeTool('update_card', { card_id: 'nonexistent', question: 'Q' });
     expect(result.success).toBe(false);
   });
 
   it('should delete a card', () => {
-    tools.executeTool('create_card', { question: 'Del', answer: 'A' });
-    const result = tools.executeTool('delete_card', { card_index: 0 });
+    const createResult = tools.executeTool('create_card', { question: 'Del', answer: 'A' });
+    const cardId = (createResult as Record<string, unknown>).card as Record<string, string>;
+    const result = tools.executeTool('delete_card', { card_id: cardId.id });
     expect(result.success).toBe(true);
   });
 
-  it('should reject invalid card index for delete', () => {
-    const result = tools.executeTool('delete_card', { card_index: 999 });
+  it('should reject delete with non-existent card_id', () => {
+    const result = tools.executeTool('delete_card', { card_id: 'nonexistent' });
     expect(result.success).toBe(false);
   });
 
@@ -151,24 +153,26 @@ describe('CardTools', () => {
   });
 
   it('should execute update_card via executeTool', () => {
-    tools.executeTool('create_card', { question: 'Q', answer: 'A' });
-    const result = tools.executeTool('update_card', { card_index: 0, question: 'New' });
+    const createResult = tools.executeTool('create_card', { question: 'Q', answer: 'A' });
+    const cardId = (createResult as Record<string, unknown>).card as Record<string, string>;
+    const result = tools.executeTool('update_card', { card_id: cardId.id, question: 'New' });
     expect(result.success).toBe(true);
   });
 
-  it('should reject update_card with invalid index type', () => {
-    const result = tools.executeTool('update_card', { card_index: 'zero' });
+  it('should reject update_card with invalid card_id type', () => {
+    const result = tools.executeTool('update_card', { card_id: 123 });
     expect(result.success).toBe(false);
   });
 
   it('should execute delete_card via executeTool', () => {
-    tools.executeTool('create_card', { question: 'Q', answer: 'A' });
-    const result = tools.executeTool('delete_card', { card_index: 0 });
+    const createResult = tools.executeTool('create_card', { question: 'Q', answer: 'A' });
+    const cardId = (createResult as Record<string, unknown>).card as Record<string, string>;
+    const result = tools.executeTool('delete_card', { card_id: cardId.id });
     expect(result.success).toBe(true);
   });
 
-  it('should reject delete_card with invalid index type', () => {
-    const result = tools.executeTool('delete_card', { card_index: 'zero' });
+  it('should reject delete_card with invalid card_id type', () => {
+    const result = tools.executeTool('delete_card', { card_id: 123 });
     expect(result.success).toBe(false);
   });
 
@@ -180,17 +184,6 @@ describe('CardTools', () => {
 
   it('should reject search_cards with non-string keyword', () => {
     const result = tools.executeTool('search_cards', { keyword: 123 });
-    expect(result.success).toBe(false);
-  });
-
-  it('should execute generate_practice_set via executeTool', () => {
-    const result = tools.executeTool('generate_practice_set', { topic: 'Math', count: 3 });
-    expect(result.success).toBe(false);
-    expect(result.error).toBeTruthy();
-  });
-
-  it('should reject generate_practice_set with non-string topic', () => {
-    const result = tools.executeTool('generate_practice_set', { topic: 123 });
     expect(result.success).toBe(false);
   });
 
@@ -281,9 +274,9 @@ describe('getToolsForOpenAI', () => {
     tools = new toolsModule.CardTools();
   });
 
-  it('should return 21 tool definitions (6 original + 15 new)', () => {
+  it('should return 20 tool definitions (6 original + 14 new)', () => {
     const schema = tools.getToolsForOpenAI();
-    expect(schema.length).toBe(21);
+    expect(schema.length).toBe(20);
   });
 
   it('should have correct structure for each tool', () => {
@@ -296,7 +289,7 @@ describe('getToolsForOpenAI', () => {
     }
   });
 
-  it('should cover all original 6 card tools', () => {
+  it('should cover all original 5 card tools', () => {
     const schema = tools.getToolsForOpenAI();
     const names = schema.map((d) => d.function.name);
     expect(names).toContain('create_card');
@@ -304,7 +297,6 @@ describe('getToolsForOpenAI', () => {
     expect(names).toContain('delete_card');
     expect(names).toContain('search_cards');
     expect(names).toContain('get_card_stats');
-    expect(names).toContain('generate_practice_set');
   });
 
   it('should include new tools', () => {
@@ -329,7 +321,7 @@ describe('getToolsForOpenAI', () => {
     expect(create?.function.parameters.required).toContain('answer');
 
     const update = schema.find((d) => d.function.name === 'update_card');
-    expect(update?.function.parameters.required).toContain('card_index');
+    expect(update?.function.parameters.required).toContain('card_id');
 
     const stats = schema.find((d) => d.function.name === 'get_card_stats');
     expect(stats?.function.parameters.required).toEqual([]);
@@ -337,7 +329,7 @@ describe('getToolsForOpenAI', () => {
 
   it('should roundtrip through executeTool for every original card tool', () => {
     const schema = tools.getToolsForOpenAI();
-    const cardNames = new Set(['create_card', 'update_card', 'delete_card', 'search_cards', 'get_card_stats', 'generate_practice_set']);
+    const cardNames = new Set(['create_card', 'update_card', 'delete_card', 'search_cards', 'get_card_stats']);
     for (const def of schema) {
       if (!cardNames.has(def.function.name)) continue;
       const result = tools.executeTool(def.function.name, {});

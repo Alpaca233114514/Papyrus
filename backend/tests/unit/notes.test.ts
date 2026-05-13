@@ -130,21 +130,21 @@ describe('Notes', () => {
   });
 
   describe('updateNote', () => {
-    it('should return null for non-existent note', () => {
-      const result = updateNote('non-existent-id', { title: 'New' });
+    it('should return null for non-existent note', async () => {
+      const result = await updateNote('non-existent-id', { title: 'New' });
       expect(result).toBeNull();
     });
 
-    it('should update note title', () => {
+    it('should update note title', async () => {
       const note = createNote('Old Title', 'content');
-      const updated = updateNote(note.id, { title: 'New Title' });
+      const updated = await updateNote(note.id, { title: 'New Title' });
       if (updated === null) throw new Error('expected updated note');
       expect(updated.title).toBe('New Title');
     });
 
-    it('should update note content and derived fields', () => {
+    it('should update note content and derived fields', async () => {
       const note = createNote('Title', 'old');
-      const updated = updateNote(note.id, { content: '# New\n[[Link]]' });
+      const updated = await updateNote(note.id, { content: '# New\n[[Link]]' });
       if (updated === null) throw new Error('expected updated note');
 
       expect(updated.content).toBe('# New\n[[Link]]');
@@ -153,16 +153,16 @@ describe('Notes', () => {
       expect(updated.hash).not.toBe(note.hash);
     });
 
-    it('should trim updated title', () => {
+    it('should trim updated title', async () => {
       const note = createNote('Title', 'content');
-      const updated = updateNote(note.id, { title: '  New  ' });
+      const updated = await updateNote(note.id, { title: '  New  ' });
       if (updated === null) throw new Error('expected updated note');
       expect(updated.title).toBe('New');
     });
 
-    it('should fallback to default folder for empty string', () => {
+    it('should fallback to default folder for empty string', async () => {
       const note = createNote('Title', 'content', 'Custom');
-      const updated = updateNote(note.id, { folder: '  ' });
+      const updated = await updateNote(note.id, { folder: '  ' });
       if (updated === null) throw new Error('expected updated note');
       expect(updated.folder).toBe('默认');
     });

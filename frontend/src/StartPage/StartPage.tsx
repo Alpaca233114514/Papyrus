@@ -30,7 +30,7 @@ type StartPageData = {
 
 type StartPageProps = {
   onDoneChange?: (done: boolean) => void;
-  onNavigate?: (page: string) => void;
+  onNavigate?: (page: string, noteId?: string) => void;
   onStartStudy?: (tag?: string) => void;
   onNewCard?: () => void;
 };
@@ -341,7 +341,7 @@ const ShortcutCard = ({ icon, label, onClick }: { icon: ReactNode; label: string
   );
 };
 
-const ShelfSections = ({ onStudyTag, onNavigate }: { onStudyTag?: (tag: string) => void; onNavigate?: (page: string) => void }) => {
+const ShelfSections = ({ onStudyTag, onNavigate }: { onStudyTag?: (tag: string) => void; onNavigate?: (page: string, noteId?: string) => void }) => {
   const { t } = useTranslation();
   const cardHeight = 140;
 
@@ -378,7 +378,7 @@ const ShelfSections = ({ onStudyTag, onNavigate }: { onStudyTag?: (tag: string) 
       </ShelfSection>
       <ShelfSection label={t('startPage.recentNotes')}>
         <RecentNotes height={cardHeight} onNavigate={(noteId) => {
-          onNavigate?.('notes');
+          onNavigate?.('notes', noteId);
         }} />
       </ShelfSection>
     </>

@@ -5,6 +5,7 @@ import { api, getFileUrl, getThumbnailUrl } from '../api';
 import type { FileItemData } from '../api';
 import { PageLayout } from '../components';
 import { PRIMARY_COLOR } from '../theme-constants';
+import { addRecentItem } from '../utils/recentFiles';
 
 import ZipIcon from './ZipIcon';
 import FilePreviewModal from './FilePreviewModal';
@@ -309,8 +310,10 @@ const FilesPage = () => {
       setFolderStack(prev => [...prev, { id: file.id, name: file.name }]);
       setActiveFilter('全部');
     } else if (isPreviewableFile(file)) {
+      addRecentItem({ id: file.id, type: 'file', title: file.name });
       setPreviewFile(file);
     } else {
+      addRecentItem({ id: file.id, type: 'file', title: file.name });
       window.open(getFileUrl(file.id, 'download'), '_blank');
     }
   }, []);

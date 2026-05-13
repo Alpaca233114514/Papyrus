@@ -70,13 +70,12 @@ const loadSettings = () => {
     if (saved) {
       const parsed = JSON.parse(saved);
       const loadedPageSceneries = parsed.pageSceneries || {};
-      // 确保所有页面都启用窗景
       const pageSceneries = { ...defaultPageSceneries };
       for (const page of Object.keys(defaultPageSceneries) as PageType[]) {
         if (loadedPageSceneries[page]) {
           pageSceneries[page] = {
+            ...defaultPageSceneries[page],
             ...loadedPageSceneries[page],
-            enabled: true // 强制启用窗景
           };
         }
       }

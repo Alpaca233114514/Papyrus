@@ -1,6 +1,7 @@
-import { randomUUID } from 'node:crypto';
+import { v4 as uuidv4 } from 'uuid';
 import {
   loadAllCards,
+  getCardById,
   insertCard,
   updateCard as dbUpdateCard,
   deleteCardById,
@@ -15,7 +16,7 @@ function createCard(question: string, answer: string, tags: string[] | undefined
     return { success: false, error: '题目和答案不能为空' };
   }
   const newCard: CardRecord = {
-    id: randomUUID(),
+    id: uuidv4().replace(/-/g, ''),
     q: question,
     a: answer,
     next_review: Date.now() / 1000,
@@ -32,13 +33,9 @@ function createCard(question: string, answer: string, tags: string[] | undefined
   };
 }
 
-function updateCardRunner(cardIndex: number, question: string | undefined, answer: string | undefined, ctx: { logger: import('../../utils/logger.js').PapyrusLogger | null }): ToolResult {
-  const cards = loadAllCards(ctx.logger ?? undefined);
-  if (cardIndex < 0 || cardIndex >= cards.length) {
-    return { success: false, error: '卡片索引无效' };
-  }
-  const card = cards[cardIndex];
-  if (!card) return { success: false, error: '卡片索引无效' };
+function updateCardRunner(cardId: string, question: string | undefined, answer: string | undefined, ctx: { logger: import('../../utils/logger.js').PapyrusLogger | null }): ToolResult {
+  const card = getCardById(cardId);
+  if (!card) return { success: false, error: `未找到卡片: ${cardId}` };
 
   const oldQ = card.q;
   const oldA = card.a;
@@ -55,13 +52,9 @@ function updateCardRunner(cardIndex: number, question: string | undefined, answe
   };
 }
 
-function deleteCardRunner(cardIndex: number, ctx: { logger: import('../../utils/logger.js').PapyrusLogger | null }): ToolResult {
-  const cards = loadAllCards(ctx.logger ?? undefined);
-  if (cardIndex < 0 || cardIndex >= cards.length) {
-    return { success: false, error: '卡片索引无效' };
-  }
-  const card = cards[cardIndex];
-  if (!card) return { success: false, error: '卡片索引无效' };
+function deleteCardRunner(cardId: string, ctx: { logger: import('../../utils/logger.js').PapyrusLogger | null }): ToolResult {
+  const card = getCardById(cardId);
+  if (!card) return { success: false, error: `未找到卡片: ${cardId}` };
   deleteCardById(card.id, ctx.logger ?? undefined);
   return {
     success: true,
@@ -73,9 +66,8 @@ function deleteCardRunner(cardIndex: number, ctx: { logger: import('../../utils/
 function searchCardsRunner(keyword: string, ctx: { logger: import('../../utils/logger.js').PapyrusLogger | null }): ToolResult {
   const keywordLower = (keyword || '').toLowerCase();
   const cards = loadAllCards(ctx.logger ?? undefined);
-  const results: Array<{ index: number; question: string; answer: string }> = [];
-  for (let i = 0; i < cards.length; i++) {
-    const card = cards[i];
+  const results: Array<{ card_id: string; question: string; answer: string }> = [];
+  for (const card of cards) {
     if (!card) continue;
     const q = card.q;
     const a = card.a;
@@ -83,7 +75,7 @@ function searchCardsRunner(keyword: string, ctx: { logger: import('../../utils/l
         a.toLowerCase().includes(keywordLower) ||
         card.tags.some(t => t.toLowerCase().includes(keywordLower))) {
       results.push({
-        index: i,
+        card_id: card.id,
         question: q,
         answer: a.length > 100 ? `${a.slice(0, 100)}...` : a,
       });
@@ -158,26 +150,26 @@ export const CARD_TOOLS: ToolDescriptor[] = [
       type: 'function',
       function: {
         name: 'update_card',
-        description: '根据卡片索引更新已存在的卡片。仅传入需要修改的字段',
+        description: '根据卡片 ID 更新已存在的卡片。仅传入需要修改的字段',
         parameters: {
           type: 'object',
           properties: {
-            card_index: { type: 'integer', description: '卡片在列表中的索引（从 0 开始）' },
+            card_id: { type: 'string', description: '卡片 ID（通过 search_cards 获取）' },
             question: { type: 'string', description: '新的题目（可选）' },
             answer: { type: 'string', description: '新的答案（可选）' },
           },
-          required: ['card_index'],
+          required: ['card_id'],
         },
       },
     },
     runner: (params, ctx) => {
-      const cardIndex = params.card_index;
-      if (typeof cardIndex !== 'number') return { success: false, error: 'card_index 必须是整数' };
+      const cardId = requireString(params, 'card_id', 100);
+      if (isErr(cardId)) return { success: false, error: cardId.error };
       const q = optionalString(params, 'question', 5000);
       if (isErr(q)) return { success: false, error: q.error };
       const a = optionalString(params, 'answer', 100000);
       if (isErr(a)) return { success: false, error: a.error };
-      return updateCardRunner(Math.floor(cardIndex), q, a, ctx);
+      return updateCardRunner(cardId, q, a, ctx);
     },
   },
   {
@@ -188,20 +180,20 @@ export const CARD_TOOLS: ToolDescriptor[] = [
       type: 'function',
       function: {
         name: 'delete_card',
-        description: '根据索引删除一张卡片',
+        description: '根据卡片 ID 删除一张卡片',
         parameters: {
           type: 'object',
           properties: {
-            card_index: { type: 'integer', description: '卡片在列表中的索引（从 0 开始）' },
+            card_id: { type: 'string', description: '卡片 ID（通过 search_cards 获取）' },
           },
-          required: ['card_index'],
+          required: ['card_id'],
         },
       },
     },
     runner: (params, ctx) => {
-      const cardIndex = params.card_index;
-      if (typeof cardIndex !== 'number') return { success: false, error: 'card_index 必须是整数' };
-      return deleteCardRunner(Math.floor(cardIndex), ctx);
+      const cardId = requireString(params, 'card_id', 100);
+      if (isErr(cardId)) return { success: false, error: cardId.error };
+      return deleteCardRunner(cardId, ctx);
     },
   },
   {
@@ -246,35 +238,9 @@ export const CARD_TOOLS: ToolDescriptor[] = [
     },
     runner: (_params, ctx) => getCardStatsRunner(ctx),
   },
-  {
-    name: 'generate_practice_set',
-    category: 'cards',
-    sideEffect: 'write',
-    openai: {
-      type: 'function',
-      function: {
-        name: 'generate_practice_set',
-        description: '基于主题生成一组练习卡片',
-        parameters: {
-          type: 'object',
-          properties: {
-            topic: { type: 'string', description: '主题' },
-            count: { type: 'integer', description: '题目数量，默认 5' },
-          },
-          required: ['topic'],
-        },
-      },
-    },
-    runner: (params) => {
-      const topic = requireString(params, 'topic', 200);
-      if (isErr(topic)) return { success: false, error: topic.error };
-      const count = typeof params.count === 'number' ? params.count : 5;
-      return { success: false, error: '生成功能尚未实现', topic, count };
-    },
-  },
 ];
 
 export const CARDS_PROMPT_HINT = `卡片相关：
-- create_card / update_card / delete_card：增删改卡片
+- create_card / update_card / delete_card：增删改卡片（操作需要卡片 ID，通过 search_cards 获取）
 - search_cards：按关键字搜索卡片
 - get_card_stats：获取卡片库统计`;

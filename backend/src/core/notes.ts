@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import matter from 'gray-matter';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Mutex } from 'async-mutex';
 import {
   loadAllNotes,
   insertNote,
@@ -14,9 +15,12 @@ import {
   getAllFolders,
 } from '../db/database.js';
 import { saveNoteVersion } from './versioning.js';
+import { recordNoteCreated } from './progress.js';
 
 import type { Note } from './types.js';
 import type { PapyrusLogger } from '../utils/logger.js';
+
+const noteMutex = new Mutex();
 
 export function getNoteById(noteId: string): Note | null {
   return dbGetNoteById(noteId);
@@ -96,37 +100,40 @@ export function createNote(
   };
 
   insertNote(note, logger);
+  recordNoteCreated();
   logger?.info(`创建笔记: ${note.id}`);
   return note;
 }
 
-export function updateNote(
+export async function updateNote(
   noteId: string,
   updates: Partial<Pick<Note, 'title' | 'content' | 'folder' | 'tags'>>,
   logger?: PapyrusLogger,
-): Note | null {
-  const note = getNoteById(noteId);
-  if (!note) return null;
+): Promise<Note | null> {
+  return noteMutex.runExclusive(() => {
+    const note = getNoteById(noteId);
+    if (!note) return null;
 
-  saveNoteVersion(note, logger);
+    saveNoteVersion(note, logger);
 
-  if (updates.title !== undefined) note.title = updates.title.trim();
-  if (updates.content !== undefined) {
-    note.content = updates.content;
-    note.preview = generatePreview(updates.content);
-    note.word_count = computeWordCount(updates.content);
-    note.hash = computeHash(updates.content);
-    note.headings = extractHeadings(updates.content);
-    note.outgoing_links = extractWikiLinks(updates.content);
-  }
-  if (updates.folder !== undefined) note.folder = updates.folder.trim() || '默认';
-  if (updates.tags !== undefined) note.tags = updates.tags.map(t => t.trim()).filter(Boolean);
+    if (updates.title !== undefined) note.title = updates.title.trim();
+    if (updates.content !== undefined) {
+      note.content = updates.content;
+      note.preview = generatePreview(updates.content);
+      note.word_count = computeWordCount(updates.content);
+      note.hash = computeHash(updates.content);
+      note.headings = extractHeadings(updates.content);
+      note.outgoing_links = extractWikiLinks(updates.content);
+    }
+    if (updates.folder !== undefined) note.folder = updates.folder.trim() || '默认';
+    if (updates.tags !== undefined) note.tags = updates.tags.map(t => t.trim()).filter(Boolean);
 
-  note.updated_at = Date.now() / 1000;
+    note.updated_at = Date.now() / 1000;
 
-  dbUpdateNote(note, logger);
-  logger?.info(`更新笔记: ${noteId}`);
-  return note;
+    dbUpdateNote(note, logger);
+    logger?.info(`更新笔记: ${noteId}`);
+    return note;
+  });
 }
 
 export function deleteNote(noteId: string, logger?: PapyrusLogger): boolean {
@@ -201,7 +208,7 @@ export function importObsidianVault(
           const title = parsed.data.title ?? entry.name.replace(/\.md$/i, '');
           // Skip if a note with the same title already exists
           if (existingTitles.has(title.toLowerCase())) {
-            return;
+            continue;
           }
           const folder = relPath || 'Obsidian';
           const tags = Array.isArray(parsed.data.tags)

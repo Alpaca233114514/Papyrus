@@ -24,6 +24,7 @@ import FilesPage from './FilesPage/FilesPage';
 import SettingsPage from './SettingsPage/SettingsPage';
 import SectionNavigation from './components/SectionNavigation';
 import type { SearchResult } from './api';
+import { addRecentItem } from './utils/recentFiles';
 
 const PAGE_ORDER = ['start', 'scroll', 'notes', 'charts', 'files', 'extensions', 'settings'];
 
@@ -63,7 +64,7 @@ const App = () => {
   const [isDragging, setIsDragging] = useState(false);
   const dragStartX = useRef<number>(0);
   const dragStartWidth = useRef<number>(0);
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [initialNoteId, setInitialNoteId] = useState<string | undefined>(undefined);
   const [initialScrollTag, setInitialScrollTag] = useState<string | undefined>(undefined);
   const mainContentRef = useRef<HTMLDivElement>(null);
   const prevPageIndexRef = useRef<number>(0);
@@ -75,8 +76,12 @@ const App = () => {
   const studyTagRef = useRef<string | undefined>(undefined);
 
   // 处理页面切换动画 - 串行执行，先退出再进入（新页面预加载但不显示）
-  const handlePageChange = useCallback((newPage: string) => {
+  const handlePageChange = useCallback((newPage: string, noteId?: string) => {
     if (isTransitioning) return;
+
+    if (noteId && newPage === 'notes') {
+      setInitialNoteId(noteId);
+    }
 
     const newIndex = PAGE_ORDER.indexOf(newPage);
     if (newIndex === -1) {
@@ -110,10 +115,12 @@ const App = () => {
   // 处理搜索结果点击
   const handleSearchResult = useCallback((result: SearchResult) => {
     if (result.type === 'note') {
+      addRecentItem({ id: result.id, type: 'note', title: result.title });
       handlePageChange('notes');
-      setSelectedNoteId(result.id);
+      setInitialNoteId(result.id);
       Message.success(t('app.openNote', { title: result.title }));
     } else if (result.type === 'card') {
+      addRecentItem({ id: result.id, type: 'card', title: result.title });
       handlePageChange('scroll');
       setInitialScrollTag(result.tags?.[0]);
       Message.success(t('app.navigateToReview'));
@@ -208,7 +215,7 @@ const App = () => {
     const pages: Record<string, ReactNode> = {
       start: <StartPage onDoneChange={setTodayDone} onNavigate={handlePageChange} onStartStudy={handleStartStudy} onNewCard={() => handleNewAction('newCard')} />,
       scroll: <ScrollPage initialTag={initialScrollTag} onInitialTagUsed={() => setInitialScrollTag(undefined)} />,
-      notes: <NotesPage />,
+      notes: <NotesPage initialNoteId={initialNoteId} onInitialNoteIdUsed={() => setInitialNoteId(undefined)} />,
       charts: <ChartsPage />,
       files: <FilesPage />,
       extensions: <ExtensionsPage />,

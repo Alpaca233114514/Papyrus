@@ -30,6 +30,7 @@ export interface SearchableNote {
 export interface GraphNode {
   id: string;
   title: string;
+  folder: string;
   is_center: boolean;
 }
 
@@ -45,8 +46,8 @@ export function getNoteRelations(noteId: string, logger?: PapyrusLogger): { outg
   const outgoing: RelatedNote[] = raw.outgoing.map(r => ({
     relation_id: r.id,
     note_id: r.target_id,
-    title: '',
-    folder: '',
+    title: r.title ?? '',
+    folder: r.folder ?? '',
     relation_type: r.relation_type,
     description: r.description,
     is_outgoing: true,
@@ -55,8 +56,8 @@ export function getNoteRelations(noteId: string, logger?: PapyrusLogger): { outg
   const incoming: RelatedNote[] = raw.incoming.map(r => ({
     relation_id: r.id,
     note_id: r.source_id,
-    title: '',
-    folder: '',
+    title: r.title ?? '',
+    folder: r.folder ?? '',
     relation_type: r.relation_type,
     description: r.description,
     is_outgoing: false,

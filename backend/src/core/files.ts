@@ -92,22 +92,22 @@ function getMimeType(ext: string): string {
 
 function validateFileContent(buffer: Buffer, ext: string): boolean {
   if (buffer.length < 8) return true;
-  const signatures: Record<string, number[][]> = {
-    png: [[0x89, 0x50, 0x4E, 0x47]],
-    jpg: [[0xFF, 0xD8, 0xFF]],
-    jpeg: [[0xFF, 0xD8, 0xFF]],
-    gif: [[0x47, 0x49, 0x46, 0x38]],
-    pdf: [[0x25, 0x50, 0x44, 0x46]],
-    zip: [[0x50, 0x4B, 0x03, 0x04]],
-    docx: [[0x50, 0x4B, 0x03, 0x04]],
-    xlsx: [[0x50, 0x4B, 0x03, 0x04]],
-    '7z': [[0x37, 0x7A, 0xBC, 0xAF]],
-    mp4: [[0x00, 0x00, 0x00], [0x66, 0x74, 0x79, 0x70]],
-    webp: [[0x52, 0x49, 0x46, 0x46]],
+  const signatures: Record<string, Array<{ offset: number; bytes: number[] }>> = {
+    png: [{ offset: 0, bytes: [0x89, 0x50, 0x4E, 0x47] }],
+    jpg: [{ offset: 0, bytes: [0xFF, 0xD8, 0xFF] }],
+    jpeg: [{ offset: 0, bytes: [0xFF, 0xD8, 0xFF] }],
+    gif: [{ offset: 0, bytes: [0x47, 0x49, 0x46, 0x38] }],
+    pdf: [{ offset: 0, bytes: [0x25, 0x50, 0x44, 0x46] }],
+    zip: [{ offset: 0, bytes: [0x50, 0x4B, 0x03, 0x04] }],
+    docx: [{ offset: 0, bytes: [0x50, 0x4B, 0x03, 0x04] }],
+    xlsx: [{ offset: 0, bytes: [0x50, 0x4B, 0x03, 0x04] }],
+    '7z': [{ offset: 0, bytes: [0x37, 0x7A, 0xBC, 0xAF] }],
+    mp4: [{ offset: 4, bytes: [0x66, 0x74, 0x79, 0x70] }],
+    webp: [{ offset: 0, bytes: [0x52, 0x49, 0x46, 0x46] }],
   };
   const sigList = signatures[ext];
   if (!sigList) return true;
-  return sigList.some(sig => sig.every((byte, i) => buffer[i] === byte));
+  return sigList.some(sig => sig.bytes.every((byte, i) => buffer[sig.offset + i] === byte));
 }
 
 function inferType(ext: string): string {
@@ -152,11 +152,8 @@ export function saveFile(
     updated_at: now,
   };
 
-  // 先写数据库，保证元数据持久化
-  insertFile(record, logger);
-
   try {
-    // Decode and write file content
+    // Decode and write file content first
     const buffer = Buffer.from(base64Content, 'base64');
     if (!validateFileContent(buffer, ext)) {
       throw new Error(`文件内容与实际扩展名 ${ext} 不匹配，可能为伪造文件`);
@@ -164,10 +161,10 @@ export function saveFile(
     const storagePath = path.join(vaultDir, storageName);
     fs.writeFileSync(storagePath, buffer);
 
-    // 更新数据库中的文件路径和大小
+    // Then write database record with complete data
     record.file_storage_path = storagePath;
     record.size = buffer.length;
-    insertFile(record, logger); // 重新插入以更新（或替换现有记录）
+    insertFile(record, logger);
 
     logger?.info(`保存文件: ${record.id} -> ${name} (${buffer.length} bytes)`);
     return record;

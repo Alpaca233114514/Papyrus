@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, type Card } from '../api';
 import { useCommonCardStyle, CommonCard, CardGroup, PRIMARY_COLOR } from '../components';
+import { addRecentItem } from '../utils/recentFiles';
 
 interface Collection {
   id: string;
@@ -178,7 +179,10 @@ const RecentScrolls = ({ height, onStudyTag }: RecentScrollsProps) => {
       emptyText={t('startPage.noCards')}
     >
       {collections.map(c => (
-        <CollectionCard key={c.id} collection={c} onClick={() => onStudyTag?.(c.id)} t={t} />
+        <CollectionCard key={c.id} collection={c} onClick={() => {
+          addRecentItem({ id: c.id, type: 'card', title: c.title });
+          onStudyTag?.(c.id);
+        }} t={t} />
       ))}
     </CardGroup>
   );

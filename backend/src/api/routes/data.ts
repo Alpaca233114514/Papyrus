@@ -4,9 +4,9 @@ import path from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
 import { paths } from '../../utils/paths.js';
 import {
-  loadAllCards, saveAllCards, insertCard, checkpointDb, runInTransaction,
+  loadAllCards, saveAllCards, insertCard, runInTransaction,
   loadAllNotes, saveAllNotes, insertNote,
-  clearAllData,
+  clearAllData, createDbSnapshot,
 } from '../../db/database.js';
 
 function safeNumber(value: unknown, defaultValue: number): number {
@@ -21,8 +21,7 @@ export default async function dataRoutes(fastify: FastifyInstance): Promise<void
       const uniqueSuffix = `${Date.now() % 1000}`;
       const backupPath = path.join(paths.backupDir, `papyrus_backup_${timestamp}_${uniqueSuffix}.db`);
       fs.mkdirSync(paths.backupDir, { recursive: true });
-      checkpointDb();
-      fs.copyFileSync(paths.dbFile, backupPath);
+      createDbSnapshot(backupPath);
       reply.send({ success: true, path: backupPath });
     } catch (err) {
       const message = err instanceof Error ? err.message : '服务器内部错误';
